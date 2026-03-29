@@ -15,7 +15,7 @@ ZTTP domains cost nothing and will always be free.
 - No expiration timers  
 - No charges of any kind
 
-Domains are hosted through the HyperZHub GitHub repository and remain active as long as they follow the rules.
+Domains are hosted through this repo and remain active as long as they follow the rules.
 
 ---
 
