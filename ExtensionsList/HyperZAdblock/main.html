@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HyperZHub DNS Level Blocking Setup</title>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #0f172a, #020617);
+      color: #e5e7eb;
+      font-family: "Segoe UI", Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: #1e293b;
+      padding: 18px;
+      border-radius: 18px;
+      width: 340px;
+      box-shadow: 0 0 30px rgba(37,99,235,0.2);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .title {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .title h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .title span {
+      font-size: 11px;
+      opacity: 0.6;
+    }
+
+    .instruction {
+      font-size: 12px;
+      text-align: center;
+      margin: 10px 0 6px 0;
+    }
+
+    .status {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 11px;
+      text-align: center;
+      opacity: 0.75;
+      margin-bottom: 10px;
+    }
+
+    .section {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .level-title {
+      font-size: 13px;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .desc {
+      font-size: 11px;
+      opacity: 0.65;
+      margin-bottom: 6px;
+    }
+
+    code {
+      display: block;
+      background: #020617;
+      padding: 7px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      margin-bottom: 6px;
+      word-break: break-all;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    button {
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 7px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: 0.15s;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .footer {
+      font-size: 10.5px;
+      opacity: 0.5;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <div class="title">
+      <h1>HyperZHub DNS</h1>
+      <span>Level Blocking Setup</span>
+    </div>
+
+    <div class="instruction">
+      Run in <b>PowerShell (Administrator)</b>
+    </div>
+
+    <div class="status">
+      ⏱ Changes apply in ~30s – 90s
+    </div>
+
+    <div class="section">
+      <div class="level-title">Basic Level</div>
+      <div class="desc">Balanced protection with minimal breakage</div>
+      <code id="basic">irm https://ublockdns.com/install?id=pzl1xtu1 | iex</code>
+      <button onclick="copyText('basic')">Copy Command</button>
+    </div>
+
+    <div class="section">
+      <div class="level-title">Aggressive Level</div>
+      <div class="desc">Blocks more ads & trackers (some sites may break)</div>
+      <code id="aggressive">irm https://ublockdns.com/install?id=4kx8hop0 | iex</code>
+      <button onclick="copyText('aggressive')">Copy Command</button>
+    </div>
+
+    <div class="section">
+      <div class="level-title">Ultra Level</div>
+      <div class="desc">Maximum blocking (higher chance of site issues)</div>
+      <code id="ultra">irm https://ublockdns.com/install?id=5sflvoem | iex</code>
+      <button onclick="copyText('ultra')">Copy Command</button>
+    </div>
+
+    <div class="footer">
+      If copying fails, manually paste into PowerShell.
+    </div>
+
+  </div>
+
+  <script>
+    function copyText(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+    }
+  </script>
+</body>
+</html>
