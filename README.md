@@ -101,10 +101,10 @@ All ZTTP domains are stored in a public GitHub repository for:
 
 ---
 
-## 8. HTTPS Compatibility
+## 8. HTTP/HTTPS Compatibility
 HyperZ supports both:
 
-- standard HTTPS websites  
+- standard HTTP/HTTPS websites  
 - ZTTP TLD domains  
 
 Both coexist seamlessly inside the HyperZHub browser.
