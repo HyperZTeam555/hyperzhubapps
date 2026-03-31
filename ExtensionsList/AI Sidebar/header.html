@@ -55,21 +55,6 @@
     color: white;
   }
 
-  button {
-    height: 28px;
-    border: none;
-    border-radius: 6px;
-    background: #6c63ff;
-    color: white;
-    padding: 0 12px;
-    font-size: 13px;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background: #574fd6;
-  }
-
   .spacer {
     height: 48px;
   }
@@ -79,9 +64,9 @@
 <body>
 
 <div class="header">
-  <div class="title">AI Sidebar</div>
+  <div class="title">🧠 AI Sidebar</div>
 
-  <select id="aiDropdown">
+  <select id="aiDropdown" onchange="openAI()">
     <option value="">Choose</option>
     <option value="https://chatgpt.com">ChatGPT</option>
     <option value="https://claude.ai">Claude</option>
@@ -92,8 +77,6 @@
     <option value="https://venice.ai/chat">Venice</option>
     <option value="https://lumo.proton.me">Lumo</option>
   </select>
-
-  <button onclick="openAI()">Go</button>
 </div>
 
 <div class="spacer"></div>
@@ -102,7 +85,12 @@
   function openAI() {
     const url = document.getElementById("aiDropdown").value;
     if (!url) return;
+
+    // Opens in new tab
     window.open(url, "_blank");
+
+    // Reset dropdown back to "Choose"
+    document.getElementById("aiDropdown").value = "";
   }
 </script>
 
