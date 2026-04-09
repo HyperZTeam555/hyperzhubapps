@@ -135,3 +135,5 @@ Use either address depending on your preferred service.
 ---
 
 ## End of Document
+
+The terms are the same for request of adding a "MiniApp"
