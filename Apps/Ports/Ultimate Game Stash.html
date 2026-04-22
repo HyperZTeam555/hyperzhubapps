@@ -351,21 +351,22 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
+            justify-items: center;
+            justify-content: center;
         }
 
         /* ─── GAME BUTTONS ─── */
         .game-btn, input[type="button"] {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            padding: 0;
+            padding: 8px;
             font-family: 'DM Sans', sans-serif;
-            font-size: 13px;
+            font-size: clamp(10px, 1.1vw, 13px);
             font-weight: 500;
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.22s ease;
             width: 100%;
-            aspect-ratio: 1 / 1;
             color: var(--text);
             text-align: center;
             letter-spacing: 0.01em;
@@ -375,8 +376,10 @@
             align-items: center;
             justify-content: center;
             word-break: break-word;
+            overflow-wrap: break-word;
             hyphens: auto;
             line-height: 1.3;
+            box-sizing: border-box;
         }
 
         .game-btn::before, input[type="button"]::before {
@@ -589,8 +592,29 @@
             if (el && count > 0) el.textContent = count.toLocaleString() + ' games available';
         }
         processAll();
-        const obs = new MutationObserver(() => processAll());
+        const obs = new MutationObserver(() => { processAll(); squareButtons(); });
         obs.observe(document.getElementById('sections-container'), { childList: true, subtree: true, attributes: false });
+
+        // ── SQUARE BUTTON RESIZER ──
+        // Sets height = width on every game button so grid is always perfectly square
+        function squareButtons() {
+            const btns = document.querySelectorAll('input[type="button"]');
+            if (!btns.length) return;
+            btns.forEach(btn => {
+                btn.style.height = '';
+                btn.style.height = btn.offsetWidth + 'px';
+            });
+        }
+
+        // Re-run on window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(squareButtons, 50);
+        });
+
+        // Also re-run after fonts/layout settle
+        window.addEventListener('load', squareButtons);
 
         document.getElementById('overlay-close').addEventListener('click', function() {
             document.getElementById('game-overlay').style.display = 'none';
