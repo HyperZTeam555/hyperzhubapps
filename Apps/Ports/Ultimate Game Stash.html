@@ -349,48 +349,52 @@
 
         .buttons-container {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
 
         /* ─── GAME BUTTONS ─── */
         .game-btn, input[type="button"] {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            padding: 14px 20px;
+            padding: 0;
             font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.22s ease;
             width: 100%;
+            aspect-ratio: 1 / 1;
             color: var(--text);
-            text-align: left;
+            text-align: center;
             letter-spacing: 0.01em;
             position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+            hyphens: auto;
+            line-height: 1.3;
         }
 
         .game-btn::before, input[type="button"]::before {
             content: '';
             position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 3px;
-            background: linear-gradient(180deg, var(--accent), var(--accent2));
+            inset: 0;
+            background: linear-gradient(135deg, rgba(123,111,255,0.15), rgba(255,107,157,0.1));
             opacity: 0;
             transition: opacity 0.2s;
-            border-radius: 0 2px 2px 0;
+            border-radius: 12px;
         }
 
         .game-btn:hover, input[type="button"]:hover {
             background: var(--bg-card-hover);
             border-color: var(--border-accent);
             color: white;
-            transform: translateX(4px);
-            box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(123,111,255,0.15);
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(123,111,255,0.2);
         }
 
         .game-btn:hover::before, input[type="button"]:hover::before {
@@ -398,7 +402,7 @@
         }
 
         .game-btn:active, input[type="button"]:active {
-            transform: translateX(2px) scale(0.99);
+            transform: translateY(-1px) scale(1.01);
         }
 
         .empty-message {
@@ -420,12 +424,11 @@
             .main-content { padding: 32px 20px 60px; }
             .sidebar-btn { font-size: 12px; padding: 8px 4px; }
             .meta-bar { gap: 10px; }
+            .buttons-container { grid-template-columns: repeat(2, 1fr); }
         }
 
-        @media (min-width: 1200px) {
-            .buttons-container {
-                grid-template-columns: 1fr 1fr;
-            }
+        @media (min-width: 1400px) {
+            .buttons-container { grid-template-columns: repeat(6, 1fr); }
         }
     </style>
 </head>
@@ -438,8 +441,8 @@
     <div class="main-content">
 
         <div class="hero">
-            <h1 class="hero-title">UGS FILES</h1>
-            <p class="hero-sub">Ultimate Game Stash &mdash; Your Library</p>
+            <h1 class="hero-title">UGS</h1>
+            <p class="hero-sub">Ultimate Game Stash</p>
         </div>
 
         <div class="meta-bar">
@@ -484,13 +487,12 @@
                 </div>
                 <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
                 <script>
-                    // Make search ignore spaces: proxy .value so searchbut.js sees no spaces,
-                    // but the user still sees their typed text normally.
+                    // Proxy .value — searchbut.js sees only base36 (A-Z, 0-9), spaces/symbols display normally
                     const searchEl = document.getElementById('searchInput');
-                    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                    const _desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
                     Object.defineProperty(searchEl, 'value', {
-                        get() { return descriptor.get.call(this).replace(/\s+/g, ''); },
-                        set(v) { descriptor.set.call(this, v); }
+                        get() { return _desc.get.call(this).replace(/[^a-zA-Z0-9]/g, ''); },
+                        set(v) { _desc.set.call(this, v); }
                     });
                 </script>
             </div>
@@ -499,6 +501,76 @@
         <div id="sections-container"></div>
 
     </div>
+
+        <div id="game-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:#000; flex-direction:column;">
+            <iframe id="game-frame" style="flex:1; width:100%; border:none; display:block;"></iframe>
+            <button id="overlay-close" style="
+                position: fixed;
+                bottom: 24px;
+                left: 24px;
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: rgba(20,20,30,0.92);
+                border: 2px solid rgba(123,111,255,0.5);
+                color: white;
+                font-size: 20px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+                transition: all 0.2s ease;
+                z-index: 10000;
+                backdrop-filter: blur(8px);
+            " onmouseover="this.style.background='rgba(123,111,255,0.4)';this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(20,20,30,0.92)';this.style.transform='scale(1)'">✕</button>
+        </div>
+
+    <!-- Patch window.open BEFORE games.js so every call is intercepted -->
+    <script>
+        window.open = function(url, target, features) {
+            const overlay = document.getElementById('game-overlay');
+            const frame = document.getElementById('game-frame');
+
+            if (!url || url === '' || url === 'about:blank' || url.startsWith('about:')) {
+                // games.js will write HTML into the returned window object
+                const fakeDoc = {
+                    _chunks: [],
+                    write(s)   { fakeDoc._chunks.push(s); },
+                    writeln(s) { fakeDoc._chunks.push(s + '\n'); },
+                    close()    {
+                        frame.removeAttribute('src');
+                        frame.srcdoc = fakeDoc._chunks.join('');
+                        overlay.style.display = 'flex';
+                    },
+                    open() {},
+                    get title()  { return 'New Tab'; },
+                    set title(v) {},
+                    getElementById()  { return null; },
+                    querySelector()   { return null; },
+                    createElement(t)  { return document.createElement(t); },
+                    body: { appendChild() {} },
+                    head: { appendChild() {} },
+                };
+                return {
+                    document: fakeDoc,
+                    focus() {},
+                    close() {},
+                    location: {
+                        replace(u) { frame.removeAttribute('srcdoc'); frame.src = u; overlay.style.display = 'flex'; },
+                        assign(u)  { frame.removeAttribute('srcdoc'); frame.src = u; overlay.style.display = 'flex'; },
+                        href: ''
+                    }
+                };
+            }
+
+            // Real URL — load directly in overlay
+            frame.removeAttribute('srcdoc');
+            frame.src = url;
+            overlay.style.display = 'flex';
+            return null;
+        };
+    </script>
 
     <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
     <script>
@@ -512,7 +584,6 @@
         }
         function processAll() {
             document.querySelectorAll('input[type="button"]').forEach(stripCl);
-            // Update game count
             const count = document.querySelectorAll('input[type="button"]').length;
             const el = document.getElementById('game-count-text');
             if (el && count > 0) el.textContent = count.toLocaleString() + ' games available';
@@ -521,21 +592,16 @@
         const obs = new MutationObserver(() => processAll());
         obs.observe(document.getElementById('sections-container'), { childList: true, subtree: true, attributes: false });
 
-        // Patch window.open so tabs opened by games.js show "New Tab" instead of about:srcdoc
-        const _origOpen = window.open.bind(window);
-        window.open = function(url, target, features) {
-            const win = _origOpen(url, target, features);
-            if (win) {
-                try { win.document.title = 'New Tab'; } catch(e) {}
-                // Poll briefly since srcdoc content sets title after open
-                let attempts = 0;
-                const interval = setInterval(() => {
-                    try { win.document.title = 'New Tab'; } catch(e) {}
-                    if (++attempts >= 10) clearInterval(interval);
-                }, 50);
-            }
-            return win;
-        };
+        document.getElementById('overlay-close').addEventListener('click', function() {
+            document.getElementById('game-overlay').style.display = 'none';
+            const frame = document.getElementById('game-frame');
+            frame.removeAttribute('srcdoc');
+            frame.src = 'about:blank';
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') document.getElementById('overlay-close').click();
+        });
     </script>
 </body>
 </html>
