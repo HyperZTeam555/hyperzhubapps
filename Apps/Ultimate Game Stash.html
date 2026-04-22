@@ -483,6 +483,16 @@
                     <input type="text" placeholder="Search games..." id="searchInput">
                 </div>
                 <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
+                <script>
+                    // Make search ignore spaces: proxy .value so searchbut.js sees no spaces,
+                    // but the user still sees their typed text normally.
+                    const searchEl = document.getElementById('searchInput');
+                    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                    Object.defineProperty(searchEl, 'value', {
+                        get() { return descriptor.get.call(this).replace(/\s+/g, ''); },
+                        set(v) { descriptor.set.call(this, v); }
+                    });
+                </script>
             </div>
         </div>
 
