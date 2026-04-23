@@ -2,13 +2,6 @@
 <html lang="en">
 
 <head>
-  </script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-4QPXKLD48W', { page_title: document.title, page_location: window.location.href });
-  </script>
   <meta charset="UTF-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>
@@ -2920,78 +2913,6 @@
       transform: translateY(0);
     }
 
-    .ad-container {
-      max-width: 728px;
-      margin: 30px auto;
-      padding: 15px 0;
-      position: relative;
-      text-align: center;
-      background: rgba(20, 20, 20, 0.5);
-      border: 1px solid rgba(var(--primary-orange-rgb), 0.3);
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      min-height: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .ad-container:hover {
-      border-color: var(--accent-orange);
-      box-shadow: 0 0 20px rgba(var(--primary-orange-rgb), 0.2);
-    }
-
-    .ad-label {
-      position: absolute;
-      top: -10px;
-      left: 20px;
-      background: var(--dark-bg);
-      color: var(--gray-text);
-      font-size: 0.7rem;
-      font-family: 'Courier New', monospace;
-      padding: 0 8px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      border: 1px solid rgba(var(--primary-orange-rgb), 0.3);
-      border-radius: 3px;
-      z-index: 2;
-    }
-
-    .ad-container iframe {
-      border-radius: 4px;
-      max-width: 100%;
-      height: 90px !important;
-      width: 728px !important;
-      margin: 0 auto;
-      display: block;
-    }
-
-    @media (max-width: 768px) {
-      .ad-container {
-        margin: 20px 10px;
-        padding: 10px 0;
-      }
-
-      .ad-container iframe {
-        width: 100% !important;
-        height: auto !important;
-        min-height: 50px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .ad-container {
-        margin: 20px 10px;
-        padding: 10px 0;
-      }
-
-      .ad-container iframe {
-        width: 100%;
-        height: 2px;
-      }
-    }
-
     .home-subtitle {
       min-height: 2em;
     }
@@ -3022,49 +2943,9 @@
       }
     }
   </style>
-  <script>
-    (function () {
-      const adsDisabled = localStorage.getItem('adsDisabled') === 'true';
-      if (!adsDisabled) {
-        const script = document.createElement('script');
-        script.src = 'https://joyfullybarn.com/62/d4/ba/62d4ba4a5e6660053b4929656a2293b0.js';
-        script.async = true;
-        document.head.appendChild(script);
-      }
-    })();
-  </script>
 </head>
 
 <body>
-  <div id="outdatedPopup" class="popup-modal" style="display: flex;">
-    <div class="popup-overlay"></div>
-    <div class="popup-container">
-      <div class="popup-content">
-        <div class="popup-header">
-
-          <h2 class="popup-title">THIS VERSION IS OUTDATED</h2>
-
-        </div>
-        <div class="popup-body">
-          <p>This version of Noah's Tutoring Hub is <span class="popup-highlight">outdated</span>.</p>
-          <p>The site has moved to a new server with faster speeds, more games, and better features! This version will
-            NOT have anymore updates.</p>
-          <div class="popup-divider"></div>
-          <p class="popup-discord-text">Join the Discord for the latest links and updates:</p>
-          <a href="https://discord.com/invite/pCGQ8vrKza" target="_blank" class="popup-discord-btn"
-            onclick="closeOutdatedPopup()">
-            <i class="fab fa-discord"></i> discord.gg/pCGQ8vrKza
-          </a>
-          <p class="popup-note">Bookmark the new link once you get it!</p>
-        </div>
-        <div class="popup-footer">
-          <button class="popup-continue-btn" onclick="closeOutdatedPopup()">
-            Continue to this version <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
   <div id="custom-scrollbar">
     <div id="custom-scrollbar-track">
       <div id="custom-scrollbar-thumb"></div>
@@ -3125,19 +3006,6 @@
         <div class="home-carousel" id="homePopularCarousel"></div>
       </div>
     </section>
-    <div class="ad-container banner-ad">
-      <div class="ad-label">ADVERTISEMENT</div>
-      <script>
-        atOptions = {
-          'key': '17597ffcacd1da248155d2da320dc2e5',
-          'format': 'iframe',
-          'height': 90,
-          'width': 728,
-          'params': {}
-        };
-      </script>
-      <script src="https://joyfullybarn.com/17597ffcacd1da248155d2da320dc2e5/invoke.js"></script>
-    </div>
     <section id="all-lessons">
       <h2>
         ALL LESSONS
@@ -3488,15 +3356,6 @@
                   class="file-input" id="logoUpload" onchange="handleLogoUpload(event)" type="file"></label>
             </div><button class="apply-btn" onclick="revertLogo(this)" style="margin-top: 10px; width: 100%;"><i
                 class="fas fa-undo"></i> Revert to Default Logo</button>
-          </div>
-          <div class="setting-item setting-ads">
-            <div class="setting-label">
-              <i class="fas fa-ad"></i> Disable Ads
-            </div>
-            <div class="setting-description">
-              Ads are currently disabled site-wide. This toggle remains for compatibility only.
-            </div><label class="toggle-switch"><input id="adToggle" onchange="toggleAds(this.checked)" type="checkbox">
-              <span class="toggle-slider"></span></label>
           </div>
           <div class="setting-item setting-import">
             <div class="setting-label">
@@ -6286,51 +6145,6 @@
       }
     }
 
-    function showOutdatedPopup() {
-      const popup = document.getElementById('outdatedPopup');
-      if (popup) {
-        popup.style.display = 'flex';
-
-        document.body.style.overflow = 'hidden';
-
-        document.addEventListener('keydown', handlePopupEscape);
-      }
-    }
-
-    function closeOutdatedPopup() {
-      const popup = document.getElementById('outdatedPopup');
-      if (popup) {
-        popup.style.display = 'none';
-
-        document.body.style.overflow = '';
-
-        document.removeEventListener('keydown', handlePopupEscape);
-
-        sessionStorage.setItem('outdatedPopupShown', 'true');
-      }
-    }
-
-    function handlePopupEscape(e) {
-      if (e.key === 'Escape') {
-        closeOutdatedPopup();
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-      if (!sessionStorage.getItem('outdatedPopupShown')) {
-        setTimeout(showOutdatedPopup, 500);
-      }
-    });
-
-    document.addEventListener('click', function (e) {
-      const popup = document.getElementById('outdatedPopup');
-      if (!popup || popup.style.display !== 'flex') return;
-
-      if (e.target.classList.contains('popup-overlay')) {
-        closeOutdatedPopup();
-      }
-    });
-
     function getGameFreezeHarnessScript() {
       return `<script>
         (function() {
@@ -7314,13 +7128,6 @@
       });
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
-      const adToggle = document.getElementById('adToggle');
-      if (adToggle) {
-        adToggle.checked = localStorage.getItem('adsDisabled') === 'true';
-      }
-    });
-
     function openSiteInAboutBlank() {
       const newWindow = window.open('about:blank', '_blank');
 
@@ -7950,23 +7757,7 @@
       loadGameIntoTab(activeTab);
     }
 
-    function toggleAds(disabled) {
-      localStorage.setItem('adsDisabled', disabled ? 'true' : 'false');
 
-      if (disabled) {
-        if (confirm("Are you sure you want to turn off the ads? 🥺\n\nAll revenue from ads goes back into the site for things like:\n• Links & hosting\n• Servers & maintenance\n• Game updates & new content\n\nPress OK to disable ads and reload the page.")) {
-          localStorage.setItem('adsDisabled', 'true');
-          alert("Okie doke! All ads will be disabled. The page will reload to apply changes.");
-          setTimeout(() => location.reload(), 500);
-        } else {
-          document.getElementById('adToggle').checked = false;
-        }
-      } else {
-        localStorage.setItem('adsDisabled', 'false');
-        alert("Yayyyyy! Ads will be enabled. The page will reload to apply changes.");
-        setTimeout(() => location.reload(), 500);
-      }
-    }
 
     let favorites = JSON.parse(localStorage.getItem('gameFavorites')) || [];
 
@@ -8050,17 +7841,7 @@
       };
     }
   </script>
-  <script>
-    (function () {
-      const adsDisabled = localStorage.getItem('adsDisabled') === 'true';
-      if (!adsDisabled) {
-        const script = document.createElement('script');
-        script.src = 'https://joyfullybarn.com/0a/7a/d0/0a7ad05d3d7e256b5f2d129096017a9c.js';
-        script.async = true;
-        document.body.appendChild(script);
-      }
-    })();
-  </script>
+
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const quotes = [
