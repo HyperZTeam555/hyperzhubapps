@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encoder-Decoder Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.0/400.css');
+        @import url('https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.0/600.css');
+        @import url('https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.0/700.css');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --bg-input: #16162a;
+            --border-color: #2a2a4a;
+            --text-primary: #e8e8f0;
+            --text-secondary: #8888aa;
+            --accent-purple: #7c3aed;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --gradient-1: linear-gradient(135deg, #7c3aed, #3b82f6);
+            --gradient-2: linear-gradient(135deg, #10b981, #3b82f6);
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --shadow-glow: 0 0 30px rgba(124,58,237,0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-pattern {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                radial-gradient(ellipse at 20% 20%, rgba(124,58,237,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(59,130,246,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(16,185,129,0.04) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .logo-img {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 6px;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .sidebar {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            padding: 0 8px;
+        }
+
+        .algo-btn {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2px;
+        }
+
+        .algo-btn:hover {
+            background: rgba(124,58,237,0.1);
+            color: var(--text-primary);
+        }
+
+        .algo-btn.active {
+            background: rgba(124,58,237,0.15);
+            border-color: rgba(124,58,237,0.3);
+            color: var(--text-primary);
+        }
+
+        .algo-btn .algo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .algo-icon.purple { background: rgba(124,58,237,0.2); color: #a78bfa; }
+        .algo-icon.blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .algo-icon.green { background: rgba(16,185,129,0.2); color: #34d399; }
+        .algo-icon.orange { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .algo-icon.red { background: rgba(239,68,68,0.2); color: #f87171; }
+        .algo-icon.pink { background: rgba(236,72,153,0.2); color: #f472b6; }
+        .algo-icon.teal { background: rgba(20,184,166,0.2); color: #2dd4bf; }
+        .algo-icon.indigo { background: rgba(99,102,241,0.2); color: #818cf8; }
+        .algo-icon.cyan { background: rgba(6,182,212,0.2); color: #22d3ee; }
+        .algo-icon.amber { background: rgba(251,191,36,0.2); color: #fde68a; }
+
+        .sidebar-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 12px 0;
+        }
+
+        .content-area {
+            min-height: 600px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .card-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 2px 12px rgba(124,58,237,0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(124,58,237,0.1);
+            border-color: rgba(124,58,237,0.3);
+        }
+
+        .btn-green {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 2px 12px rgba(16,185,129,0.3);
+        }
+
+        .btn-green:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(16,185,129,0.4);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .text-area {
+            width: 100%;
+            min-height: 120px;
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+
+        .text-area:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+        }
+
+        .text-area::placeholder {
+            color: #444466;
+        }
+
+        .output-area {
+            width: 100%;
+            min-height: 120px;
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--accent-green);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            word-break: break-all;
+            position: relative;
+        }
+
+        .output-empty {
+            color: #444466;
+            font-family: 'Inter', sans-serif;
+            font-style: italic;
+        }
+
+        .key-section {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .key-input-wrap {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .key-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        .key-input:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+        }
+
+        .caesar-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .shift-display {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .shift-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shift-btn:hover {
+            background: rgba(124,58,237,0.15);
+            border-color: var(--accent-purple);
+        }
+
+        .vigenere-key-wrap {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--gradient-1);
+            color: white;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: rgba(16,185,129,0.2);
+            border: 1px solid rgba(16,185,129,0.4);
+            color: #34d399;
+        }
+
+        .toast.error {
+            background: rgba(239,68,68,0.2);
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #f87171;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: rgba(124,58,237,0.15);
+            color: var(--text-primary);
+        }
+
+        .char-count {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            text-align: right;
+        }
+
+        .swap-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.3s;
+            margin: 0 auto;
+        }
+
+        .swap-btn:hover {
+            background: rgba(124,58,237,0.15);
+            border-color: var(--accent-purple);
+            color: var(--text-primary);
+            transform: rotate(180deg);
+        }
+
+        .key-gen-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .key-info {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .output-wrapper {
+            position: relative;
+        }
+
+        .mobile-toggle {
+            display: none;
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: left;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+                max-height: none;
+                display: none;
+            }
+
+            .sidebar.mobile-open {
+                display: block;
+            }
+
+            .mobile-toggle {
+                display: block;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .key-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .key-input-wrap {
+                min-width: auto;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .aes-options {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .aes-option-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .checkbox-custom {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-purple);
+            cursor: pointer;
+        }
+
+        .banner-img {
+            width: 100%;
+            max-height: 160px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="app-container">
+        <header>
+            <div class="logo-container">
+                <img src="https://image.qwenlm.ai/public_source/6341b150-912d-4b00-9ab8-2c0dd91c0205/1df36644a-b491-4994-a552-9a7c09fe41fb.png" alt="Logo" class="logo-img">
+                <div>
+                    <h1>Encoder-Decoder Tool</h1>
+                    <p>All-in-one encoding, decoding & encryption suite</p>
+                </div>
+            </div>
+        </header>
+
+        <button class="mobile-toggle" onclick="toggleMobileSidebar()">☰ Select Encoding Method</button>
+
+        <div class="main-layout">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-title">Encoding / Decoding</div>
+                <button class="algo-btn active" data-algo="base64" onclick="selectAlgo(this)">
+                    <span class="algo-icon purple">B64</span> Base64
+                </button>
+                <button class="algo-btn" data-algo="url" onclick="selectAlgo(this)">
+                    <span class="algo-icon blue">URL</span> URL Encoding
+                </button>
+                <button class="algo-btn" data-algo="html" onclick="selectAlgo(this)">
+                    <span class="algo-icon teal">HT</span> HTML Entities
+                </button>
+                <button class="algo-btn" data-algo="hex" onclick="selectAlgo(this)">
+                    <span class="algo-icon orange">0x</span> Hex Encode
+                </button>
+                <button class="algo-btn" data-algo="binary" onclick="selectAlgo(this)">
+                    <span class="algo-icon green">01</span> Binary Encode
+                </button>
+                <button class="algo-btn" data-algo="octal" onclick="selectAlgo(this)">
+                    <span class="algo-icon amber">8</span> Octal Encode
+                </button>
+                <button class="algo-btn" data-algo="uri" onclick="selectAlgo(this)">
+                    <span class="algo-icon cyan">%</span> URI Component
+                </button>
+
+                <div class="sidebar-divider"></div>
+                <div class="sidebar-title">Ciphers</div>
+                <button class="algo-btn" data-algo="caesar" onclick="selectAlgo(this)">
+                    <span class="algo-icon red">Ca</span> Caesar Cipher
+                </button>
+                <button class="algo-btn" data-algo="rot13" onclick="selectAlgo(this)">
+                    <span class="algo-icon orange">R13</span> ROT13
+                </button>
+                <button class="algo-btn" data-algo="atbash" onclick="selectAlgo(this)">
+                    <span class="algo-icon purple">A↔Z</span> Atbash Cipher
+                </button>
+                <button class="algo-btn" data-algo="vigenere" onclick="selectAlgo(this)">
+                    <span class="algo-icon blue">Vg</span> Vigenère Cipher
+                </button>
+                <button class="algo-btn" data-algo="morse" onclick="selectAlgo(this)">
+                    <span class="algo-icon green">·−</span> Morse Code
+                </button>
+
+                <div class="sidebar-divider"></div>
+                <div class="sidebar-title">Encryption</div>
+                <button class="algo-btn" data-algo="aes128" onclick="selectAlgo(this)">
+                    <span class="algo-icon indigo">A128</span> AES-128
+                </button>
+                <button class="algo-btn" data-algo="aes256" onclick="selectAlgo(this)">
+                    <span class="algo-icon pink">A256</span> AES-256
+                </button>
+
+                <div class="sidebar-divider"></div>
+                <div class="sidebar-title">Utilities</div>
+                <button class="algo-btn" data-algo="reverse" onclick="selectAlgo(this)">
+                    <span class="algo-icon red">↩</span> Reverse String
+                </button>
+                <button class="algo-btn" data-algo="base58" onclick="selectAlgo(this)">
+                    <span class="algo-icon amber">B58</span> Base58
+                </button>
+                <button class="algo-btn" data-algo="uuid" onclick="selectAlgo(this)">
+                    <span class="algo-icon cyan">ID</span> UUID Generator
+                </button>
+            </aside>
+
+            <main class="content-area" id="contentArea">
+                <!-- Content injected by JS -->
+            </main>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let currentAlgo = 'base64';
+        let currentMode = 'encode';
+
+        const morseMap = {
+            'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.',
+            'G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..',
+            'M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.',
+            'S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-',
+            'Y':'-.--','Z':'--..','0':'-----','1':'.----','2':'..---',
+            '3':'...--','4':'....-','5':'.....','6':'-....','7':'--...',
+            '8':'---..','9':'----.', ' ': '/'
+        };
+        const morseRev = {};
+        for (const [k,v] of Object.entries(morseMap)) morseRev[v] = k;
+
+        const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+        function selectAlgo(btn) {
+            document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentAlgo = btn.dataset.algo;
+            document.getElementById('sidebar').classList.remove('mobile-open');
+            renderContent();
+        }
+
+        function toggleMobileSidebar() {
+            document.getElementById('sidebar').classList.toggle('mobile-open');
+        }
+
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + type + ' show';
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        function copyOutput() {
+            const el = document.getElementById('outputText');
+            if (!el || el.classList.contains('output-empty')) return;
+            navigator.clipboard.writeText(el.textContent).then(() => showToast('Copied to clipboard!'));
+        }
+
+        function swapIO() {
+            const inp = document.getElementById('inputText');
+            const out = document.getElementById('outputText');
+            if (!out || out.classList.contains('output-empty')) return;
+            inp.value = out.textContent;
+            out.textContent = '';
+            out.classList.add('output-empty');
+            out.textContent = 'Result will appear here';
+        }
+
+        function generateRandomKey(bytes) {
+            const arr = new Uint8Array(bytes);
+            crypto.getRandomValues(arr);
+            return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function renderContent() {
+            const area = document.getElementById('contentArea');
+            area.innerHTML = '';
+            const config = algoConfigs[currentAlgo];
+            if (!config) return;
+            const html = config.render();
+            area.innerHTML = `<div class="card fade-in">${html}</div>`;
+            if (config.onMount) config.onMount();
+        }
+
+        const algoConfigs = {
+            base64: {
+                render() {
+                    return `
+                        <div class="card-header">
+                            <div class="card-header-left">
+                                <div class="card-icon purple">B64</div>
+                                <div><div class="card-title">Base64</div><div class="card-subtitle">Encode and decode Base64 strings</div></div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" onclick="setMode('encode',this)">Encode</button>
+                            <button class="mode-btn" onclick="setMode('decode',this)">Decode</button>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Input</label>
+                            <textarea class="text-area" id="inputText" placeholder="Enter text to ${currentMode === 'encode' ? 'encode' : 'decode'}..."></textarea>
+                            <div class="char-count" id="inputCount">0 characters</div>
+                        </div>
+                        <div style="text-align:center;margin:8px 0"><button class="swap-btn" onclick="swapIO()" title="Swap input/output">⇅</button></div>
+                        <div class="input-group">
+                            <label class="input-label">Output</label>
+                            <div class="output-wrapper">
+                                <div class="output-area" id="outputText"><span class="output-empty">Result will appear here</span></div>
+                                <button class="copy-btn" onclick="copyOutput()" title="Copy">📋</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end">
+                            <button class="btn btn-primary" onclick="processAlgo('base64')">⚡ Process</button>
+                        </div>
+                    `;
+                }
+            },
+            url: {
+                render() {
+                    return renderStandardCard('URL Encoding', 'URL', 'blue', 'Encode and decode URL strings');
+                }
+            },
+            html: {
+                render() {
+                    return renderStandardCard('HTML Entities', 'HT', 'teal', 'Encode and decode HTML entities');
+                }
+            },
+            hex: {
+                render() {
+                    return renderStandardCard('Hex Encode', '0x', 'orange', 'Encode and decode hexadecimal');
+                }
+            },
+            binary: {
+                render() {
+                    return renderStandardCard('Binary Encode', '01', 'green', 'Encode and decode binary strings');
+                }
+            },
+            octal: {
+                render() {
+                    return renderStandardCard('Octal Encode', '8', 'amber', 'Encode and decode octal values');
+                }
+            },
+            uri: {
+                render() {
+                    return renderStandardCard('URI Component', '%', 'cyan', 'Encode and decode URI components');
+                }
+            },
+            caesar: {
+                render() {
+                    return `
+                        <div class="card-header">
+                            <div class="card-header-left">
+                                <div class="card-icon red">Ca</div>
+                                <div><div class="card-title">Caesar Cipher</div><div class="card-subtitle">Shift cipher with adjustable offset</div></div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" onclick="setMode('encode',this)">Encode</button>
+                            <button class="mode-btn" onclick="setMode('decode',this)">Decode</button>
+                        </div>
+                        <div class="caesar-controls">
+                            <label class="input-label" style="margin:0">Shift:</label>
+                            <button class="shift-btn" onclick="changeShift(-1)">−</button>
+                            <div class="shift-display" id="shiftDisplay">3</div>
+                            <button class="shift-btn" onclick="changeShift(1)">+</button>
+                            <input type="number" id="shiftInput" value="3" min="0" max="25" 
+                                style="width:60px;padding:6px 10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-primary);font-family:'Inter',sans-serif;font-size:0.9rem;text-align:center"
+                                onchange="updateShiftFromInput()">
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Input</label>
+                            <textarea class="text-area" id="inputText" placeholder="Enter text to process..."></textarea>
+                            <div class="char-count" id="inputCount">0 characters</div>
+                        </div>
+                        <div style="text-align:center;margin:8px 0"><button class="swap-btn" onclick="swapIO()" title="Swap input/output">⇅</button></div>
+                        <div class="input-group">
+                            <label class="input-label">Output</label>
+                            <div class="output-wrapper">
+                                <div class="output-area" id="outputText"><span class="output-empty">Result will appear here</span></div>
+                                <button class="copy-btn" onclick="copyOutput()" title="Copy"></button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end">
+                            <button class="btn btn-primary" onclick="processAlgo('caesar')">⚡ Process</button>
+                        </div>
+                    `;
+                }
+            },
+            rot13: {
+                render() {
+                    return renderStandardCard('ROT13', 'R13', 'orange', 'Simple substitution cipher (shift 13)');
+                }
+            },
+            atbash: {
+                render() {
+                    return renderStandardCard('Atbash Cipher', 'A↔Z', 'purple', 'Reversed alphabet cipher');
+                }
+            },
+            vigenere: {
+                render() {
+                    return `
+                        <div class="card-header">
+                            <div class="card-header-left">
+                                <div class="card-icon blue">Vg</div>
+                                <div><div class="card-title">Vigenère Cipher</div><div class="card-subtitle">Polyalphabetic substitution cipher</div></div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" onclick="setMode('encode',this)">Encode</button>
+                            <button class="mode-btn" onclick="setMode('decode',this)">Decode</button>
+                        </div>
+                        <div class="key-section">
+                            <div class="key-input-wrap">
+                                <label class="input-label">Keyword</label>
+                                <input class="key-input" id="vigenereKey" placeholder="Enter keyword (e.g., SECRET)">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Input</label>
+                            <textarea class="text-area" id="inputText" placeholder="Enter text to process..."></textarea>
+                            <div class="char-count" id="inputCount">0 characters</div>
+                        </div>
+                        <div style="text-align:center;margin:8px 0"><button class="swap-btn" onclick="swapIO()" title="Swap input/output">⇅</button></div>
+                        <div class="input-group">
+                            <label class="input-label">Output</label>
+                            <div class="output-wrapper">
+                                <div class="output-area" id="outputText"><span class="output-empty">Result will appear here</span></div>
+                                <button class="copy-btn" onclick="copyOutput()" title="Copy">📋</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end">
+                            <button class="btn btn-primary" onclick="processAlgo('vigenere')"> Process</button>
+                        </div>
+                    `;
+                }
+            },
+            morse: {
+                render() {
+                    return renderStandardCard('Morse Code', '·−', 'green', 'Encode and decode Morse code');
+                }
+            },
+            aes128: {
+                render() {
+                    return renderAESCard('AES-128', 'A128', 'indigo', 'Encrypt and decrypt with AES-128-CBC', 16);
+                }
+            },
+            aes256: {
+                render() {
+                    return renderAESCard('AES-256', 'A256', 'pink', 'Encrypt and decrypt with AES-256-CBC', 32);
+                }
+            },
+            reverse: {
+                render() {
+                    return renderStandardCard('Reverse String', '', 'red', 'Reverse the input string');
+                }
+            },
+            base58: {
+                render() {
+                    return renderStandardCard('Base58', 'B58', 'amber', 'Encode and decode Base58 (Bitcoin-style)');
+                }
+            },
+            uuid: {
+                render() {
+                    return `
+                        <div class="card-header">
+                            <div class="card-header-left">
+                                <div class="card-icon cyan">ID</div>
+                                <div><div class="card-title">UUID Generator</div><div class="card-subtitle">Generate random UUIDs v4</div></div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Number of UUIDs</label>
+                            <input class="key-input" id="uuidCount" type="number" value="1" min="1" max="100" style="max-width:200px">
+                        </div>
+                        <div style="display:flex;gap:10px;margin-bottom:20px">
+                            <button class="btn btn-green" onclick="generateUUIDs()"> Generate</button>
+                            <button class="btn btn-primary" onclick="generateUUIDs()">Generate Multiple</button>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Output</label>
+                            <div class="output-wrapper">
+                                <div class="output-area" id="outputText" style="min-height:200px"><span class="output-empty">Generated UUIDs will appear here</span></div>
+                                <button class="copy-btn" onclick="copyOutput()" title="Copy">📋</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        function renderStandardCard(title, icon, colorClass, subtitle) {
+            return `
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="card-icon ${colorClass}">${icon}</div>
+                        <div><div class="card-title">${title}</div><div class="card-subtitle">${subtitle}</div></div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                    </div>
+                </div>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('encode',this)">Encode</button>
+                    <button class="mode-btn" onclick="setMode('decode',this)">Decode</button>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Input</label>
+                    <textarea class="text-area" id="inputText" placeholder="Enter text to ${currentMode === 'encode' ? 'encode' : 'decode'}..."></textarea>
+                    <div class="char-count" id="inputCount">0 characters</div>
+                </div>
+                <div style="text-align:center;margin:8px 0"><button class="swap-btn" onclick="swapIO()" title="Swap input/output"></button></div>
+                <div class="input-group">
+                    <label class="input-label">Output</label>
+                    <div class="output-wrapper">
+                        <div class="output-area" id="outputText"><span class="output-empty">Result will appear here</span></div>
+                        <button class="copy-btn" onclick="copyOutput()" title="Copy">📋</button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end">
+                    <button class="btn btn-primary" onclick="processAlgo('${currentAlgo}')">⚡ Process</button>
+                </div>
+            `;
+        }
+
+        function renderAESCard(title, icon, colorClass, subtitle, keyBytes) {
+            return `
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="card-icon ${colorClass}">${icon}</div>
+                        <div><div class="card-title">${title}</div><div class="card-subtitle">${subtitle}</div></div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-secondary" onclick="clearIO()">Clear</button>
+                    </div>
+                </div>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('encode',this)">Encrypt</button>
+                    <button class="mode-btn" onclick="setMode('decode',this)">Decrypt</button>
+                </div>
+                <div class="key-section">
+                    <div class="key-input-wrap">
+                        <label class="input-label">Encryption Key</label>
+                        <input class="key-input" id="aesKey" placeholder="Enter your key..." maxlength="${keyBytes * 2}">
+                        <div class="key-gen-row">
+                            <button class="btn btn-sm btn-green" onclick="genAESKey(${keyBytes})">🎲 Random Key</button>
+                            <button class="btn btn-sm btn-secondary" onclick="toggleKeyVis()"> Show/Hide</button>
+                        </div>
+                        <div class="key-info" id="keyInfo">${keyBytes} bytes = ${keyBytes * 2} hex characters</div>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Input</label>
+                    <textarea class="text-area" id="inputText" placeholder="Enter text to ${currentMode === 'encode' ? 'encrypt' : 'decrypt'}..."></textarea>
+                    <div class="char-count" id="inputCount">0 characters</div>
+                </div>
+                <div style="text-align:center;margin:8px 0"><button class="swap-btn" onclick="swapIO()" title="Swap input/output">⇅</button></div>
+                <div class="input-group">
+                    <label class="input-label">Output</label>
+                    <div class="output-wrapper">
+                        <div class="output-area" id="outputText"><span class="output-empty">Result will appear here</span></div>
+                        <button class="copy-btn" onclick="copyOutput()" title="Copy">📋</button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end">
+                    <button class="btn btn-primary" onclick="processAlgo('${currentAlgo}')">⚡ Process</button>
+                </div>
+            `;
+        }
+
+        function setMode(mode, btn) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const inp = document.getElementById('inputText');
+            if (inp) {
+                const ph = inp.placeholder;
+                if (currentAlgo === 'aes128' || currentAlgo === 'aes256') {
+                    inp.placeholder = `Enter text to ${mode === 'encode' ? 'encrypt' : 'decrypt'}...`;
+                } else {
+                    inp.placeholder = `Enter text to ${mode === 'encode' ? 'encode' : 'decode'}...`;
+                }
+            }
+        }
+
+        function changeShift(delta) {
+            let el = document.getElementById('shiftDisplay');
+            let inp = document.getElementById('shiftInput');
+            let val = parseInt(inp.value) + delta;
+            if (val < 0) val = 25;
+            if (val > 25) val = 0;
+            inp.value = val;
+            el.textContent = val;
+        }
+
+        function updateShiftFromInput() {
+            let inp = document.getElementById('shiftInput');
+            let val = parseInt(inp.value);
+            if (isNaN(val)) val = 0;
+            if (val < 0) val = 25;
+            if (val > 25) val = 0;
+            inp.value = val;
+            document.getElementById('shiftDisplay').textContent = val;
+        }
+
+        function genAESKey(bytes) {
+            document.getElementById('aesKey').value = generateRandomKey(bytes);
+        }
+
+        function toggleKeyVis() {
+            const inp = document.getElementById('aesKey');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        function clearIO() {
+            const inp = document.getElementById('inputText');
+            const out = document.getElementById('outputText');
+            if (inp) inp.value = '';
+            if (out) {
+                out.textContent = 'Result will appear here';
+                out.classList.add('output-empty');
+            }
+            const count = document.getElementById('inputCount');
+            if (count) count.textContent = '0 characters';
+        }
+
+        function caesarShift(text, shift, encode) {
+            const s = encode ? shift : (26 - (shift % 26)) % 26;
+            return text.replace(/[a-zA-Z]/g, c => {
+                const base = c <= 'Z' ? 65 : 97;
+                return String.fromCharCode(((c.charCodeAt(0) - base + s) % 26) + base);
+            });
+        }
+
+        function rot13(text) {
+            return caesarShift(text, 13, true);
+        }
+
+        function atbash(text) {
+            return text.replace(/[a-zA-Z]/g, c => {
+                const base = c <= 'Z' ? 65 : 97;
+                return String.fromCharCode(122 - (c.charCodeAt(0) - 97));
+            }).replace(/[A-Z]/g, c => {
+                const base = 65;
+                return String.fromCharCode(90 - (c.charCodeAt(0) - 65));
+            });
+        }
+
+        function atbashCorrect(text) {
+            return text.replace(/[a-z]/g, c => String.fromCharCode(219 - c.charCodeAt(0)))
+                       .replace(/[A-Z]/g, c => String.fromCharCode(155 - c.charCodeAt(0)));
+        }
+
+        function vigenereCipher(text, key, encode) {
+            if (!key) return 'Please enter a keyword';
+            key = key.toUpperCase().replace(/[^A-Z]/g, '');
+            if (!key) return 'Keyword must contain letters';
+            let result = '';
+            let ki = 0;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (/[a-zA-Z]/.test(c)) {
+                    const base = c <= 'Z' ? 65 : 97;
+                    const shift = key.charCodeAt(ki % key.length) - 65;
+                    const dir = encode ? 1 : -1;
+                    result += String.fromCharCode(((c.charCodeAt(0) - base + dir * shift + 26) % 26) + base);
+                    ki++;
+                } else {
+                    result += c;
+                }
+            }
+            return result;
+        }
+
+        function textToMorse(text) {
+            return text.toUpperCase().split('').map(c => morseMap[c] || c).join(' ');
+        }
+
+        function morseToText(morse) {
+            return morse.split(' ').map(m => morseRev[m] || m).join('');
+        }
+
+        function toHex(text) {
+            return Array.from(text).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
+        }
+
+        function fromHex(hex) {
+            return hex.trim().split(/\s+/).map(h => String.fromCharCode(parseInt(h, 16))).join('');
+        }
+
+        function toBinary(text) {
+            return Array.from(text).map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+        }
+
+        function fromBinary(bin) {
+            return bin.trim().split(/\s+/).map(b => String.fromCharCode(parseInt(b, 2))).join('');
+        }
+
+        function toOctal(text) {
+            return Array.from(text).map(c => c.charCodeAt(0).toString(8).padStart(3, '0')).join(' ');
+        }
+
+        function fromOctal(oct) {
+            return oct.trim().split(/\s+/).map(o => String.fromCharCode(parseInt(o, 8))).join('');
+        }
+
+        function htmlEncode(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function htmlDecode(text) {
+            const el = document.createElement('textarea');
+            el.innerHTML = text;
+            return el.value;
+        }
+
+        function base58Encode(text) {
+            let bytes = Array.from(text).map(c => c.charCodeAt(0));
+            let zeros = 0;
+            while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+            let num = 0n;
+            for (const b of bytes) num = num * 256n + BigInt(b);
+            let result = '';
+            while (num > 0n) {
+                result = base58Alphabet[Number(num % 58n)] + result;
+                num /= 58n;
+            }
+            return '1'.repeat(zeros) + result;
+        }
+
+        function base58Decode(text) {
+            let zeros = 0;
+            while (zeros < text.length && text[zeros] === '1') zeros++;
+            let num = 0n;
+            for (const c of text) {
+                const idx = base58Alphabet.indexOf(c);
+                if (idx === -1) throw new Error('Invalid Base58 character: ' + c);
+                num = num * 58n + BigInt(idx);
+            }
+            let bytes = [];
+            while (num > 0n) {
+                bytes.unshift(Number(num % 256n));
+                num /= 256n;
+            }
+            return '\x00'.repeat(zeros) + bytes.map(b => String.fromCharCode(b)).join('');
+        }
+
+        function generateUUIDs() {
+            const count = parseInt(document.getElementById('uuidCount').value) || 1;
+            const uuids = [];
+            for (let i = 0; i < count; i++) {
+                uuids.push(crypto.randomUUID());
+            }
+            const out = document.getElementById('outputText');
+            out.textContent = uuids.join('\n');
+            out.classList.remove('output-empty');
+        }
+
+        function processAlgo(algo) {
+            const inp = document.getElementById('inputText');
+            const out = document.getElementById('outputText');
+            if (!inp || !out) return;
+            const text = inp.value;
+
+            if (!text && algo !== 'uuid') {
+                showToast('Please enter some text', 'error');
+                return;
+            }
+
+            let result = '';
+
+            try {
+                switch (algo) {
+                    case 'base64':
+                        result = currentMode === 'encode' ? btoa(unescape(encodeURIComponent(text))) : decodeURIComponent(escape(atob(text)));
+                        break;
+                    case 'url':
+                        result = currentMode === 'encode' ? encodeURIComponent(text) : decodeURIComponent(text);
+                        break;
+                    case 'html':
+                        result = currentMode === 'encode' ? htmlEncode(text) : htmlDecode(text);
+                        break;
+                    case 'hex':
+                        result = currentMode === 'encode' ? toHex(text) : fromHex(text);
+                        break;
+                    case 'binary':
+                        result = currentMode === 'encode' ? toBinary(text) : fromBinary(text);
+                        break;
+                    case 'octal':
+                        result = currentMode === 'encode' ? toOctal(text) : fromOctal(text);
+                        break;
+                    case 'uri':
+                        result = currentMode === 'encode' ? encodeURI(text) : decodeURI(text);
+                        break;
+                    case 'caesar': {
+                        const shiftEl = document.getElementById('shiftInput');
+                        const shift = parseInt(shiftEl.value) || 0;
+                        result = caesarShift(text, shift, currentMode === 'encode');
+                        break;
+                    }
+                    case 'rot13':
+                        result = rot13(text);
+                        break;
+                    case 'atbash':
+                        result = atbashCorrect(text);
+                        break;
+                    case 'vigenere': {
+                        const key = document.getElementById('vigenereKey').value;
+                        result = vigenereCipher(text, key, currentMode === 'encode');
+                        break;
+                    }
+                    case 'morse':
+                        result = currentMode === 'encode' ? textToMorse(text) : morseToText(text);
+                        break;
+                    case 'aes128': {
+                        const keyHex = document.getElementById('aesKey').value;
+                        if (!keyHex) { showToast('Please enter or generate a key', 'error'); return; }
+                        const key = CryptoJS.enc.Hex.parse(keyHex);
+                        if (currentMode === 'encode') {
+                            const iv = CryptoJS.lib.WordArray.random(16);
+                            const encrypted = CryptoJS.AES.encrypt(text, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+                            result = iv.toString(CryptoJS.enc.Hex) + ':' + encrypted.ciphertext.toString(CryptoJS.enc.Hex);
+                        } else {
+                            const parts = text.split(':');
+                            if (parts.length !== 2) throw new Error('Invalid encrypted format. Expected iv:ciphertext');
+                            const iv = CryptoJS.enc.Hex.parse(parts[0]);
+                            const ct = CryptoJS.enc.Hex.parse(parts[1]);
+                            const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+                            result = decrypted.toString(CryptoJS.enc.Utf8);
+                            if (!result) throw new Error('Decryption failed - wrong key?');
+                        }
+                        break;
+                    }
+                    case 'aes256': {
+                        const keyHex = document.getElementById('aesKey').value;
+                        if (!keyHex) { showToast('Please enter or generate a key', 'error'); return; }
+                        const key = CryptoJS.enc.Hex.parse(keyHex);
+                        if (currentMode === 'encode') {
+                            const iv = CryptoJS.lib.WordArray.random(16);
+                            const encrypted = CryptoJS.AES.encrypt(text, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+                            result = iv.toString(CryptoJS.enc.Hex) + ':' + encrypted.ciphertext.toString(CryptoJS.enc.Hex);
+                        } else {
+                            const parts = text.split(':');
+                            if (parts.length !== 2) throw new Error('Invalid encrypted format. Expected iv:ciphertext');
+                            const iv = CryptoJS.enc.Hex.parse(parts[0]);
+                            const ct = CryptoJS.enc.Hex.parse(parts[1]);
+                            const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+                            result = decrypted.toString(CryptoJS.enc.Utf8);
+                            if (!result) throw new Error('Decryption failed - wrong key?');
+                        }
+                        break;
+                    }
+                    case 'reverse':
+                        result = text.split('').reverse().join('');
+                        break;
+                    case 'base58':
+                        result = currentMode === 'encode' ? base58Encode(text) : base58Decode(text);
+                        break;
+                }
+                out.textContent = result;
+                out.classList.remove('output-empty');
+                showToast('Success!');
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+                out.innerHTML = `<span class="output-empty">Error: ${err.message}</span>`;
+            }
+        }
+
+        // Char count updater
+        document.addEventListener('input', function(e) {
+            if (e.target.id === 'inputText') {
+                const count = document.getElementById('inputCount');
+                if (count) count.textContent = e.target.value.length + ' characters';
+            }
+        });
+
+        // Keyboard shortcut
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                processAlgo(currentAlgo);
+            }
+        });
+
+        // Initial render
+        renderContent();
+    </script>
+</body>
+</html>
