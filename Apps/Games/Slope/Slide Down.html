@@ -1,54 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Slide Down Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html>
+<body style="margin:0; overflow:hidden;">
 
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-    }
-
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-    }
-
-    .fallback {
-      position: fixed;
-      bottom: 6px;
-      right: 8px;
-      font-size: 10px;
-      opacity: 0.5;
-      z-index: 9999;
-    }
-
-    .fallback a {
-      color: #aaa;
-      text-decoration: none;
-    }
-  </style>
-</head>
-<body>
-
-  <iframe
-    src="https://gamea.azgame.io/slide-down/"
-    allow="autoplay; fullscreen; gamepad; xr-spatial-tracking"
-    allowfullscreen
-    sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-forms"
-    referrerpolicy="no-referrer"
-  ></iframe>
-
-  <div class="fallback">
-    <a href="https://gamea.azgame.io/slide-down/" target="_blank">open</a>
-  </div>
+<iframe 
+  src="https://gamea.azgame.io/slide-down/" 
+  frameborder="0"
+  allowtransparency="true"
+  style="
+    width:100vw;
+    height:100vh;
+    border:0;
+    display:block;
+  ">
+</iframe>
 
 </body>
 </html>
