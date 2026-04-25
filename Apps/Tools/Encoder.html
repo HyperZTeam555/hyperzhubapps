@@ -777,6 +777,7 @@
             document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentAlgo = btn.dataset.algo;
+            currentMode = 'encode'; // Reset mode so UI and state always match on algo switch
             document.getElementById('sidebar').classList.remove('mobile-open');
             renderContent();
         }
