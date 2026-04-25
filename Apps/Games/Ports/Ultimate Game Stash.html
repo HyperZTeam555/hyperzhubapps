@@ -357,6 +357,7 @@
         .buttons-container button {
             width: calc(16.666% - 9px) !important;
             flex-shrink: 0;
+            aspect-ratio: 1 / 1;
         }
 
         /* Full reset for converted buttons */
@@ -541,22 +542,36 @@
             <div class="search-inner">
                 <div class="search-row">
                     <span class="search-icon">🔍</span>
-                    <input type="text" placeholder="Search games..." id="searchInput">
+                    <input type="text" placeholder="Search games..." id="searchInput" autocomplete="off">
                 </div>
-                <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
-                <script>
-                    // Proxy .value — searchbut.js sees only base36 (A-Z, 0-9), spaces/symbols display normally
-                    const searchEl = document.getElementById('searchInput');
-                    const _desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-                    Object.defineProperty(searchEl, 'value', {
-                        get() { return _desc.get.call(this).replace(/[^a-zA-Z0-9]/g, ''); },
-                        set(v) { _desc.set.call(this, v); }
-                    });
-                </script>
             </div>
         </div>
 
         <div id="sections-container"></div>
+
+        <script>
+            // Self-contained search — filters buttons by text content
+            (function() {
+                let searchTimer;
+                document.getElementById('searchInput').addEventListener('input', function() {
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(() => runSearch(this.value.trim()), 120);
+                });
+
+                function runSearch(query) {
+                    const q = query.toLowerCase();
+                    document.querySelectorAll('.letter-section').forEach(section => {
+                        let visible = 0;
+                        section.querySelectorAll('.buttons-container button').forEach(btn => {
+                            const match = !q || btn.textContent.toLowerCase().includes(q);
+                            btn.style.display = match ? '' : 'none';
+                            if (match) visible++;
+                        });
+                        section.style.display = visible === 0 && q ? 'none' : '';
+                    });
+                }
+            })();
+        </script>
 
     </div>
 
@@ -647,26 +662,15 @@
             const count = document.querySelectorAll('.buttons-container button').length;
             const el = document.getElementById('game-count-text');
             if (el && count > 0) el.textContent = count.toLocaleString() + ' games available';
-            squareButtons();
         }
 
         processAll();
-        const obs = new MutationObserver(() => processAll());
-        obs.observe(document.getElementById('sections-container'), { childList: true, subtree: true, attributes: false });
-
-        function squareButtons() {
-            document.querySelectorAll('.buttons-container button').forEach(btn => {
-                btn.style.height = '';
-                btn.style.height = btn.offsetWidth + 'px';
-            });
-        }
-
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(squareButtons, 50);
+        let obsTimer;
+        const obs = new MutationObserver(() => {
+            clearTimeout(obsTimer);
+            obsTimer = setTimeout(processAll, 150);
         });
-        window.addEventListener('load', squareButtons);
+        obs.observe(document.getElementById('sections-container'), { childList: true, subtree: true, attributes: false });
 
         document.getElementById('overlay-close').addEventListener('click', function() {
             document.getElementById('game-overlay').style.display = 'none';
