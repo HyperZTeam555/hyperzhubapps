@@ -556,32 +556,17 @@
 
                 input.addEventListener('input', function() {
                     const raw = this.value;
-                    const cursor = this.selectionStart;
 
-                    // Strip anything not base36 (a-z, A-Z, 0-9) or space — silently, visually keep spaces
-                    // First pass: keep only base36 chars + spaces
-                    let clean = raw.replace(/[^a-zA-Z0-9 ]/g, '');
-
-                    // Auto-insert space at boundaries (only if no space already there):
-                    // lowercase→uppercase (camelCase): "SuperMario" → "Super Mario"
-                    // letter→digit: "Mario64" → "Mario 64"
-                    // digit→letter: "64Mario" → "64 Mario"
-                    clean = clean
+                    // Silently strip everything non-base36 (spaces, symbols, etc.) for internal query only
+                    // Nothing is changed visually — user sees exactly what they typed
+                    const stripped = raw.replace(/[^a-zA-Z0-9]/g, '');
+                    const expanded = stripped
                         .replace(/([a-z])([A-Z])/g, '$1 $2')
                         .replace(/([a-zA-Z])(\d)/g, '$1 $2')
-                        .replace(/(\d)([a-zA-Z])/g, '$1 $2')
-                        // collapse multiple spaces into one
-                        .replace(/ {2,}/g, ' ');
-
-                    // Only update DOM if value actually changed (avoids cursor jump)
-                    if (clean !== raw) {
-                        const diff = clean.length - raw.length;
-                        this.value = clean;
-                        this.setSelectionRange(cursor + diff, cursor + diff);
-                    }
+                        .replace(/(\d)([a-zA-Z])/g, '$1 $2');
 
                     clearTimeout(searchTimer);
-                    searchTimer = setTimeout(() => runSearch(clean.trim()), 120);
+                    searchTimer = setTimeout(() => runSearch(expanded), 120);
                 });
 
                 function runSearch(query) {
