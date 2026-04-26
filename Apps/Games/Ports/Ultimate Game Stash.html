@@ -555,27 +555,18 @@
                 let searchTimer;
 
                 input.addEventListener('input', function() {
-                    const raw = this.value;
-
-                    // Silently strip everything non-base36 (spaces, symbols, etc.) for internal query only
-                    // Nothing is changed visually — user sees exactly what they typed
-                    const stripped = raw.replace(/[^a-zA-Z0-9]/g, '');
-                    const expanded = stripped
-                        .replace(/([a-z])([A-Z])/g, '$1 $2')
-                        .replace(/([a-zA-Z])(\d)/g, '$1 $2')
-                        .replace(/(\d)([a-zA-Z])/g, '$1 $2');
-
+                    // Visually unchanged — strip non-base36 silently for query only
+                    const q = this.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                     clearTimeout(searchTimer);
-                    searchTimer = setTimeout(() => runSearch(expanded), 120);
+                    searchTimer = setTimeout(() => runSearch(q), 120);
                 });
 
-                function runSearch(query) {
-                    // Case-insensitive: lowercase everything for comparison
-                    const q = query.toLowerCase();
+                function runSearch(q) {
                     document.querySelectorAll('.letter-section').forEach(section => {
                         let visible = 0;
                         section.querySelectorAll('.buttons-container button').forEach(btn => {
-                            const match = !q || btn.textContent.toLowerCase().includes(q);
+                            const name = btn.textContent.toLowerCase().replace(/\s/g, '');
+                            const match = !q || name.includes(q);
                             btn.style.display = match ? '' : 'none';
                             if (match) visible++;
                         });
