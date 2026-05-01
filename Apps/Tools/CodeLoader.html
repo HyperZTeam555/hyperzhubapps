@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeLoader</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101314;
+      --panel: #181d1f;
+      --panel-2: #20272a;
+      --text: #e9f0ec;
+      --muted: #9aa8a1;
+      --line: #344044;
+      --green: #60d394;
+      --cyan: #48c6ef;
+      --red: #ff6b6b;
+      --yellow: #f7d774;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(120deg, rgba(72, 198, 239, 0.1), transparent 32%),
+        linear-gradient(300deg, rgba(96, 211, 148, 0.1), transparent 34%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: rgba(16, 19, 20, 0.9);
+      backdrop-filter: blur(12px);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    button,
+    select,
+    .file-label {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      min-height: 36px;
+      padding: 8px 11px;
+      cursor: pointer;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    button:hover,
+    select:hover,
+    .file-label:hover {
+      border-color: var(--cyan);
+      color: #ffffff;
+    }
+
+    select {
+      appearance: none;
+      min-width: 76px;
+      background-image: linear-gradient(45deg, transparent 50%, var(--cyan) 50%), linear-gradient(135deg, var(--cyan) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 15px, calc(100% - 9px) 15px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 28px;
+    }
+
+    button.primary {
+      background: var(--green);
+      border-color: var(--green);
+      color: #07110b;
+      font-weight: 700;
+    }
+
+    button.danger {
+      color: var(--red);
+    }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 44%) minmax(320px, 56%);
+      min-height: 0;
+    }
+
+    .editor-wrap,
+    .terminal-wrap {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-wrap {
+      border-right: 1px solid var(--line);
+      background: rgba(24, 29, 31, 0.8);
+    }
+
+    .pane-head {
+      min-height: 42px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status {
+      color: var(--green);
+    }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      width: 100%;
+      border: 0;
+      outline: 0;
+      padding: 16px;
+      color: var(--text);
+      background: transparent;
+      line-height: 1.5;
+      tab-size: 2;
+    }
+
+    .terminal-wrap {
+      background: #090c0d;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #screen {
+      flex: 1;
+      min-height: 0;
+      max-height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: scroll;
+      overflow-x: auto;
+      padding: 18px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      scrollbar-color: var(--green) #0d1112;
+      scrollbar-width: thin;
+    }
+
+    #screen::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    #screen::-webkit-scrollbar-track {
+      background: #0d1112;
+    }
+
+    #screen::-webkit-scrollbar-thumb {
+      background: var(--green);
+      border-radius: 8px;
+    }
+
+    #screen.preview-mode {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .line {
+      flex: 0 0 auto;
+      min-height: 22px;
+    }
+
+    .preview-frame {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      border: 0;
+      background: #ffffff;
+    }
+
+    .terminal-wrap:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      background: #090c0d;
+    }
+
+    .terminal-wrap:fullscreen #screen {
+      height: 100%;
+    }
+
+    .line.error {
+      color: var(--red);
+    }
+
+    .line.ok {
+      color: var(--green);
+    }
+
+    .line.warn {
+      color: var(--yellow);
+    }
+
+    .line.info {
+      color: var(--cyan);
+    }
+
+    .input-row {
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--panel);
+    }
+
+    .prompt {
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    #terminalInput {
+      flex: 1;
+      min-width: 80px;
+      background: transparent;
+      color: var(--text);
+      border: 0;
+      outline: 0;
+    }
+
+    @media (max-width: 860px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(340px, 48vh) minmax(380px, 1fr);
+      }
+
+      .editor-wrap {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="brand-copy">
+          <h1>CodeLoader</h1>
+          <div class="tagline">Simple CodeLoader in HyperZHub</div>
+        </div>
+        <button id="docsBtn">Docs</button>
+      </div>
+      <div class="actions">
+        <select id="fileType" title="File type">
+          <option value=".zt" selected>.zt</option>
+          <option value=".py">.py</option>
+          <option value=".html">.html</option>
+          <option value=".js">.js</option>
+          <option value=".ts">.ts</option>
+          <option value=".bat">.bat</option>
+          <option value=".ps1">.ps1</option>
+          <option value=".lua">.lua</option>
+          <option value=".java">.java</option>
+          <option value=".cpp">.cpp</option>
+          <option value=".cs">.cs</option>
+        </select>
+        <label class="file-label" for="fileInput" id="loadLabel">Load .zt</label>
+        <input id="fileInput" type="file" accept=".zt,.py,.html,.js,.ts,.bat,.ps1,.lua,.java,.cpp,.cs,text/plain,text/html,text/javascript">
+        <button id="runBtn" class="primary">Run</button>
+        <button id="fullscreenBtn">Fullscreen</button>
+        <button id="saveBtn">Download .zt</button>
+        <button id="demoBtn">Demo</button>
+        <button id="clearBtn" class="danger">Clear</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="editor-wrap">
+        <div class="pane-head">
+          <span id="fileName">untitled.zt</span>
+          <span class="status" id="runStatus">ready</span>
+        </div>
+        <textarea id="code" spellcheck="false"></textarea>
+      </section>
+
+      <section class="terminal-wrap">
+        <div class="pane-head">
+          <span>CodeLoader Terminal</span>
+          <span>output and previews</span>
+        </div>
+        <div id="screen" aria-live="polite"></div>
+        <div class="input-row">
+          <span class="prompt">zt&gt;</span>
+          <input id="terminalInput" autocomplete="off" placeholder="try: help, vars, open menu">
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const demoScript = `# ZyperTerm starter app
+title ZyperTerm Control Deck
+color info
+box Welcome to ZyperTerm
+say This is not Bash, PowerShell, Python, or JS.
+say ZyperTerm commands are made for terminal apps.
+set name pilot
+set score 0
+list menu Launch Reactor|Open Vault|Scan Signal|Show Score|Help|Quit
+label loop
+open menu
+ifeq command Launch Reactor reactor
+ifeq command Open Vault vault
+ifeq command Scan Signal scan
+ifeq command Show Score score
+ifeq command Help docs
+ifeq command Quit done
+say Unknown choice. Pick a number or exact menu name.
+goto loop
+
+label reactor
+color ok
+progress Charging reactor
+add score 5
+say Reactor online. Score: $score
+goto loop
+
+label vault
+ask key Enter vault key
+ifeq key ZYPER unlock
+color warn
+say Wrong key. Hint: ZYPER
+goto loop
+label unlock
+add score 10
+color ok
+box Vault opened. Score: $score
+goto loop
+
+label scan
+color info
+wait 400
+say Signal found at grid $score.
+goto loop
+
+label score
+color ok
+say Current score is $score for $name.
+goto loop
+
+label docs
+color info
+say ZT lets you build menus, prompts, labels, jumps, variables, math, and screens.
+say Use commands in the text editor, then press Run.
+goto loop
+
+label done
+color ok
+box Session closed
+end`;
+
+    const pyDemo = `# CodeLoader Python demo
+# Runs directly in CodeLoader with Pyodide.
+
+name = "HyperZHub"
+score = 0
+
+def line(text=""):
+    print(f"[CodeLoader] {text}")
+
+line("Simple CodeLoader in HyperZHub")
+line("Python demo loaded.")
+
+choice = input("Pick 1 to add points, 2 to show status, or 3 to quit: ").strip()
+
+if choice == "1":
+    score += 5
+    line(f"Score is now {score}")
+elif choice == "2":
+    line(f"{name} score: {score}")
+elif choice == "3":
+    line("Goodbye.")
+else:
+    line("Unknown option.")
+
+line("Run again when you want another turn.")`;
+
+    const htmlDemo = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeLoader HTML Demo</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #111516;
+      color: #e9f0ec;
+      font-family: Arial, sans-serif;
+    }
+    main {
+      width: min(520px, calc(100vw - 32px));
+      border: 1px solid #344044;
+      border-radius: 8px;
+      padding: 24px;
+      background: #181d1f;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: #60d394;
+      color: #07110b;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Simple CodeLoader in HyperZHub</h1>
+    <p>This is an HTML demo you can save from CodeLoader.</p>
+    <button id="countBtn">Clicks: 0</button>
+  </main>
+  <script>
+    let clicks = 0;
+    document.querySelector("#countBtn").addEventListener("click", event => {
+      clicks += 1;
+      event.target.textContent = "Clicks: " + clicks;
+    });
+  <\/script>
+</body>
+</html>`;
+
+    const jsDemo = `// CodeLoader JavaScript demo
+// Save as .js and run in a browser console or Node.js.
+
+const app = {
+  name: "Simple CodeLoader in HyperZHub",
+  score: 0,
+  add(points) {
+    this.score += points;
+    return this.score;
+  },
+  status() {
+    return \`\${this.name} score: \${this.score}\`;
+  }
+};
+
+console.log(app.name);
+console.log("Added 5 points:", app.add(5));
+console.log(app.status());`;
+
+    const tsDemo = `// CodeLoader TypeScript demo
+type CodeLoaderApp = {
+  name: string;
+  score: number;
+};
+
+const app: CodeLoaderApp = {
+  name: "Simple CodeLoader in HyperZHub",
+  score: 0
+};
+
+function addPoints(points: number): number {
+  app.score += points;
+  return app.score;
+}
+
+console.log(app.name);
+console.log("TypeScript added:", addPoints(7));
+console.log(\`\${app.name} score: \${app.score}\`);`;
+
+    const batDemo = `@echo off
+echo Simple CodeLoader in HyperZHub
+echo Batch demo running in the CodeLoader terminal
+set SCORE=0
+echo SCORE is %SCORE%
+echo Adding 5 points...
+set /a SCORE=5
+echo SCORE is now %SCORE%
+echo Done.`;
+
+    const ps1Demo = `Write-Output "Simple CodeLoader in HyperZHub"
+Write-Output "PowerShell demo running in the CodeLoader terminal"
+$score = 0
+Write-Output "Score is $score"
+$score += 5
+Write-Output "Score is now $score"
+Write-Output "Done."`;
+
+    const luaDemo = `print("Simple CodeLoader in HyperZHub")
+local score = 0
+score = score + 5
+print("Lua score: " .. score)
+for i = 1, 3 do
+  print("Lua tick " .. i)
+end`;
+
+    const javaDemo = `public class Demo {
+  public static void main(String[] args) {
+    int score = 0;
+    score += 5;
+    System.out.println("Simple CodeLoader in HyperZHub");
+    System.out.println("Java score: " + score);
+  }
+}`;
+
+    const cppDemo = `#include <iostream>
+using namespace std;
+
+int main() {
+  int score = 0;
+  score += 5;
+  cout << "Simple CodeLoader in HyperZHub" << endl;
+  cout << "C++ score: " << score << endl;
+  return 0;
+}`;
+
+    const csDemo = `using System;
+
+class Program {
+  static void Main() {
+    int score = 0;
+    score += 5;
+    Console.WriteLine("Simple CodeLoader in HyperZHub");
+    Console.WriteLine("C# score: " + score);
+  }
+}`;
+
+    const demos = {
+      ".zt": { name: "demo.zt", code: demoScript },
+      ".py": { name: "demo.py", code: pyDemo },
+      ".html": { name: "demo.html", code: htmlDemo },
+      ".js": { name: "demo.js", code: jsDemo },
+      ".ts": { name: "demo.ts", code: tsDemo },
+      ".bat": { name: "demo.bat", code: batDemo },
+      ".ps1": { name: "demo.ps1", code: ps1Demo },
+      ".lua": { name: "demo.lua", code: luaDemo },
+      ".java": { name: "Demo.java", code: javaDemo },
+      ".cpp": { name: "demo.cpp", code: cppDemo },
+      ".cs": { name: "Program.cs", code: csDemo }
+    };
+
+    const editor = document.querySelector("#code");
+    const screen = document.querySelector("#screen");
+    const input = document.querySelector("#terminalInput");
+    const statusEl = document.querySelector("#runStatus");
+    const fileNameEl = document.querySelector("#fileName");
+    const fileInput = document.querySelector("#fileInput");
+    const fileType = document.querySelector("#fileType");
+    const loadLabel = document.querySelector("#loadLabel");
+    const saveBtn = document.querySelector("#saveBtn");
+    const terminalWrap = document.querySelector(".terminal-wrap");
+    const extensionPattern = /\.(zt|py|html|js|ts|bat|ps1|lua|java|cpp|cs)$/i;
+
+    let program = [];
+    let labels = new Map();
+    let vars = {};
+    let lists = {};
+    let pointer = 0;
+    let running = false;
+    let waiting = null;
+    let tone = "info";
+    let pyodideReady = null;
+    let luaReady = null;
+    let tsReady = null;
+    const nativeRunnerUrl = "http://127.0.0.1:8765";
+    const pistonUrl = "https://emkc.org/api/v1/piston/execute";
+
+    editor.value = demos[".zt"].code;
+
+    function selectedExt() {
+      return fileType.value || ".zt";
+    }
+
+    function updateFileTypeUI() {
+      const ext = selectedExt();
+      loadLabel.textContent = `Load ${ext}`;
+      saveBtn.textContent = `Download ${ext}`;
+      fileInput.accept = ".zt,.py,.html,.js,.ts,.bat,.ps1,.lua,.java,.cpp,.cs,text/plain,text/html,text/javascript";
+      if (!fileNameEl.textContent || fileNameEl.textContent === "untitled.zt" || /^untitled\.(zt|py|html|js|ts|bat|ps1|lua|java|cpp|cs)$/.test(fileNameEl.textContent)) {
+        fileNameEl.textContent = `untitled${ext}`;
+      }
+    }
+
+    function nameWithSelectedExt(name) {
+      const ext = selectedExt();
+      return name.replace(extensionPattern, "") + ext;
+    }
+
+    function loadSelectedDemo() {
+      const demo = demos[selectedExt()] || demos[".zt"];
+      editor.value = demo.code;
+      fileNameEl.textContent = demo.name;
+      updateFileTypeUI();
+      statusEl.textContent = `${selectedExt()} demo loaded`;
+    }
+
+    function print(text = "", type = tone) {
+      screen.classList.remove("preview-mode");
+      const line = document.createElement("div");
+      line.className = `line ${type}`;
+      line.textContent = expand(String(text));
+      screen.appendChild(line);
+      screen.scrollTop = screen.scrollHeight;
+    }
+
+    function blockPopup(kind, message) {
+      print(`${kind} blocked: ${message ?? ""}`, "warn");
+    }
+
+    function installPopupBlockers(targetWindow = window) {
+      try {
+        targetWindow.alert = message => blockPopup("alert", message);
+        targetWindow.confirm = message => {
+          blockPopup("confirm", message);
+          return true;
+        };
+        targetWindow.prompt = message => {
+          blockPopup("prompt", message);
+          return "";
+        };
+      } catch (error) {
+        print(`Popup blocker could not attach: ${error.message}`, "error");
+      }
+    }
+
+    function withHtmlPopupBlocker(source) {
+      const blocker = `<script>
+window.alert = function(message) {
+  parent.postMessage({ codeLoaderPopup: "alert", message: String(message ?? "") }, "*");
+};
+window.confirm = function(message) {
+  parent.postMessage({ codeLoaderPopup: "confirm", message: String(message ?? "") }, "*");
+  return true;
+};
+window.prompt = function(message) {
+  parent.postMessage({ codeLoaderPopup: "prompt", message: String(message ?? "") }, "*");
+  return "";
+};
+<\/script>`;
+
+      if (/<head[\s>]/i.test(source)) {
+        return source.replace(/<head([^>]*)>/i, `<head$1>${blocker}`);
+      }
+      return blocker + source;
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+          existing.addEventListener("load", resolve, { once: true });
+          if (window.loadPyodide) resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Could not load ${src}`));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function getPyodide() {
+      if (!pyodideReady) {
+        statusEl.textContent = "loading python";
+        print("Loading Python runtime with Pyodide 0.29.3...", "warn");
+        pyodideReady = loadScript("https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js")
+          .then(() => loadPyodide({
+            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/",
+            stdout: text => print(text, "info"),
+            stderr: text => print(text, "error")
+          }));
+      }
+      return pyodideReady;
+    }
+
+    async function runPython() {
+      screen.textContent = "";
+      statusEl.textContent = "python running";
+      try {
+        const pyodide = await getPyodide();
+        let inputCount = 0;
+        pyodide.setStdin({
+          stdin: () => {
+            inputCount += 1;
+            if (inputCount > 3) {
+              throw new Error("Stopped Python because it requested input too many times.");
+            }
+            print(`Python input() ${inputCount}/3 auto-entered.`, "warn");
+            return "";
+          }
+        });
+        print("Running Python...", "ok");
+        await pyodide.runPythonAsync(editor.value);
+        statusEl.textContent = "python ended";
+        print("Python finished.", "ok");
+      } catch (error) {
+        statusEl.textContent = "python error";
+        print(error.message, "error");
+      }
+    }
+
+    async function runScriptLines(kind) {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = `${kind} running`;
+      const lines = editor.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      print(`${kind} live terminal started.`, "ok");
+      print("Browser security blocks real OS command execution; CodeLoader streams the script flow here.", "warn");
+      for (const line of lines) {
+        await new Promise(resolve => setTimeout(resolve, 180));
+        if (line.toLowerCase() === "@echo off") continue;
+        print(`${kind}> ${line}`, "info");
+        if (/^(echo|write-output)\s+/i.test(line)) {
+          print(line.replace(/^(echo|write-output)\s+/i, "").replace(/^["']|["']$/g, ""), "ok");
+        }
+      }
+      statusEl.textContent = `${kind} ended`;
+      print(`${kind} script finished.`, "ok");
+    }
+
+    async function runNative(ext) {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = `${ext} native`;
+      print(`Running ${ext} with CodeLoader native runner...`, "ok");
+      print("Interactive stdin: type all needed input in the terminal before Run, one line per answer, or leave blank.", "warn");
+      try {
+        const response = await fetch(`${nativeRunnerUrl}/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ext,
+            code: editor.value,
+            stdin: input.value,
+            timeoutMs: 20000
+          })
+        });
+        const result = await response.json();
+        if (result.output) {
+          result.output.split(/\r?\n/).filter(Boolean).forEach(line => print(line, "info"));
+        }
+        if (result.error) {
+          result.error.split(/\r?\n/).filter(Boolean).forEach(line => print(line, "error"));
+        }
+        statusEl.textContent = result.ok ? `${ext} ended` : `${ext} failed`;
+        print(`Exit code: ${result.exitCode ?? "none"}`, result.ok ? "ok" : "error");
+      } catch (error) {
+        statusEl.textContent = "runner offline";
+        print("Native runner is not running.", "error");
+        print("Start it with: powershell -ExecutionPolicy Bypass -File C:\\Projects\\CodeLoaderRunner.ps1", "warn");
+        print(`Fallback reason: ${error.message}`, "error");
+      }
+    }
+
+    async function runOnline(ext) {
+      const languageMap = {
+        ".java": { language: "java" },
+        ".cpp": { language: "cpp" },
+        ".cs": { language: "csharp" }
+      };
+      const config = languageMap[ext];
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = `${ext} online`;
+      print(`Running ${ext} with online compiler...`, "ok");
+      try {
+        const response = await fetch(pistonUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            language: config.language,
+            source: editor.value,
+            stdin: input.value || ""
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`Compiler server returned ${response.status} ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.output) result.output.split(/\r?\n/).filter(Boolean).forEach(line => print(line, result.stderr ? "warn" : "info"));
+        if (result.stderr) result.stderr.split(/\r?\n/).filter(Boolean).forEach(line => print(line, "error"));
+        statusEl.textContent = result.ran ? `${ext} ended` : `${ext} failed`;
+        print(`Compiler: ${result.language || config.language} ${result.version || ""}`.trim(), result.ran ? "ok" : "error");
+      } catch (error) {
+        statusEl.textContent = "online error";
+        print("Online compiler request failed.", "error");
+        print(error.message, "error");
+      }
+    }
+
+    async function getLua() {
+      if (!luaReady) {
+        statusEl.textContent = "loading lua";
+        print("Loading Lua runtime...", "warn");
+        luaReady = loadScript("https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js");
+      }
+      return luaReady;
+    }
+
+    async function runLua() {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = "lua running";
+      try {
+        await getLua();
+        const originalLog = console.log;
+        const originalError = console.error;
+        console.log = (...items) => {
+          originalLog(...items);
+          print(items.map(String).join(" "), "info");
+        };
+        console.error = (...items) => {
+          originalError(...items);
+          print(items.map(String).join(" "), "error");
+        };
+        try {
+          fengari.load(editor.value)();
+          statusEl.textContent = "lua ended";
+          print("Lua finished.", "ok");
+        } finally {
+          console.log = originalLog;
+          console.error = originalError;
+        }
+      } catch (error) {
+        statusEl.textContent = "lua error";
+        print(error.message, "error");
+      }
+    }
+
+    async function getTypeScript() {
+      if (!tsReady) {
+        statusEl.textContent = "loading typescript";
+        print("Loading TypeScript compiler...", "warn");
+        tsReady = loadScript("https://cdn.jsdelivr.net/npm/typescript@5.9.3/lib/typescript.js");
+      }
+      return tsReady;
+    }
+
+    async function runTypeScript() {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = "ts running";
+      try {
+        await getTypeScript();
+        const result = ts.transpileModule(editor.value, {
+          compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2020 }
+        });
+        print("TypeScript transpiled. Running JavaScript output...", "ok");
+        await runJavaScript(result.outputText, "ts");
+      } catch (error) {
+        statusEl.textContent = "ts error";
+        print(error.message, "error");
+      }
+    }
+
+    async function runJavaScript(source = editor.value, label = "js") {
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = `${label} running`;
+      print(`Running ${label.toUpperCase()}...`, "ok");
+      const originalLog = console.log;
+      const originalError = console.error;
+      const originalAlert = window.alert;
+      const originalConfirm = window.confirm;
+      const originalPrompt = window.prompt;
+      try {
+        console.log = (...items) => {
+          originalLog(...items);
+          print(items.map(String).join(" "), "info");
+        };
+        console.error = (...items) => {
+          originalError(...items);
+          print(items.map(String).join(" "), "error");
+        };
+        installPopupBlockers(window);
+        new Function(source)();
+        statusEl.textContent = `${label} ended`;
+        print(`${label.toUpperCase()} finished.`, "ok");
+      } catch (error) {
+        statusEl.textContent = `${label} error`;
+        print(error.message, "error");
+      } finally {
+        console.log = originalLog;
+        console.error = originalError;
+        window.alert = originalAlert;
+        window.confirm = originalConfirm;
+        window.prompt = originalPrompt;
+      }
+    }
+
+    async function compilePreview(kind, command) {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = `${kind} preview`;
+      print(`${kind} compile/run preview`, "ok");
+      print("Full native compilation is blocked inside a standalone browser HTML file.", "warn");
+      print(`Would run: ${command}`, "info");
+      await new Promise(resolve => setTimeout(resolve, 250));
+      print("Source accepted by CodeLoader editor.", "ok");
+      print("Download the file to compile it with your local toolchain.", "info");
+    }
+
+    function expand(text) {
+      return text.replace(/\$([A-Za-z_][\w-]*)/g, (_, key) => vars[key] ?? "");
+    }
+
+    function parse(source) {
+      return source.split(/\r?\n/)
+        .map((raw, index) => ({ raw, index: index + 1, text: raw.trim() }))
+        .filter(line => line.text && !line.text.startsWith("#"));
+    }
+
+    function rebuildLabels() {
+      labels = new Map();
+      program.forEach((line, index) => {
+        const [cmd, ...rest] = line.text.split(/\s+/);
+        if (cmd.toLowerCase() === "label" && rest[0]) {
+          labels.set(rest[0], index);
+        }
+      });
+    }
+
+    function words(line) {
+      const parts = [];
+      let current = "";
+      let quoted = false;
+      for (const char of line) {
+        if (char === '"') {
+          quoted = !quoted;
+          continue;
+        }
+        if (/\s/.test(char) && !quoted) {
+          if (current) parts.push(current);
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      if (current) parts.push(current);
+      return parts;
+    }
+
+    function rest(args, start = 0) {
+      return args.slice(start).join(" ");
+    }
+
+    function numberOf(value) {
+      const expanded = expand(value ?? "0");
+      const n = Number(expanded);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    async function step() {
+      if (!running || waiting) return;
+      if (pointer >= program.length) {
+        finish("ended");
+        return;
+      }
+
+      const line = program[pointer++];
+      const args = words(line.text);
+      const command = (args.shift() || "").toLowerCase();
+
+      try {
+        switch (command) {
+          case "say":
+          case "print":
+            print(rest(args));
+            break;
+          case "title":
+            print(`== ${rest(args)} ==`, "ok");
+            break;
+          case "set":
+            vars[args[0]] = expand(rest(args, 1));
+            break;
+          case "add":
+            vars[args[0]] = numberOf(vars[args[0]]) + numberOf(args[1]);
+            break;
+          case "sub":
+            vars[args[0]] = numberOf(vars[args[0]]) - numberOf(args[1]);
+            break;
+          case "mul":
+            vars[args[0]] = numberOf(vars[args[0]]) * numberOf(args[1]);
+            break;
+          case "div":
+            vars[args[0]] = numberOf(vars[args[0]]) / (numberOf(args[1]) || 1);
+            break;
+          case "join":
+            vars[args[0]] = expand(rest(args, 1));
+            break;
+          case "upper":
+            vars[args[0]] = expand(vars[args[0]] ?? "").toUpperCase();
+            break;
+          case "lower":
+            vars[args[0]] = expand(vars[args[0]] ?? "").toLowerCase();
+            break;
+          case "ask":
+            print(rest(args, 1) || `Enter ${args[0]}:`, "warn");
+            waiting = { kind: "var", name: args[0] };
+            break;
+          case "input":
+            waiting = { kind: "var", name: args[0] || "input" };
+            break;
+          case "choose":
+            waiting = { kind: "choice", name: args[0] || "choice", options: args.slice(1).join(" ").split("|") };
+            print(`Choose: ${waiting.options.join(" / ")}`, "warn");
+            break;
+          case "list":
+            lists[args[0]] = rest(args, 1).split("|").filter(Boolean);
+            print(`List saved: ${args[0]} (${lists[args[0]].length})`, "info");
+            break;
+          case "open":
+            showList(args[0]);
+            break;
+          case "close":
+            print(`Closed ${args[0] || "panel"}.`, "info");
+            break;
+          case "button":
+            print(`[ ${rest(args)} ]`, "ok");
+            break;
+          case "ifeq":
+            if (compareArgs(args)) jump(args[args.length - 1]);
+            break;
+          case "ifnot":
+            if (!compareArgs(args)) jump(args[args.length - 1]);
+            break;
+          case "goto":
+            jump(args[0]);
+            break;
+          case "label":
+            break;
+          case "wait":
+            await new Promise(resolve => setTimeout(resolve, numberOf(args[0])));
+            break;
+          case "clear":
+          case "cls":
+            screen.textContent = "";
+            break;
+          case "color":
+            tone = ["ok", "warn", "error", "info"].includes(args[0]) ? args[0] : "info";
+            break;
+          case "box":
+            drawBox(rest(args));
+            break;
+          case "progress":
+            print(`${rest(args)} [#####.....]`, "info");
+            await new Promise(resolve => setTimeout(resolve, 250));
+            print(`${rest(args)} [##########]`, "ok");
+            break;
+          case "help":
+            showDocs();
+            break;
+          case "end":
+            finish("ended");
+            return;
+          default:
+            print(`Line ${line.index}: unknown command "${command}"`, "error");
+        }
+      } catch (error) {
+        print(`Line ${line.index}: ${error.message}`, "error");
+      }
+
+      if (running && !waiting) requestAnimationFrame(step);
+    }
+
+    function showList(name) {
+      const list = lists[name];
+      if (!list) {
+        print(`No list named ${name}.`, "error");
+        return;
+      }
+      list.forEach((item, index) => print(`${index + 1}. ${item}`, "info"));
+      waiting = { kind: "menu", name, options: list };
+      print("Enter a number or exact option name.", "warn");
+    }
+
+    function runDirectCommand(value) {
+      const args = words(value);
+      const command = (args.shift() || "").toLowerCase();
+      switch (command) {
+        case "help":
+          showDocs();
+          return true;
+        case "vars":
+          print(JSON.stringify(vars, null, 2), "info");
+          return true;
+        case "lists":
+          print(Object.keys(lists).join(", ") || "No lists loaded.", "info");
+          return true;
+        case "open":
+          showList(args[0]);
+          return true;
+        case "cls":
+        case "clear":
+          screen.textContent = "";
+          return true;
+        case "run":
+          run();
+          return true;
+        case "stop":
+        case "end":
+          finish("stopped");
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    function jump(label) {
+      if (!labels.has(label)) {
+        print(`Missing label: ${label}`, "error");
+        return;
+      }
+      pointer = labels.get(label) + 1;
+    }
+
+    function compareArgs(args) {
+      if (args.length < 3) return false;
+      const left = expand(vars[args[0]] ?? args[0]);
+      const right = expand(args.slice(1, -1).join(" "));
+      return left === right;
+    }
+
+    function drawBox(text) {
+      const value = expand(text);
+      const edge = "+-" + "-".repeat(value.length) + "-+";
+      print(edge, "ok");
+      print(`| ${value} |`, "ok");
+      print(edge, "ok");
+    }
+
+    function showDocs() {
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      statusEl.textContent = ".zt docs";
+      print("ZyperTerm .zt Command Docs", "ok");
+      print("say <text>                 Print text to the terminal.", "info");
+      print("title <text>               Print a section title.", "info");
+      print("set <name> <value>         Save a variable. Use $name inside text.", "info");
+      print("add/sub/mul/div n x        Change numeric variables.", "info");
+      print("join <name> <text>         Save joined text into a variable.", "info");
+      print("upper/lower <name>         Change variable casing.", "info");
+      print("ask <name> <prompt>        Ask the user for text.", "info");
+      print("input <name>               Wait for terminal input.", "info");
+      print("choose <name> a|b|c        Ask for a choice list.", "info");
+      print("list <name> a|b|c          Create a menu list.", "info");
+      print("open <list>                Show a numbered menu and wait for a pick.", "info");
+      print("ifeq v value label         Jump if variable equals value.", "info");
+      print("ifnot v value label        Jump if variable does not equal value.", "info");
+      print("label <name>               Mark a jump point.", "info");
+      print("goto <label>               Jump to a label.", "info");
+      print("wait <ms>                  Pause for milliseconds.", "info");
+      print("clear / cls                Clear the terminal.", "info");
+      print("color ok|warn|error|info   Change output color.", "info");
+      print("box <text>                 Draw a text box.", "info");
+      print("progress <text>            Show a small progress animation.", "info");
+      print("button <text>              Print button-looking text.", "info");
+      print("close <name>               Print a close message.", "info");
+      print("help                       Show these docs.", "info");
+      print("end                        Stop the program.", "info");
+    }
+
+    async function run() {
+      const ext = selectedExt();
+      if (ext === ".html") {
+        screen.textContent = "";
+        screen.classList.add("preview-mode");
+        statusEl.textContent = "html preview";
+        const frame = document.createElement("iframe");
+        frame.title = "HTML preview";
+        frame.className = "preview-frame";
+        frame.srcdoc = withHtmlPopupBlocker(editor.value);
+        screen.appendChild(frame);
+        return;
+      }
+
+      if (ext === ".js") {
+        screen.textContent = "";
+        await runJavaScript();
+        return;
+      }
+
+      if (ext === ".ts") {
+        await runTypeScript();
+        return;
+      }
+
+      if (ext === ".py") {
+        screen.classList.remove("preview-mode");
+        await runPython();
+        return;
+      }
+
+      if (ext === ".bat") {
+        await runNative(".bat");
+        return;
+      }
+
+      if (ext === ".ps1") {
+        await runNative(".ps1");
+        return;
+      }
+
+      if (ext === ".lua") {
+        await runLua();
+        return;
+      }
+
+      if (ext === ".java") {
+        await runOnline(".java");
+        return;
+      }
+
+      if (ext === ".cpp") {
+        await runOnline(".cpp");
+        return;
+      }
+
+      if (ext === ".cs") {
+        await runOnline(".cs");
+        return;
+      }
+
+      screen.textContent = "";
+      screen.classList.remove("preview-mode");
+      program = parse(editor.value);
+      rebuildLabels();
+      vars = {};
+      lists = {};
+      pointer = 0;
+      running = true;
+      waiting = null;
+      tone = "info";
+      statusEl.textContent = "running";
+      print("CodeLoader booting .zt...", "ok");
+      step();
+      input.focus();
+    }
+
+    function finish(text) {
+      running = false;
+      waiting = null;
+      statusEl.textContent = text;
+      print(`Program ${text}.`, "ok");
+    }
+
+    input.addEventListener("keydown", event => {
+      if (event.key !== "Enter") return;
+      const value = input.value.trim();
+      input.value = "";
+      if (!value) return;
+      print(`zt> ${value}`, "ok");
+
+      if (!running) {
+        if (!runDirectCommand(value)) {
+          print("Press Run, or type help for CodeLoader commands.", "info");
+        }
+        return;
+      }
+
+      if (!waiting) {
+        if (!runDirectCommand(value)) {
+          vars.command = value;
+          print(`Stored command = ${value}.`, "info");
+        }
+        return;
+      }
+
+      if (waiting.kind === "menu" || waiting.kind === "choice") {
+        const picked = waiting.options[Number(value) - 1] || value;
+        vars.command = picked;
+        vars[waiting.name] = picked;
+      } else {
+        vars[waiting.name] = value;
+      }
+      waiting = null;
+      step();
+    });
+
+    window.addEventListener("message", event => {
+      if (!event.data || !event.data.codeLoaderPopup) return;
+      blockPopup(event.data.codeLoaderPopup, event.data.message);
+    });
+
+    document.querySelector("#runBtn").addEventListener("click", run);
+    document.querySelector("#docsBtn").addEventListener("click", showDocs);
+    document.querySelector("#fullscreenBtn").addEventListener("click", async () => {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await terminalWrap.requestFullscreen();
+      }
+    });
+    document.querySelector("#clearBtn").addEventListener("click", () => {
+      screen.textContent = "";
+      statusEl.textContent = running ? "running" : "ready";
+    });
+    document.querySelector("#demoBtn").addEventListener("click", () => {
+      loadSelectedDemo();
+    });
+    saveBtn.addEventListener("click", () => {
+      const blob = new Blob([editor.value], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nameWithSelectedExt(fileNameEl.textContent || `program${selectedExt()}`);
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      editor.value = await file.text();
+      fileNameEl.textContent = file.name;
+      const match = file.name.match(extensionPattern);
+      if (match) {
+        fileType.value = `.${match[1].toLowerCase()}`;
+        updateFileTypeUI();
+      }
+      statusEl.textContent = "loaded";
+    });
+    fileType.addEventListener("change", () => {
+      fileNameEl.textContent = nameWithSelectedExt(fileNameEl.textContent || `untitled${selectedExt()}`);
+      updateFileTypeUI();
+      loadSelectedDemo();
+    });
+
+    updateFileTypeUI();
+    installPopupBlockers(window);
+    print("CodeLoader ready. Press Run or load a .zt file.", "ok");
+  </script>
+</body>
+</html>
