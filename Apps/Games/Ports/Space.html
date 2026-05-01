@@ -32,6 +32,26 @@ h1 {
     margin-bottom: 20px;
 }
 
+/* MAIN LINK */
+.main-link {
+    margin-bottom: 25px;
+    padding: 18px 140px; /* LONG BUTTON */
+    font-size: 1.2rem;
+    border-radius: 12px;
+    border: 2px solid #9333ea;
+    background: rgba(147, 51, 234, 0.2);
+    color: #c084fc;
+    cursor: pointer;
+    transition: 0.3s;
+    letter-spacing: 2px;
+}
+
+.main-link:hover {
+    background: #9333ea;
+    color: black;
+    box-shadow: 0 0 25px #9333ea;
+}
+
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -96,20 +116,25 @@ iframe {
 <div id="home">
     <h1>Space</h1>
 
-    <div class="grid">
-      <button onclick="openSite('https://spacing.centromariapolis.cl/')">Link 1</button>
-<button onclick="openSite('https://spacing.gorich.hk/')">Link 2</button>
-<button onclick="openSite('https://spacing.night.int.yt/')">Link 3</button>
-<button onclick="openSite('https://spacing.is-a.software.cdn.cloudflare.net/')">Link 4</button>
+    <!-- MAIN LINK -->
+    <button class="main-link" onclick="openSite('https://gointospace.app')">
+        🚀 MAIN LINK
+    </button>
 
-<button onclick="openSite('https://buy.gpu74.ru/')">Link 5</button>
-<button onclick="openSite('https://member.electricpiano.xyz.cdn.cloudflare.net/')">Link 6</button>
-<button onclick="openSite('https://outerspace.boiso.ar/')">Link 7</button>
-<button onclick="openSite('https://graph.desmos.live.cdn.cloudflare.net/')">Link 8</button>
-<button onclick="openSite('https://outerspace.arrowbases.com/')">Link 9</button>
-<button onclick="openSite('https://outerspace.regu.ch/')">Link 10</button>
-<button onclick="openSite('https://app.infotechnology.com/')">Link 11</button>
-<button onclick="openSite('https://outerspace.tomashirsch.cl/')">Link 12</button>
+    <div class="grid">
+        <button onclick="openSite('https://spacing.centromariapolis.cl/')">Link 1</button>
+        <button onclick="openSite('https://spacing.gorich.hk/')">Link 2</button>
+        <button onclick="openSite('https://spacing.night.int.yt/')">Link 3</button>
+        <button onclick="openSite('https://spacing.is-a.software.cdn.cloudflare.net/')">Link 4</button>
+
+        <button onclick="openSite('https://buy.gpu74.ru/')">Link 5</button>
+        <button onclick="openSite('https://member.electricpiano.xyz.cdn.cloudflare.net/')">Link 6</button>
+        <button onclick="openSite('https://outerspace.boiso.ar/')">Link 7</button>
+        <button onclick="openSite('https://graph.desmos.live.cdn.cloudflare.net/')">Link 8</button>
+        <button onclick="openSite('https://outerspace.arrowbases.com/')">Link 9</button>
+        <button onclick="openSite('https://outerspace.regu.ch/')">Link 10</button>
+        <button onclick="openSite('https://app.infotechnology.com/')">Link 11</button>
+        <button onclick="openSite('https://outerspace.tomashirsch.cl/')">Link 12</button>
     </div>
 </div>
 
