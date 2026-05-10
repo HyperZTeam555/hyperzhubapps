@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HackZF v3.1.4</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;height:100%;background:#0a0a0a;overflow:hidden;}
+  body{display:flex;flex-direction:column;font-family:'Share Tech Mono','Courier New',monospace;}
+
+  .term-bar{
+    flex-shrink:0;
+    background:#111;
+    border-bottom:1px solid #22c55e33;
+    padding:10px 18px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .term-dot{width:12px;height:12px;border-radius:50%;}
+  .term-title{color:#22c55e77;font-size:13px;margin:0 auto;letter-spacing:3px;}
+
+  .term-out{
+    flex:1;
+    overflow-y:auto;
+    padding:16px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    scrollbar-width:thin;
+    scrollbar-color:#22c55e33 transparent;
+  }
+  .term-out::-webkit-scrollbar{width:6px;}
+  .term-out::-webkit-scrollbar-track{background:transparent;}
+  .term-out::-webkit-scrollbar-thumb{background:#22c55e33;border-radius:3px;}
+
+  .line{font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-all;}
+  .g {color:#22c55e;}
+  .g2{color:#86efac;}
+  .g3{color:#4ade8055;}
+  .w {color:#f0fdf4;}
+  .y {color:#fde047;}
+  .r {color:#f87171;}
+  .b {color:#60a5fa;}
+
+  .term-input-row{
+    flex-shrink:0;
+    border-top:1px solid #22c55e22;
+    padding:12px 20px;
+    display:flex;align-items:center;gap:8px;
+    background:#0d0d0d;
+  }
+  .prompt-sym{color:#22c55e;font-size:14px;font-family:inherit;white-space:nowrap;}
+  .term-input{
+    flex:1;background:transparent;border:none;outline:none;
+    color:#86efac;font-family:inherit;font-size:14px;
+    caret-color:#22c55e;
+  }
+
+  /* scanline overlay */
+  body::after{
+    content:'';
+    position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);
+    pointer-events:none;
+    z-index:999;
+  }
+</style>
+</head>
+<body>
+
+<div class="term-bar">
+  <div class="term-dot" style="background:#f87171"></div>
+  <div class="term-dot" style="background:#fde047"></div>
+  <div class="term-dot" style="background:#22c55e"></div>
+  <span class="term-title">HackZF v3.1.4 — root@hackzf</span>
+</div>
+
+<div class="term-out" id="out"></div>
+
+<div class="term-input-row">
+  <span class="prompt-sym">root@hackzf:~$</span>
+  <input class="term-input" id="inp" autocomplete="off" spellcheck="false" placeholder="type 'help' for commands..."/>
+</div>
+
+<script>
+const out = document.getElementById('out');
+const inp = document.getElementById('inp');
+
+const STORE_KEY = 'hackzf_cache_v3';
+function loadCache(){try{return JSON.parse(localStorage.getItem(STORE_KEY)||'{}')}catch{return{}}}
+function saveCache(c){try{localStorage.setItem(STORE_KEY,JSON.stringify(c))}catch{}}
+let cache = loadCache();
+function getTarget(name){
+  const k = name.toLowerCase().trim();
+  if(!cache[k]) cache[k] = generateTarget(k);
+  saveCache(cache);
+  return cache[k];
+}
+
+const streets=["Maple Ave","Oak St","Pine Rd","Elm Blvd","Cedar Ln","Birch Dr","Walnut Ct","Sunset Blvd","Highland Ave","River Rd","Park St","Lake Dr","Forest Ln","Valley Rd","Hillside Ave","Grand Blvd","Church St","Washington Ave","Jefferson Rd","Lincoln Dr","Peach Tree Rd","Mockingbird Ln","Commerce St","Fairway Dr","Ridgeline Blvd"];
+const isps=["Comcast Business","AT&T Internet","Verizon Fios","Cox Communications","CenturyLink","Spectrum","Charter","Frontier","Mediacom","WideOpenWest","T-Mobile Home Internet","Google Fiber","Brightspeed","Optimum","Xfinity"];
+const devices=["iPhone 15 Pro","Samsung Galaxy S24","Google Pixel 8","MacBook Pro 2023","Dell XPS 15","HP Pavilion","iPad Air","Surface Pro 11","Lenovo ThinkPad X1","ASUS ROG Zephyrus","OnePlus 12","Razer Blade 16"];
+const browsers=["Chrome 124","Firefox 126","Safari 17","Edge 123","Brave 1.65","Opera 109"];
+const os_list=["Windows 11","macOS Sonoma","Ubuntu 22.04","iOS 17.4","Android 14","Kali Linux 2024.1"];
+const emails_d=["gmail.com","yahoo.com","hotmail.com","outlook.com","icloud.com","proton.me"];
+const words=["password123","iloveyou","letmein","123456","monkey","dragon","sunshine","qwerty123","football","baseball","batman","superman","trustno1","master123","hello123","shadow2024","iloveyou1","abc123456","pass1234","hunter2"];
+const hashes=["5f4dcc3b5aa765d61d83","e10adc3949ba59abbe56","d8578edf8458ce06fbc5","4297f44b13955235245b","7c6a180b36896a0a8c02","25d55ad283aa400af464","f25a2fc72690b780b2a14e140ef6a9e0"];
+const city_data=[
+  {city:"New York",state:"NY",zip_prefix:"10"},{city:"Los Angeles",state:"CA",zip_prefix:"90"},
+  {city:"Houston",state:"TX",zip_prefix:"77"},{city:"Chicago",state:"IL",zip_prefix:"60"},
+  {city:"Phoenix",state:"AZ",zip_prefix:"85"},{city:"Philadelphia",state:"PA",zip_prefix:"19"},
+  {city:"San Antonio",state:"TX",zip_prefix:"78"},{city:"San Diego",state:"CA",zip_prefix:"92"},
+  {city:"Dallas",state:"TX",zip_prefix:"75"},{city:"Jacksonville",state:"FL",zip_prefix:"32"},
+  {city:"Austin",state:"TX",zip_prefix:"73"},{city:"Memphis",state:"TN",zip_prefix:"38"},
+  {city:"Seattle",state:"WA",zip_prefix:"98"},{city:"Denver",state:"CO",zip_prefix:"80"},
+  {city:"Nashville",state:"TN",zip_prefix:"37"},{city:"Portland",state:"OR",zip_prefix:"97"},
+  {city:"Las Vegas",state:"NV",zip_prefix:"89"},{city:"Louisville",state:"KY",zip_prefix:"40"},
+  {city:"Milwaukee",state:"WI",zip_prefix:"53"},{city:"Albuquerque",state:"NM",zip_prefix:"87"},
+  {city:"Atlanta",state:"GA",zip_prefix:"30"},{city:"Kansas City",state:"MO",zip_prefix:"64"},
+  {city:"Raleigh",state:"NC",zip_prefix:"27"},{city:"Omaha",state:"NE",zip_prefix:"68"},
+  {city:"Colorado Springs",state:"CO",zip_prefix:"80"},{city:"Virginia Beach",state:"VA",zip_prefix:"23"},
+  {city:"Tulsa",state:"OK",zip_prefix:"74"},{city:"Minneapolis",state:"MN",zip_prefix:"55"},
+  {city:"Tampa",state:"FL",zip_prefix:"33"},{city:"New Orleans",state:"LA",zip_prefix:"70"},
+  {city:"Cleveland",state:"OH",zip_prefix:"44"},{city:"Bakersfield",state:"CA",zip_prefix:"93"},
+  {city:"Aurora",state:"CO",zip_prefix:"80"},{city:"Anaheim",state:"CA",zip_prefix:"92"},
+  {city:"Santa Ana",state:"CA",zip_prefix:"92"},{city:"Corpus Christi",state:"TX",zip_prefix:"78"},
+  {city:"Riverside",state:"CA",zip_prefix:"92"},{city:"St. Louis",state:"MO",zip_prefix:"63"},
+  {city:"Lexington",state:"KY",zip_prefix:"40"},{city:"Pittsburgh",state:"PA",zip_prefix:"15"},
+  {city:"Stockton",state:"CA",zip_prefix:"95"},{city:"Anchorage",state:"AK",zip_prefix:"99"},
+  {city:"Cincinnati",state:"OH",zip_prefix:"45"},{city:"St. Paul",state:"MN",zip_prefix:"55"},
+  {city:"Greensboro",state:"NC",zip_prefix:"27"},{city:"Toledo",state:"OH",zip_prefix:"43"},
+  {city:"Newark",state:"NJ",zip_prefix:"07"},{city:"Plano",state:"TX",zip_prefix:"75"},
+  {city:"Henderson",state:"NV",zip_prefix:"89"},{city:"Orlando",state:"FL",zip_prefix:"32"},
+  {city:"Chandler",state:"AZ",zip_prefix:"85"},{city:"Laredo",state:"TX",zip_prefix:"78"},
+  {city:"Madison",state:"WI",zip_prefix:"53"},{city:"Durham",state:"NC",zip_prefix:"27"},
+  {city:"Lubbock",state:"TX",zip_prefix:"79"},{city:"Winston-Salem",state:"NC",zip_prefix:"27"},
+  {city:"Garland",state:"TX",zip_prefix:"75"},{city:"Glendale",state:"AZ",zip_prefix:"85"},
+  {city:"Hialeah",state:"FL",zip_prefix:"33"},{city:"Scottsdale",state:"AZ",zip_prefix:"85"},
+  {city:"Baton Rouge",state:"LA",zip_prefix:"70"},{city:"Norfolk",state:"VA",zip_prefix:"23"},
+  {city:"Chesapeake",state:"VA",zip_prefix:"23"},{city:"Fremont",state:"CA",zip_prefix:"94"},
+  {city:"Gilbert",state:"AZ",zip_prefix:"85"},{city:"Boise",state:"ID",zip_prefix:"83"},
+  {city:"Birmingham",state:"AL",zip_prefix:"35"},{city:"Rochester",state:"NY",zip_prefix:"14"},
+  {city:"Richmond",state:"VA",zip_prefix:"23"},{city:"Spokane",state:"WA",zip_prefix:"99"},
+  {city:"Des Moines",state:"IA",zip_prefix:"50"},{city:"Montgomery",state:"AL",zip_prefix:"36"},
+  {city:"Modesto",state:"CA",zip_prefix:"95"},{city:"Fayetteville",state:"NC",zip_prefix:"28"},
+  {city:"Tacoma",state:"WA",zip_prefix:"98"},{city:"Shreveport",state:"LA",zip_prefix:"71"},
+  {city:"Fontana",state:"CA",zip_prefix:"92"},{city:"Moreno Valley",state:"CA",zip_prefix:"92"},
+  {city:"Glendale",state:"CA",zip_prefix:"91"},{city:"Akron",state:"OH",zip_prefix:"44"},
+  {city:"Yonkers",state:"NY",zip_prefix:"10"},{city:"Columbus",state:"GA",zip_prefix:"31"},
+  {city:"Augusta",state:"GA",zip_prefix:"30"},{city:"Little Rock",state:"AR",zip_prefix:"72"},
+];
+const ports_pool=[[21,'ftp','vsftpd 3.0'],[22,'ssh','OpenSSH 8.9'],[25,'smtp','Postfix 3.7'],[80,'http','Apache 2.4'],[110,'pop3','Dovecot 2.3'],[143,'imap','Dovecot 2.3'],[443,'https','nginx 1.24'],[3306,'mysql','MySQL 8.0'],[3389,'rdp','Windows RDP'],[5900,'vnc','RealVNC 6.7'],[6667,'irc','UnrealIRCd 6.0'],[8080,'http-alt','Jetty 9.4'],[8443,'https-alt','Tomcat 10.1'],[27017,'mongodb','MongoDB 6.0'],[6379,'redis','Redis 7.2'],[9200,'elasticsearch','ES 8.11']];
+const ddos_methods=['UDP Flood','SYN Flood','HTTP Flood','DNS Amplification','NTP Amplification','Slowloris','ICMP Flood','Memcached Amplification','BGP Hijack','Layer 7 HTTP/2'];
+const lures=['Your account has been suspended','Verify your identity now','You have a pending refund of $847.00','Unusual login detected from Russia','You have won a $500 gift card','Action required: update billing info','Security alert: password changed','Your package could not be delivered'];
+const timezones=['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Phoenix','America/Detroit','America/Indianapolis','America/Anchorage','Pacific/Honolulu'];
+
+let userCity = null;
+let userState = null;
+
+function ri(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function rp(a){return a[Math.floor(Math.random()*a.length)];}
+function randIp(){return `${ri(1,254)}.${ri(0,255)}.${ri(0,255)}.${ri(1,254)}`;}
+function si(seed,max){let h=0;for(let i=0;i<seed.length;i++){h=Math.imul(31,h)+seed.charCodeAt(i)|0;}return Math.abs(h)%max;}
+function sp(arr,seed,off=''){return arr[si(seed+off,arr.length)];}
+function sint(min,max,seed,off=''){return min+si(seed+off,max-min+1);}
+function sip(seed){return `${sint(1,254,seed,'a')}.${sint(0,255,seed,'b')}.${sint(0,255,seed,'c')}.${sint(1,254,seed,'d')}`;}
+
+function generateTarget(k){
+  const cd=sp(city_data,k,'city');
+  const zip=cd.zip_prefix+String(sint(100,999,k,'zip'));
+  const open=ports_pool.filter((_,i)=>si(k+'port'+i,3)>0).slice(0,sint(3,7,k,'portct'));
+  const nf=k.split(' ')[0];
+  return{
+    ip:sip(k),
+    isp:sp(isps,k,'isp'),
+    asn:'AS'+sint(10000,65000,k,'asn'),
+    street:sint(100,9999,k,'snum')+' '+sp(streets,k,'st'),
+    city:cd.city,state:cd.state,zip,
+    device:sp(devices,k,'dev'),
+    browser:sp(browsers,k,'br'),
+    os:sp(os_list,k,'os'),
+    email:nf+sint(1,9999,k,'em')+'@'+sp(emails_d,k,'emd'),
+    hash:sp(hashes,k,'hsh')+sint(100,999,k,'hshx'),
+    password:sp(words,k,'pw'),
+    ports:open,
+    mac:[...Array(6)].map((_,i)=>sint(0,255,k,'mac'+i).toString(16).padStart(2,'0')).join(':'),
+    timezone:sp(timezones,k,'tz'),
+    lat:(sint(250,490,k,'lat')/10).toFixed(1),
+    lon:('-'+(sint(700,1240,k,'lon')/10).toFixed(1)),
+    phone:`(${sint(200,999,k,'ph1')}) ${sint(100,999,k,'ph2')}-${sint(1000,9999,k,'ph3')}`,
+    dob:`${sint(1,12,k,'dobm')}/${sint(1,28,k,'dobd')}/${sint(1990,2005,k,'doby')}`,
+    ssn:`***-**-${sint(1000,9999,k,'ssn')}`,
+  };
+}
+
+function print(text,cls='w',d=0){
+  return new Promise(res=>setTimeout(()=>{
+    const el=document.createElement('div');
+    el.className=`line ${cls}`;el.textContent=text;
+    out.appendChild(el);out.scrollTop=out.scrollHeight;res();
+  },d));
+}
+async function tl(lines){for(const[t,c,d]of lines)await print(t,c,d||0);}
+async function dl(ms){return new Promise(r=>setTimeout(r,ms));}
+async function progress(label,steps=6,speed=110){
+  await print('');
+  const bars=['[          ]','[##        ]','[####      ]','[######    ]','[########  ]','[##########]'];
+  const el=document.createElement('div');el.className='line g3';el.textContent=label+' '+bars[0];
+  out.appendChild(el);
+  for(let i=1;i<steps;i++){await dl(speed);el.textContent=label+' '+bars[Math.floor(i*(bars.length-1)/(steps-1))];}
+  out.scrollTop=out.scrollHeight;
+}
+
+async function cmdHelp(){
+  await tl([
+    ['','g3'],
+    ['  HACKZF COMMAND REFERENCE','g'],
+    ['  ─────────────────────────────────────────────────','g3'],
+    ['  scan             — scan your own connection info','g2'],
+    ['  fyfa <name>      — find anyones full address','g2'],
+    ['  dox  <name>      — full dox report (address, SSN, DOB...)','g2'],
+    ['  trace <name>     — traceroute to target IP','g2'],
+    ['  nmap <name>      — port scan target machine','g2'],
+    ['  crack <name>     — crack target password hash','g2'],
+    ['  ddos <name>      — launch DDoS attack on target','g2'],
+    ['  phish <name>     — send phishing email to target','g2'],
+    ['  sniff <name>     — sniff plaintext packets from target','g2'],
+    ['  rat <name>       — deploy remote access trojan','g2'],
+    ['  mitm <name>      — man-in-the-middle attack','g2'],
+    ['  sql <name>       — SQL injection on target site','g2'],
+    ['  brute <name>     — brute force target login portal','g2'],
+    ['  whoami           — display current user','g2'],
+    ['  clear            — clear terminal','g2'],
+    ['  help             — show this menu','g2'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdScan(){
+  const t=getTarget('__self__');
+  const myCity=userCity||t.city;
+  const myState=userState||t.state;
+  await progress(' scanning local interface...');
+  await dl(150);
+  await tl([
+    ['','g3'],
+    [' ┌─ YOUR CONNECTION ──────────────────────────────┐','g'],
+    [` │  IP Address  : ${t.ip}`,'g2'],
+    [` │  ISP         : ${t.isp}`,'g2'],
+    [` │  ASN         : ${t.asn}`,'g2'],
+    [` │  City        : ${myCity}, ${myState}`,'g2'],
+    [` │  Zip Code    : ${t.zip}`,'g2'],
+    [` │  Street      : ${t.street}`,'g2'],
+    [` │  Device      : ${t.device}`,'g2'],
+    [` │  OS          : ${t.os}`,'g2'],
+    [` │  Browser     : ${t.browser}`,'g2'],
+    [` │  MAC         : ${t.mac}`,'g2'],
+    [` │  VPN         : not active (rookie move)`,'y'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [' [!] ur fully exposed. get a VPN champ.','r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdFyfa(args){
+  if(!args||!args.trim()){await print(' usage: fyfa <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` searching records for "${name}"...`);
+  await dl(100);await progress(' cross-referencing voter/property db...');
+  await dl(100);await progress(' confirming via ISP geolocation...');
+  await dl(150);
+  await tl([
+    ['','g3'],
+    [` ┌─ TARGET: ${name.toUpperCase()} ${'─'.repeat(Math.max(2,36-name.length))}┐`,'g'],
+    [` │  Street  : ${t.street}`,'g2'],
+    [` │  City    : ${t.city}, ${t.state} ${t.zip}`,'g2'],
+    [` │  IP      : ${t.ip}`,'g2'],
+    [` │  ISP     : ${t.isp}`,'g2'],
+    [` │  Email   : ${t.email}`,'g2'],
+    [` │  Device  : ${t.device}`,'g2'],
+    [` │  Status  : located ✓`,'g2'],
+    [' └──────────────────────────────────────────────────┘','g'],
+    [` [+] ${name} is cooked. gg.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdDox(args){
+  if(!args||!args.trim()){await print(' usage: dox <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` building full dox on ${name}...`,8,100);
+  await dl(100);await progress(' scraping social media profiles...');
+  await dl(100);await progress(' pulling phone carrier records...');
+  await dl(100);
+  await tl([
+    ['','g3'],
+    [` ╔═ FULL DOX: ${name.toUpperCase()} ${'═'.repeat(Math.max(2,33-name.length))}╗`,'g'],
+    [` ║  Full Name  : ${name}`,'g2'],
+    [` ║  DOB        : ${t.dob}`,'g2'],
+    [` ║  SSN        : ${t.ssn}`,'g2'],
+    [` ║  Phone      : ${t.phone}`,'g2'],
+    [` ║  Email      : ${t.email}`,'g2'],
+    [` ║  Address    : ${t.street}, ${t.city} ${t.state} ${t.zip}`,'g2'],
+    [` ║  IP         : ${t.ip} (${t.isp})`,'g2'],
+    [` ║  MAC        : ${t.mac}`,'g2'],
+    [` ║  Device     : ${t.device}`,'g2'],
+    [` ║  OS         : ${t.os}`,'g2'],
+    [` ║  Browser    : ${t.browser}`,'g2'],
+    [` ║  Timezone   : ${t.timezone}`,'g2'],
+    [` ║  Coords     : ${t.lat}°N ${t.lon}°W`,'g2'],
+    [' ╚═══════════════════════════════════════════════════╝','g'],
+    [` [+] ${name} has been fully doxed. rip bozo.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdDdos(args){
+  if(!args||!args.trim()){await print(' usage: ddos <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const gbps=(sint(10,999,name,'gbps')/10).toFixed(1);
+  const pps=sint(100,999,name,'pps')+'k';
+  const method=sp(ddos_methods,name,'ddosm');
+  const bots=sint(800,9999,name,'bots');
+  await print('');
+  await print(` [!] targeting ${t.ip} (${name})...`,'y');
+  await dl(200);
+  await progress(' spinning up botnet nodes...',8,120);
+  await dl(100);
+  const el=document.createElement('div');el.className='line g3';
+  el.textContent=' launching attack... [          ] 0%';out.appendChild(el);
+  const pcts=['10%','25%','41%','58%','74%','89%','100%'];
+  const bars=['[##        ]','[###       ]','[#####     ]','[#######   ]','[########  ]','[#########]','[##########]'];
+  for(let i=0;i<pcts.length;i++){await dl(220);el.textContent=` launching attack... ${bars[i]} ${pcts[i]}`;out.scrollTop=out.scrollHeight;}
+  await dl(200);
+  await tl([
+    ['','g3'],
+    [` ┌─ DDOS STATUS ──────────────────────────────────┐`,'g'],
+    [` │  Target      : ${t.ip}`,'g2'],
+    [` │  Method      : ${method}`,'g2'],
+    [` │  Throughput  : ${gbps} Gbps`,'r'],
+    [` │  PPS         : ${pps} packets/sec`,'r'],
+    [` │  Botnet Nodes: ${bots} active`,'y'],
+    [` │  Duration    : ongoing`,'y'],
+    [` │  Status      : TARGET OFFLINE ✓`,'r'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${name} has been taken offline. rip bozo.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdPhish(args){
+  if(!args||!args.trim()){await print(' usage: phish <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const lure=sp(lures,name,'lure');
+  await progress(` crafting phishing email for ${t.email}...`);
+  await dl(100);await progress(' spoofing sender domain...');
+  await dl(100);await progress(' bypassing spam filters...');
+  await dl(150);
+  await tl([
+    ['','g3'],
+    [` ┌─ PHISHING REPORT ──────────────────────────────┐`,'g'],
+    [` │  To          : ${t.email}`,'g2'],
+    [` │  Subject     : "${lure}"`,'g2'],
+    [` │  Spoofed as  : support@apple-security.com`,'g2'],
+    [` │  Payload URL : hxxp://verify-acc-secure[.]xyz`,'g2'],
+    [` │  IP Logger   : armed`,'y'],
+    [` │  Status      : DELIVERED ✓`,'g2'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] email sent to ${name}. awaiting click.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdSniff(args){
+  if(!args||!args.trim()){await print(' usage: sniff <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` intercepting ${t.ip} traffic...`,7,130);
+  await print('');
+  await print(' [*] capturing live packets... ctrl+c to stop','g3');
+  await print('');
+  const pkts=[
+    `  ${t.ip}:${sint(1024,65535,name,'p1')} → 142.250.80.46:443    [TLS] GET /mail/u/0`,
+    `  ${t.ip}:${sint(1024,65535,name,'p2')} → 157.240.22.35:443    [TLS] POST /api/graphql`,
+    `  ${t.ip}:${sint(1024,65535,name,'p3')} → 104.16.99.52:443     [TLS] GET /cdn/assets.js`,
+    `  ${t.ip}:${sint(1024,65535,name,'p4')} → 8.8.8.8:53           [DNS] A discord.com`,
+    `  ${t.ip}:${sint(1024,65535,name,'p5')} → 151.101.65.140:443   [TLS] GET /r/all`,
+    `  ${t.ip}:${sint(1024,65535,name,'p6')} → 203.0.113.42:80      [HTTP] POST /login`,
+    `  PLAINTEXT ← credentials: user=${t.email} pass=${t.password}`,
+  ];
+  for(let i=0;i<pkts.length;i++){
+    await dl(200);
+    await print(pkts[i],i>=pkts.length-1?'r':'g2');
+  }
+  await print('');
+  await print(` [+] plaintext credentials captured. lmaooo.`,'r');
+  await print('','g3');
+}
+
+async function cmdRat(args){
+  if(!args||!args.trim()){await print(' usage: rat <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` compiling RAT for ${t.os}...`,8,110);
+  await dl(100);await progress(' encrypting + obfuscating payload...');
+  await dl(100);await progress(` injecting into ${t.device}...`);
+  await dl(150);
+  await tl([
+    ['','g3'],
+    [` ┌─ RAT DEPLOYMENT ───────────────────────────────┐`,'g'],
+    [` │  Target      : ${t.ip} (${name})`,'g2'],
+    [` │  OS          : ${t.os}`,'g2'],
+    [` │  Payload     : hackzf_rat_v4.exe (256kb)`,'g2'],
+    [` │  Keylogger   : active`,'r'],
+    [` │  Webcam      : streaming ✓`,'r'],
+    [` │  Microphone  : recording ✓`,'r'],
+    [` │  File Access : full read/write`,'r'],
+    [` │  Persistence : boot startup enabled`,'r'],
+    [` │  Status      : CONNECTED`,'g'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] u now own ${name}'s ${t.device}.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdMitm(args){
+  if(!args||!args.trim()){await print(' usage: mitm <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` performing ARP poisoning on ${t.ip}...`,7,130);
+  await dl(100);await progress(' redirecting traffic through our node...');
+  await dl(150);
+  const intercepted=[
+    `  GET  https://instagram.com/accounts/login/`,
+    `  POST https://instagram.com/accounts/login/  →  user=${t.email}&pass=${t.password}`,
+    `  GET  https://mail.google.com/mail/u/0/#inbox`,
+    `  GET  https://discord.com/channels/@me`,
+  ];
+  await print('');
+  await print(` [*] all traffic from ${t.ip} routing through us...`,'g3');
+  await print('');
+  for(const p of intercepted){await dl(180);await print(p,p.includes('POST')?'r':'g2');}
+  await print('');
+  await tl([
+    [` ┌─ MITM SUMMARY ─────────────────────────────────┐`,'g'],
+    [` │  Gateway spoofed   : ✓`,'g2'],
+    [` │  SSL stripped      : ✓`,'g2'],
+    [` │  Credentials found : ${t.email} / ${t.password}`,'y'],
+    [` │  Sessions hijacked : 3`,'r'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${name} has no idea. classic.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdSql(args){
+  if(!args||!args.trim()){await print(' usage: sql <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const db=`${name.split(' ')[0].toLowerCase()}_prod_db`;
+  const tables=['users','passwords','sessions','payments','admin_users','credit_cards','private_messages'];
+  const found=tables.filter((_,i)=>si(name+'tbl'+i,2)===0);
+  await progress(` scanning ${t.ip} for SQLi vulnerabilities...`);
+  await dl(100);await progress(' injecting payload into login form...');
+  await dl(100);await progress(` dumping database: ${db}...`);
+  await dl(150);
+  await print('');
+  await print(` [*] connected to ${db} (MySQL 8.0)`,'g3');
+  await print(' [*] tables found:','g3');
+  for(const tbl of found){await dl(80);await print(`      → ${tbl}`,'y');}
+  await print('');
+  await tl([
+    [` ┌─ SQL DUMP ──────────────────────────────────────┐`,'g'],
+    [` │  Database    : ${db}`,'g2'],
+    [` │  Tables hit  : ${found.length}`,'g2'],
+    [` │  Rows dumped : ${sint(1000,50000,name,'rows').toLocaleString()}`,'r'],
+    [` │  Admin user  : admin@${t.email.split('@')[1]}`,'g2'],
+    [` │  Admin pass  : ${t.password}`,'y'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] entire db of ${name} dumped. gg no re.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdBrute(args){
+  if(!args||!args.trim()){await print(' usage: brute <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const attempts=sint(1200,9800,name,'att');
+  await progress(` detecting login portal for ${t.ip}...`);
+  await dl(100);
+  await print('');
+  await print(` [*] portal found: http://${t.ip}/wp-login.php`,'g3');
+  await print(' [*] loading wordlist: rockyou.txt (14.3M entries)','g3');
+  await print('');
+  const el=document.createElement('div');el.className='line g3';
+  el.textContent=' trying passwords... [          ] 0%';out.appendChild(el);
+  const pcts=['5%','18%','33%','49%','61%','78%','100%'];
+  const bars=['[#         ]','[##        ]','[####      ]','[#####     ]','[######    ]','[########  ]','[##########]'];
+  for(let i=0;i<pcts.length;i++){await dl(230);el.textContent=` trying passwords... ${bars[i]} ${pcts[i]}`;out.scrollTop=out.scrollHeight;}
+  await dl(250);
+  await tl([
+    ['','g3'],
+    [` ┌─ BRUTE FORCE RESULT ───────────────────────────┐`,'g'],
+    [` │  Target      : ${t.ip}/wp-login.php`,'g2'],
+    [` │  Username    : ${t.email}`,'g2'],
+    [` │  Password    : ${t.password}`,'y'],
+    [` │  Attempts    : ${attempts.toLocaleString()}`,'g2'],
+    [` │  Time        : ${sint(3,47,name,'brt')}s`,'g2'],
+    [` │  Status      : ACCESS GRANTED ✓`,'g'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] logged into ${name}'s account. u r in.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdTrace(args){
+  if(!args||!args.trim()){await print(' usage: trace <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const hops=sint(8,14,name,'hops');
+  await progress(` resolving route to ${t.ip}...`);
+  await print('');
+  await print(` traceroute to ${t.ip} (${name}), max ${hops} hops`,'g');
+  await print(' HOP    MS        IP ADDRESS','g3');
+  await print(' ───────────────────────────────────────────────','g3');
+  for(let i=1;i<=hops;i++){
+    const hopIp=i===hops?t.ip:randIp();
+    const ms=sint(4,180,name,'hop'+i);
+    await dl(90);
+    await print(`  ${String(i).padStart(2)}   ${String(ms).padStart(5)}ms   ${hopIp}`,i===hops?'y':'g2');
+  }
+  await print('');
+  await print(` [+] trace complete. ${name} pinned at ${t.ip}`,'g');
+  await print('','g3');
+}
+
+async function cmdCrack(args){
+  if(!args||!args.trim()){await print(' usage: crack <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` pulling ${name}'s hash from breach db...`);
+  await dl(100);await print(` hash found: ${t.hash}`,'g3');
+  await progress(' running rockyou.txt wordlist...');
+  await dl(150);await progress(' applying rainbow tables...');
+  await dl(150);
+  await tl([
+    ['','g3'],
+    [` ┌─ CRACKED ──────────────────────────────────────┐`,'g'],
+    [` │  Target    : ${name}`,'g2'],
+    [` │  Hash      : ${t.hash}`,'g2'],
+    [` │  Password  : ${t.password}`,'y'],
+    [` │  Type      : MD5`,'g2'],
+    [` │  Time      : ${sint(1,9,name,'crt')}.${sint(0,9,name,'crtd')}s`,'g2'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] cracked in under 10s. they really used that. smh.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdNmap(args){
+  if(!args||!args.trim()){await print(' usage: nmap <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` scanning ${t.ip}...`);
+  await print('');
+  await print(` nmap 7.94 — ${t.ip} (${name})`,'g');
+  await print(` host: ${t.city}, ${t.state} — ${t.isp}`,'g3');
+  await print(' PORT        STATE   SERVICE        VERSION','g3');
+  await print(' ─────────────────────────────────────────────────','g3');
+  for(const[p,s,v]of t.ports){
+    await dl(70);
+    await print(`  ${String(p).padEnd(8)} open    ${s.padEnd(13)}  ${v}`,'g2');
+  }
+  await print('');
+  await print(` [+] ${t.ports.length} open ports on ${name}. this target is cooked.`,'y');
+  await print('','g3');
+}
+
+async function cmdWhoami(){
+  await tl([
+    ['','g3'],
+    [' root@hackzf','g'],
+    [' clearance : ULTRA MEGA ELITE','g'],
+    [' status    : actively hacking (the planet)','g2'],
+    [' threats   : none (everyone scared)','g2'],
+    [' coffee    : yes','g2'],
+    ['','g3'],
+  ]);
+}
+
+async function detectCity(){
+  try{
+    const r=await fetch('https://ipapi.co/json/');
+    if(r.ok){const d=await r.json();if(d.city){userCity=d.city;userState=d.region_code||d.region;}}
+  }catch{}
+  try{
+    const r=await fetch('https://ip-api.com/json/');
+    if(r.ok){const d=await r.json();if(!userCity&&d.city){userCity=d.city;userState=d.region||d.regionName;}}
+  }catch{}
+  try{
+    const r=await fetch('https://freeipapi.com/api/json/');
+    if(r.ok){const d=await r.json();if(!userCity&&d.cityName){userCity=d.cityName;userState=d.regionCode||d.regionName;}}
+  }catch{}
+}
+
+async function boot(){
+  detectCity();
+  await tl([
+    ['  _   _            _     ____________  ','g'],
+    [' | | | |          | |    |___  /  ___|','g'],
+    [' | |_| | __ _  ___| | __    / /| |_  ','g'],
+    [' |  _  |/ _` |/ __| |/ /   / / |  _| ','g'],
+    [' | | | | (_| | (__|   <  ./ /__| |   ','g'],
+    [' \\_| |_/\\__,_|\\___|_|\\_\\ \\_____\\_|   ','g'],
+    ['','g3'],
+    [' v3.1.4  — ultra elite hacking suite','g3'],
+    [' target data is fully cached — same name = same info always','g3'],
+    [' type "help" to list all commands','g3'],
+    ['','g3'],
+  ]);
+}
+
+let busy=false;
+inp.addEventListener('keydown',async(e)=>{
+  if(e.key!=='Enter'||busy)return;
+  const raw=inp.value.trim();if(!raw)return;
+  inp.value='';busy=true;
+  await print(`root@hackzf:~$ ${raw}`,'g3');
+  const[cmd,...rest]=raw.split(' ');const args=rest.join(' ');
+  switch(cmd.toLowerCase()){
+    case 'help':   await cmdHelp();break;
+    case 'scan':   await cmdScan();break;
+    case 'fyfa':   await cmdFyfa(args);break;
+    case 'dox':    await cmdDox(args);break;
+    case 'ddos':   await cmdDdos(args);break;
+    case 'phish':  await cmdPhish(args);break;
+    case 'sniff':  await cmdSniff(args);break;
+    case 'rat':    await cmdRat(args);break;
+    case 'mitm':   await cmdMitm(args);break;
+    case 'sql':    await cmdSql(args);break;
+    case 'brute':  await cmdBrute(args);break;
+    case 'trace':  await cmdTrace(args);break;
+    case 'crack':  await cmdCrack(args);break;
+    case 'nmap':   await cmdNmap(args);break;
+    case 'whoami': await cmdWhoami();break;
+    case 'clear':  out.innerHTML='';break;
+    default: await print(` command not found: ${cmd}. type 'help'.`,'r');
+  }
+  busy=false;inp.focus();
+});
+
+boot();inp.focus();
+</script>
+</body>
+</html>
