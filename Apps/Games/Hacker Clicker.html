@@ -7,137 +7,54 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --green: #00ff41;
-            --green-dim: #00cc33;
-            --green-dark: #009922;
-            --bg: #0a0a0a;
-            --bg-light: #111111;
-            --bg-card: #0d1117;
-            --border: #1a3a1a;
-            --red: #ff3333;
-            --cyan: #00ffff;
-            --yellow: #ffff00;
-            --orange: #ff9500;
-            --gold: #ffd700;
+            --green: #00ff41; --green-dim: #00cc33; --green-dark: #009922;
+            --bg: #0a0a0a; --bg-card: #0d1117; --border: #1a3a1a;
+            --red: #ff3333; --cyan: #00ffff; --yellow: #ffff00; --gold: #ffd700;
         }
 
         body {
             font-family: 'JetBrains Mono', monospace;
-            background: var(--bg);
-            color: var(--green);
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
+            background: var(--bg); color: var(--green);
+            height: 100vh; overflow: hidden; position: relative;
         }
 
-        #matrix-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            opacity: 0.06;
-            pointer-events: none;
-        }
-
+        #matrix-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.06; pointer-events: none; }
         .scanlines {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            pointer-events: none;
-            background: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(0, 255, 65, 0.015) 2px,
-                rgba(0, 255, 65, 0.015) 4px
-            );
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.015) 2px, rgba(0,255,65,0.015) 4px);
         }
 
-        .app-container {
-            position: relative;
-            z-index: 2;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
+        .app-container { position: relative; z-index: 2; display: flex; height: 100vh; overflow: hidden; }
 
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            overflow-y: auto;
-            min-height: 0;
-        }
+        .main-content { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; min-height: 0; }
+        .main-inner { width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 20px; }
 
-        .main-inner {
-            width: 100%;
-            max-width: 700px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px 0;
-            gap: 20px;
-        }
-
-        .terminal-header {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px 8px 0 0;
-            padding: 8px 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-        }
-
+        .terminal-header { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px 8px 0 0; padding: 8px 16px; display: flex; align-items: center; gap: 8px; width: 100%; }
         .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
-        .terminal-dot.red { background: #ff5f57; }
-        .terminal-dot.yellow { background: #febc2e; }
-        .terminal-dot.green { background: #28c840; }
-
+        .terminal-dot.red { background: #ff5f57; } .terminal-dot.yellow { background: #febc2e; } .terminal-dot.green { background: #28c840; }
         .terminal-title { flex: 1; text-align: center; font-size: 12px; color: #666; letter-spacing: 1px; }
 
         .mining-panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 40px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 0 30px rgba(0, 255, 65, 0.05), inset 0 0 60px rgba(0, 0, 0, 0.5);
-            position: relative;
-            overflow: hidden;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 35px; width: 100%; text-align: center;
+            box-shadow: 0 0 30px rgba(0,255,65,0.05), inset 0 0 60px rgba(0,0,0,0.5);
+            position: relative; overflow: hidden;
         }
-
-        .mining-panel::before {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--green), transparent); opacity: 0.5;
-        }
+        .mining-panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--green), transparent); opacity: 0.5; }
 
         .stats-display { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        .stat-box { background: rgba(0, 255, 65, 0.03); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+        .stat-box { background: rgba(0,255,65,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
         .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #555; margin-bottom: 4px; }
-        .stat-value { font-size: 14px; font-weight: 700; color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 65, 0.3); }
-        .stat-value.usd { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 255, 255, 0.3); }
-        .stat-value.red { color: var(--red); text-shadow: 0 0 8px rgba(255, 50, 50, 0.3); }
-        .stat-value.gold { color: var(--gold); text-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+        .stat-value { font-size: 14px; font-weight: 700; color: var(--green); text-shadow: 0 0 8px rgba(0,255,65,0.3); }
+        .stat-value.usd { color: var(--cyan); text-shadow: 0 0 8px rgba(0,255,255,0.3); }
+        .stat-value.red { color: var(--red); text-shadow: 0 0 8px rgba(255,50,50,0.3); }
+        .stat-value.gold { color: var(--gold); text-shadow: 0 0 8px rgba(255,215,0,0.3); }
         .btc-balance { font-size: 10px; color: #777; margin-top: 3px; }
 
-        .balance-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 255, 65, 0.03); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; }
+        .balance-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,255,65,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; }
         .balance-item { text-align: center; flex: 1; }
         .balance-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #555; margin-bottom: 4px; }
         .balance-item .val { font-size: 16px; font-weight: 700; }
@@ -148,14 +65,12 @@
         .button-stack { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 
         .hack-btn {
-            background: linear-gradient(145deg, #1a1a00, #141400);
-            border: 2px solid var(--yellow); color: var(--yellow);
+            background: linear-gradient(145deg, #1a1a00, #141400); border: 2px solid var(--yellow); color: var(--yellow);
             font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;
             padding: 12px 30px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease;
-            position: relative; overflow: hidden; width: 260px;
-            text-shadow: 0 0 6px rgba(255, 255, 0, 0.4);
+            position: relative; overflow: hidden; width: 260px; text-shadow: 0 0 6px rgba(255,255,0,0.4);
         }
-        .hack-btn:hover:not(:disabled) { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 215, 0, 0.25); transform: translateY(-1px); }
+        .hack-btn:hover:not(:disabled) { border-color: var(--gold); box-shadow: 0 0 20px rgba(255,215,0,0.25); transform: translateY(-1px); }
         .hack-btn:active:not(:disabled) { transform: translateY(1px); }
         .hack-btn:disabled { border-color: #555; color: #555; cursor: not-allowed; opacity: 0.6; }
         .hack-btn .progress-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--gold); transition: width 0.1s linear; }
@@ -165,12 +80,12 @@
             color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;
             padding: 20px 50px; border-radius: 8px; cursor: pointer; text-transform: uppercase;
             letter-spacing: 3px; transition: all 0.1s ease; position: relative; overflow: hidden;
-            min-width: 300px; text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+            min-width: 300px; text-shadow: 0 0 8px rgba(0,255,65,0.5);
         }
-        .mine-btn:hover { border-color: var(--green); box-shadow: 0 0 25px rgba(0, 255, 65, 0.3), inset 0 0 25px rgba(0, 255, 65, 0.1); transform: translateY(-2px); }
-        .mine-btn:active { transform: translateY(1px) scale(0.98); box-shadow: 0 0 15px rgba(0, 255, 65, 0.2), inset 0 0 15px rgba(0, 255, 65, 0.15); }
+        .mine-btn:hover { border-color: var(--green); box-shadow: 0 0 25px rgba(0,255,65,0.3), inset 0 0 25px rgba(0,255,65,0.1); transform: translateY(-2px); }
+        .mine-btn:active { transform: translateY(1px) scale(0.98); box-shadow: 0 0 15px rgba(0,255,65,0.2), inset 0 0 15px rgba(0,255,65,0.15); }
         .mine-btn .btn-icon { margin-right: 8px; }
-        .mine-btn .ripple { position: absolute; border-radius: 50%; background: rgba(0, 255, 65, 0.3); transform: scale(0); animation: ripple-anim 0.6s linear; pointer-events: none; }
+        .mine-btn .ripple { position: absolute; border-radius: 50%; background: rgba(0,255,65,0.3); transform: scale(0); animation: ripple-anim 0.6s linear; pointer-events: none; }
         @keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }
 
         .convert-btn {
@@ -179,47 +94,39 @@
             padding: 12px 28px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
             letter-spacing: 1px; position: relative; overflow: hidden;
         }
-        .convert-btn:hover { box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.05); transform: translateY(-1px); }
-        .convert-btn:active { transform: translateY(1px) scale(0.97); box-shadow: 0 0 10px rgba(0, 255, 255, 0.15), inset 0 0 15px rgba(0, 255, 255, 0.1); }
-        .convert-btn .ripple { position: absolute; border-radius: 50%; background: rgba(0, 255, 255, 0.25); transform: scale(0); animation: ripple-cyan 0.5s linear; pointer-events: none; }
+        .convert-btn:hover { box-shadow: 0 0 20px rgba(0,255,255,0.2); transform: translateY(-1px); }
+        .convert-btn:active { transform: translateY(1px) scale(0.97); }
+        .convert-btn .ripple { position: absolute; border-radius: 50%; background: rgba(0,255,255,0.25); transform: scale(0); animation: ripple-cyan 0.5s linear; pointer-events: none; }
         @keyframes ripple-cyan { to { transform: scale(4); opacity: 0; } }
 
         .per-click-display { font-size: 11px; color: #555; }
         .per-click-display span { color: var(--green-dim); }
         .per-click-display .frenzy { color: var(--gold); font-weight: 700; }
 
-        .float-text {
-            position: absolute; font-size: 14px; font-weight: 700; pointer-events: none;
-            animation: float-up 1s ease-out forwards; z-index: 100;
-        }
-        .float-text.btc { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 65, 0.5); }
-        .float-text.usd { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 255, 255, 0.5); }
-        .float-text.gold { color: var(--gold); text-shadow: 0 0 12px rgba(255, 215, 0, 0.6); }
-        .float-text.red { color: var(--red); text-shadow: 0 0 8px rgba(255, 50, 50, 0.5); }
+        .float-text { position: absolute; font-size: 14px; font-weight: 700; pointer-events: none; animation: float-up 1s ease-out forwards; z-index: 100; }
+        .float-text.btc { color: var(--green); text-shadow: 0 0 8px rgba(0,255,65,0.5); }
+        .float-text.usd { color: var(--cyan); text-shadow: 0 0 8px rgba(0,255,255,0.5); }
+        .float-text.gold { color: var(--gold); text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+        .float-text.red { color: var(--red); text-shadow: 0 0 8px rgba(255,50,50,0.5); }
         @keyframes float-up { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-80px) scale(0.7); } }
 
         .toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
             background: var(--bg-card); border: 1px solid var(--green-dark); color: var(--green);
             padding: 12px 24px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-            z-index: 1000; transition: transform 0.3s ease; box-shadow: 0 0 20px rgba(0, 255, 65, 0.15);
+            z-index: 1000; transition: transform 0.3s ease; box-shadow: 0 0 20px rgba(0,255,65,0.15);
         }
         .toast.show { transform: translateX(-50%) translateY(0); }
 
         .log-panel { width: 100%; }
         .log-header { font-size: 11px; color: #555; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
         .log-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 100px; overflow-y: auto; font-size: 11px; line-height: 1.7; }
-        .log-box::-webkit-scrollbar { width: 4px; }
-        .log-box::-webkit-scrollbar-track { background: transparent; }
-        .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-        .log-entry { color: #555; }
-        .log-entry .time { color: #333; }
-        .log-entry.success { color: var(--green-dim); }
-        .log-entry.purchase { color: var(--cyan); }
-        .log-entry.warning { color: var(--yellow); }
-        .log-entry.danger { color: var(--red); }
+        .log-box::-webkit-scrollbar { width: 4px; } .log-box::-webkit-scrollbar-track { background: transparent; } .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .log-entry { color: #555; } .log-entry .time { color: #333; }
+        .log-entry.success { color: var(--green-dim); } .log-entry.purchase { color: var(--cyan); }
+        .log-entry.warning { color: var(--yellow); } .log-entry.danger { color: var(--red); }
 
-        .title-glitch { font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 6px; margin-bottom: 4px; text-shadow: 0 0 10px rgba(0, 255, 65, 0.3); }
+        .title-glitch { font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 6px; margin-bottom: 4px; text-shadow: 0 0 10px rgba(0,255,65,0.3); }
         .subtitle { font-size: 11px; color: #444; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
 
         .status-bar { display: flex; justify-content: center; gap: 16px; margin-bottom: 16px; font-size: 10px; color: #444; }
@@ -230,103 +137,88 @@
         .status-dot.danger { background: var(--red); animation: status-pulse-fast 0.5s ease-in-out infinite; }
         @keyframes status-pulse-fast { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 
-        /* Gold Star Button */
-        .gold-btn-container {
-            position: fixed;
-            z-index: 100;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-            transform: translate(-50%, -50%);
-        }
-
-        .gold-btn-container.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
+        .gold-btn-container { position: fixed; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; transform: translate(-50%, -50%); }
+        .gold-btn-container.visible { opacity: 1; pointer-events: auto; }
         .gold-btn {
-            background: linear-gradient(145deg, #4a4000, #333000);
-            border: 3px solid var(--gold);
-            color: var(--gold);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 40px;
-            font-weight: 700;
-            padding: 20px 30px;
-            border-radius: 50%;
-            cursor: pointer;
-            animation: gold-glow 1s ease-in-out infinite alternate;
-            box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
-            transition: transform 0.1s ease;
-            width: 100px;
-            height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: linear-gradient(145deg, #4a4000, #333000); border: 3px solid var(--gold); color: var(--gold);
+            font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 700;
+            padding: 20px 30px; border-radius: 50%; cursor: pointer; animation: gold-glow 1s ease-in-out infinite alternate;
+            box-shadow: 0 0 40px rgba(255,215,0,0.3); transition: transform 0.1s ease; width: 100px; height: 100px;
+            display: flex; align-items: center; justify-content: center;
         }
-        @keyframes gold-glow {
-            from { box-shadow: 0 0 30px rgba(255, 215, 0, 0.2); }
-            to { box-shadow: 0 0 60px rgba(255, 215, 0, 0.5); }
-        }
-        .gold-btn:hover { transform: scale(1.1); }
-        .gold-btn:active { transform: scale(0.95); }
+        @keyframes gold-glow { from { box-shadow: 0 0 30px rgba(255,215,0,0.2); } to { box-shadow: 0 0 60px rgba(255,215,0,0.5); } }
+        .gold-btn:hover { transform: scale(1.1); } .gold-btn:active { transform: scale(0.95); }
 
-        /* Game Over Overlay */
-        .gameover-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.95); z-index: 2000; display: none;
-            flex-direction: column; align-items: center; justify-content: center; text-align: center;
-        }
+        .gameover-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
         .gameover-overlay.show { display: flex; animation: fade-in 0.5s ease; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .gameover-title { font-size: 48px; font-weight: 700; color: var(--red); text-shadow: 0 0 30px rgba(255, 50, 50, 0.5); margin-bottom: 20px; letter-spacing: 4px; }
+        .gameover-title { font-size: 48px; font-weight: 700; color: var(--red); text-shadow: 0 0 30px rgba(255,50,50,0.5); margin-bottom: 20px; letter-spacing: 4px; }
         .gameover-subtitle { font-size: 16px; color: #888; margin-bottom: 10px; }
         .gameover-stats { font-size: 14px; color: #666; margin-bottom: 30px; line-height: 1.8; }
         .restart-btn {
             background: linear-gradient(145deg, #2a0000, #1f0000); border: 2px solid var(--red);
             color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600;
-            padding: 14px 40px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
-            text-transform: uppercase; letter-spacing: 2px;
+            padding: 14px 40px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 2px;
         }
-        .restart-btn:hover { box-shadow: 0 0 25px rgba(255, 50, 50, 0.3); transform: translateY(-2px); }
+        .restart-btn:hover { box-shadow: 0 0 25px rgba(255,50,50,0.3); transform: translateY(-2px); }
 
-        /* RIGHT Sidebar */
         .sidebar { width: 380px; background: var(--bg-card); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
-        .sidebar-header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: rgba(0, 255, 65, 0.02); flex-shrink: 0; }
+        .sidebar-header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: rgba(0,255,65,0.02); flex-shrink: 0; }
         .sidebar-header h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 3px; color: var(--green); display: flex; align-items: center; gap: 8px; }
         .sidebar-header h2::before { content: '>'; animation: blink 1s step-end infinite; }
         @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
         .upgrade-list-container { flex: 1; overflow-y: auto; padding: 12px; }
-        .upgrade-list-container::-webkit-scrollbar { width: 6px; }
-        .upgrade-list-container::-webkit-scrollbar-track { background: transparent; }
-        .upgrade-list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .upgrade-list-container::-webkit-scrollbar { width: 6px; } .upgrade-list-container::-webkit-scrollbar-track { background: transparent; } .upgrade-list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-        .upgrade-card { background: rgba(0, 255, 65, 0.02); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease; position: relative; overflow: hidden; }
+        .upgrade-card { background: rgba(0,255,65,0.02); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease; position: relative; overflow: hidden; }
         .upgrade-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green-dark); transition: background 0.2s; }
-        .upgrade-card:hover:not(.locked) { border-color: var(--green-dark); background: rgba(0, 255, 65, 0.04); }
+        .upgrade-card:hover:not(.locked) { border-color: var(--green-dark); background: rgba(0,255,65,0.04); }
         .upgrade-card:hover:not(.locked)::before { background: var(--green); }
         .upgrade-card.locked { opacity: 0.4; cursor: not-allowed; }
         .upgrade-card.locked .upgrade-cost { color: var(--red); }
         .upgrade-card.affordable { border-color: var(--green-dark); animation: pulse-affordable 2s ease-in-out infinite; }
-        @keyframes pulse-affordable { 0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 65, 0.1); } 50% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.15); } }
+        @keyframes pulse-affordable { 0%, 100% { box-shadow: 0 0 5px rgba(0,255,65,0.1); } 50% { box-shadow: 0 0 15px rgba(0,255,65,0.15); } }
         .upgrade-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
         .upgrade-name { font-size: 13px; font-weight: 600; color: var(--green); }
-        .upgrade-owned { font-size: 11px; color: var(--cyan); background: rgba(0, 255, 255, 0.1); padding: 2px 8px; border-radius: 10px; }
+        .upgrade-owned { font-size: 11px; color: var(--cyan); background: rgba(0,255,255,0.1); padding: 2px 8px; border-radius: 10px; }
         .upgrade-desc { font-size: 11px; color: #666; margin-bottom: 8px; line-height: 1.5; }
         .upgrade-cost { font-size: 12px; color: var(--yellow); font-weight: 600; }
         .upgrade-effect { font-size: 10px; color: var(--green-dim); margin-top: 4px; }
 
-        @media (max-width: 1000px) {
-            .app-container { flex-direction: column; }
-            .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+        .io-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+        .io-btn {
+            background: linear-gradient(145deg, #111, #0a0a0a); border: 1px solid var(--border);
+            color: #888; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+            padding: 8px 18px; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;
+            letter-spacing: 1px; text-transform: uppercase;
         }
+        .io-btn:hover { border-color: var(--green-dark); color: var(--green-dim); box-shadow: 0 0 10px rgba(0,255,65,0.1); }
+        .io-btn.save:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 10px rgba(0,255,255,0.1); }
+        .io-btn.load:hover { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px rgba(255,215,0,0.1); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; backdrop-filter: blur(5px); }
+        .modal-overlay.show { display: flex; animation: fade-in 0.3s ease; }
+        .modal-box { background: var(--bg-card); border: 1px solid var(--green-dark); border-radius: 8px; padding: 30px; width: 90%; max-width: 420px; box-shadow: 0 0 40px rgba(0,255,65,0.1); }
+        .modal-title { font-size: 16px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+        .modal-subtitle { font-size: 11px; color: #666; margin-bottom: 20px; line-height: 1.5; }
+        .modal-input { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--border); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 14px; padding: 12px 16px; border-radius: 6px; outline: none; transition: border-color 0.2s; }
+        .modal-input:focus { border-color: var(--green); }
+        .modal-input::placeholder { color: #444; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
+        .modal-btn { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; padding: 10px 24px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; letter-spacing: 1px; border: 2px solid transparent; }
+        .modal-btn.primary { background: var(--green-dark); border-color: var(--green); color: #000; }
+        .modal-btn.primary:hover { box-shadow: 0 0 15px rgba(0,255,65,0.3); }
+        .modal-btn.secondary { background: transparent; border-color: #444; color: #888; }
+        .modal-btn.secondary:hover { border-color: #888; color: #ccc; }
+        .modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .modal-error { font-size: 11px; color: var(--red); margin-top: 10px; min-height: 16px; }
+        .modal-icon { font-size: 32px; margin-bottom: 12px; }
+
+        @media (max-width: 1000px) { .app-container { flex-direction: column; } .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 40vh; } }
         @media (max-width: 600px) {
-            .stats-display { grid-template-columns: 1fr; }
-            .balance-row { flex-direction: column; gap: 8px; }
-            .balance-divider { width: 80%; height: 1px; }
-            .mine-btn { font-size: 16px; padding: 16px 35px; min-width: auto; width: 100%; }
-            .hack-btn { width: 100%; font-size: 12px; padding: 10px 20px; }
-            .mining-panel { padding: 25px 20px; }
+            .stats-display { grid-template-columns: 1fr; } .balance-row { flex-direction: column; gap: 8px; }
+            .balance-divider { width: 80%; height: 1px; } .mine-btn { font-size: 16px; padding: 16px 35px; min-width: auto; width: 100%; }
+            .hack-btn { width: 100%; font-size: 12px; padding: 10px 20px; } .mining-panel { padding: 25px 20px; } .io-buttons { flex-direction: column; }
         }
     </style>
 </head>
@@ -399,11 +291,9 @@
                             💻 HACK RANDOM PC
                             <div class="progress-bar" id="hackProgress" style="width: 0%"></div>
                         </button>
-
                         <button class="mine-btn" id="mineBtn" onclick="mineBitcoin(event)">
                             <span class="btn-icon">⛏</span> MINE BITCOIN
                         </button>
-
                         <button class="convert-btn" id="convertBtn" onclick="convertBTC(event)">
                             ◈ CONVERT BTC → USD
                         </button>
@@ -411,6 +301,11 @@
 
                     <div class="per-click-display" style="margin-top: 14px;">
                         Per click: <span id="perClickDisplay">+0.00000001 BTC</span>
+                    </div>
+
+                    <div class="io-buttons">
+                        <button class="io-btn save" onclick="openSaveModal()">💾 ENCRYPTED SAVE</button>
+                        <button class="io-btn load" onclick="openLoadModal()">📂 ENCRYPTED LOAD</button>
                     </div>
                 </div>
 
@@ -422,16 +317,12 @@
         </div>
 
         <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>UPGRADES MARKET</h2>
-            </div>
+            <div class="sidebar-header"><h2>UPGRADES MARKET</h2></div>
             <div class="upgrade-list-container" id="upgradeList"></div>
         </div>
     </div>
 
-    <div class="gold-btn-container" id="goldBtnContainer">
-        <button class="gold-btn" id="goldBtn" onclick="clickGoldStar()">★</button>
-    </div>
+    <div class="gold-btn-container" id="goldBtnContainer"><button class="gold-btn" id="goldBtn" onclick="clickGoldStar()">★</button></div>
 
     <div class="gameover-overlay" id="gameoverOverlay">
         <div class="gameover-title">🚨 BUSTED 🚨</div>
@@ -440,25 +331,45 @@
         <button class="restart-btn" onclick="restartGame()">RESTART SYSTEM</button>
     </div>
 
+    <div class="modal-overlay" id="saveModal">
+        <div class="modal-box">
+            <div class="modal-icon">🔐</div>
+            <div class="modal-title">Encrypted Save</div>
+            <div class="modal-subtitle">Set a password to encrypt your save file.<br>AES-256-GCM + PBKDF2 (100k iterations).</div>
+            <input type="password" class="modal-input" id="savePasswordInput" placeholder="Enter save password..." autocomplete="off">
+            <div class="modal-error" id="saveError"></div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="closeSaveModal()">Cancel</button>
+                <button class="modal-btn primary" id="saveBtn" onclick="executeSave()">ENCRYPT & SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="loadModal">
+        <div class="modal-box">
+            <div class="modal-icon">🔓</div>
+            <div class="modal-title">Encrypted Load</div>
+            <div class="modal-subtitle">Select your encrypted .txt save file and enter the password.</div>
+            <input type="file" class="modal-input" id="loadFileInput" accept=".txt" style="padding: 8px; cursor: pointer; color: #888; font-size: 12px;">
+            <input type="password" class="modal-input" id="loadPasswordInput" placeholder="Enter save password..." autocomplete="off" style="margin-top: 10px;">
+            <div class="modal-error" id="loadError"></div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="closeLoadModal()">Cancel</button>
+                <button class="modal-btn primary" id="loadBtn" onclick="executeLoad()">DECRYPT & LOAD</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
         let gameState = {
-            btc: 0,
-            usd: 0,
-            totalBtc: 0,
-            totalClicks: 0,
-            btcPerClick: 0.00000001,
-            btcPerSecond: 0,
-            btcPrice: 0,
-            pcsHacked: 0,
-            catchChanceBase: 0.01,
-            upgradesOwned: 0,
-            frenzyMultiplier: 1,
-            frenzyEndTime: 0,
-            gameOver: false,
-            priceFetchFails: 0,
-            priceSource: 'api'
+            btc: 0, usd: 0, totalBtc: 0, totalClicks: 0,
+            btcPerClick: 0.00000001, btcPerSecond: 0, btcPrice: 0,
+            pcsHacked: 0, catchChanceBase: 0.01,
+            frenzyMultiplier: 1, frenzyEndTime: 0,
+            gameOver: false, priceFetchFails: 0, priceSource: 'api',
+            hasLivePrice: false
         };
 
         const upgrades = [
@@ -476,10 +387,12 @@
             { id: 'genesis_clone', name: 'Genesis Block Clone', desc: 'Replicate the original block reward.', baseCost: 15000000.00, type: 'auto', value: 0.001, icon: '🔮', effectText: '+0.001 BTC/sec' }
         ];
 
-        const upgradesOwned = {};
+        let upgradesOwned = {};
+
+        function getFreshState() { const obj = {}; upgrades.forEach(u => obj[u.id] = { owned: 0 }); return obj; }
 
         function init() {
-            upgrades.forEach(u => upgradesOwned[u.id] = { owned: 0 });
+            upgradesOwned = getFreshState();
             fetchBTCPrice();
             setInterval(fetchBTCPrice, 10000);
             setInterval(autoMine, 1000);
@@ -494,34 +407,40 @@
         async function fetchBTCPrice() {
             if (gameState.gameOver) return;
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { signal: controller.signal });
-                clearTimeout(timeoutId);
-                const data = await response.json();
+                const ctrl = new AbortController();
+                const tid = setTimeout(() => ctrl.abort(), 5000);
+                const resp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { signal: ctrl.signal });
+                clearTimeout(tid);
+                const data = await resp.json();
                 if (data.bitcoin && data.bitcoin.usd) {
                     gameState.btcPrice = data.bitcoin.usd;
+                    gameState.hasLivePrice = true;
                     gameState.priceFetchFails = 0;
                     gameState.priceSource = 'api';
                     document.getElementById('btcPriceDisplay').textContent = '$' + gameState.btcPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     document.getElementById('priceSource').textContent = 'live data';
                     document.getElementById('nodeStatus').textContent = 'CONNECTED';
                     document.getElementById('nodeDot').className = 'status-dot online';
-                    updateDisplay();
-                    renderUpgrades();
+                    updateDisplay(); renderUpgrades();
                 }
             } catch (e) {
                 gameState.priceFetchFails++;
                 if (gameState.priceFetchFails >= 3) {
-                    gameState.btcPrice = 65000;
-                    gameState.priceSource = 'fallback';
-                    document.getElementById('btcPriceDisplay').textContent = '$65,000.00';
-                    document.getElementById('priceSource').textContent = 'API failed → fallback';
-                    document.getElementById('nodeStatus').textContent = 'FALLBACK';
-                    document.getElementById('nodeDot').className = 'status-dot danger';
-                    addLog('API unreachable 3x. Using fallback: $65,000 BTC.', 'warning');
-                    updateDisplay();
-                    renderUpgrades();
+                    if (gameState.hasLivePrice) {
+                        document.getElementById('priceSource').textContent = 'API down · keeping last price';
+                        document.getElementById('nodeStatus').textContent = 'CACHED';
+                        document.getElementById('nodeDot').className = 'status-dot online';
+                        addLog(`API unreachable. Retaining last known price: $${gameState.btcPrice.toLocaleString()}`, 'warning');
+                    } else {
+                        gameState.btcPrice = 65000;
+                        gameState.priceSource = 'fallback';
+                        document.getElementById('btcPriceDisplay').textContent = '$65,000.00';
+                        document.getElementById('priceSource').textContent = 'API failed → fallback';
+                        document.getElementById('nodeStatus').textContent = 'FALLBACK';
+                        document.getElementById('nodeDot').className = 'status-dot danger';
+                        addLog('API unreachable 3x. Using fallback: $65,000 BTC.', 'warning');
+                    }
+                    updateDisplay(); renderUpgrades();
                 } else {
                     document.getElementById('priceSource').textContent = `retrying (${gameState.priceFetchFails}/3)`;
                 }
@@ -531,21 +450,17 @@
         function mineBitcoin(event) {
             if (gameState.gameOver) return;
             const earned = gameState.btcPerClick * gameState.frenzyMultiplier;
-            gameState.btc += earned;
-            gameState.totalBtc += earned;
-            gameState.totalClicks++;
+            gameState.btc += earned; gameState.totalBtc += earned; gameState.totalClicks++;
             updateDisplay();
 
             const btn = document.getElementById('mineBtn');
-            const ripple = document.createElement('span');
-            ripple.className = 'ripple';
+            const ripple = document.createElement('span'); ripple.className = 'ripple';
             const rect = btn.getBoundingClientRect();
             const size = Math.max(rect.width, rect.height);
             ripple.style.width = ripple.style.height = size + 'px';
             ripple.style.left = (event.clientX - rect.left - size / 2) + 'px';
             ripple.style.top = (event.clientY - rect.top - size / 2) + 'px';
-            btn.appendChild(ripple);
-            setTimeout(() => ripple.remove(), 600);
+            btn.appendChild(ripple); setTimeout(() => ripple.remove(), 600);
 
             createFloatText(event, '+' + earned.toFixed(8) + ' BTC', gameState.frenzyMultiplier > 1 ? 'gold' : 'btc');
             renderUpgrades();
@@ -554,63 +469,48 @@
         function createFloatText(event, text, type) {
             const panel = document.getElementById('miningPanel');
             const rect = panel.getBoundingClientRect();
-            const el = document.createElement('div');
-            el.className = `float-text ${type}`;
-            el.textContent = text;
+            const el = document.createElement('div'); el.className = `float-text ${type}`; el.textContent = text;
             el.style.left = (event.clientX - rect.left - 40) + 'px';
             el.style.top = (event.clientY - rect.top - 10) + 'px';
-            panel.appendChild(el);
-            setTimeout(() => el.remove(), 1000);
+            panel.appendChild(el); setTimeout(() => el.remove(), 1000);
         }
 
         function autoMine() {
             if (gameState.gameOver || gameState.btcPerSecond <= 0) return;
             const earned = gameState.btcPerSecond * gameState.frenzyMultiplier;
-            gameState.btc += earned;
-            gameState.totalBtc += earned;
-            updateDisplay();
-            renderUpgrades();
+            gameState.btc += earned; gameState.totalBtc += earned;
+            updateDisplay(); renderUpgrades();
         }
 
         function convertBTC(event) {
             if (gameState.gameOver) return;
-            if (gameState.btc <= 0 || gameState.btcPrice <= 0) {
-                showToast('⚠ No BTC to convert or price not loaded');
-                return;
-            }
+            if (gameState.btc <= 0 || gameState.btcPrice <= 0) { showToast('⚠ No BTC to convert or price not loaded'); return; }
             const usdValue = gameState.btc * gameState.btcPrice;
             const btcAmount = gameState.btc;
-            gameState.usd += usdValue;
-            gameState.btc = 0;
+            gameState.usd += usdValue; gameState.btc = 0;
             addLog(`Converted ${btcAmount.toFixed(8)} BTC → $${usdValue.toFixed(2)} USD`, 'success');
             showToast(`✓ Converted ${btcAmount.toFixed(8)} BTC to $${usdValue.toFixed(2)} USD`);
 
             const btn = document.getElementById('convertBtn');
-            const ripple = document.createElement('span');
-            ripple.className = 'ripple';
+            const ripple = document.createElement('span'); ripple.className = 'ripple';
             const rect = btn.getBoundingClientRect();
             const size = Math.max(rect.width, rect.height);
             ripple.style.width = ripple.style.height = size + 'px';
             ripple.style.left = (event.clientX - rect.left - size / 2) + 'px';
             ripple.style.top = (event.clientY - rect.top - size / 2) + 'px';
-            btn.appendChild(ripple);
-            setTimeout(() => ripple.remove(), 500);
+            btn.appendChild(ripple); setTimeout(() => ripple.remove(), 500);
 
-            updateDisplay();
-            renderUpgrades();
+            updateDisplay(); renderUpgrades();
         }
 
         let hackInProgress = false;
         function hackPC(event) {
             if (gameState.gameOver || hackInProgress) return;
             hackInProgress = true;
-            const btn = document.getElementById('hackBtn');
-            const progress = document.getElementById('hackProgress');
-            btn.disabled = true;
+            const btn = document.getElementById('hackBtn'); btn.disabled = true;
             btn.innerHTML = '⏳ HACKING... <div class="progress-bar" id="hackProgress" style="width: 0%"></div>';
 
-            const startTime = Date.now();
-            const duration = 5000;
+            const startTime = Date.now(); const duration = 5000;
             const interval = setInterval(() => {
                 const elapsed = Date.now() - startTime;
                 const pct = Math.min((elapsed / duration) * 100, 100);
@@ -619,31 +519,19 @@
             }, 50);
 
             setTimeout(() => {
-                clearInterval(interval);
-                hackInProgress = false;
-                btn.disabled = false;
+                clearInterval(interval); hackInProgress = false; btn.disabled = false;
                 btn.innerHTML = '💻 HACK RANDOM PC <div class="progress-bar" id="hackProgress" style="width: 0%"></div>';
 
                 const hackReward = 0.000001 + (gameState.pcsHacked * 0.0000002);
-                gameState.btc += hackReward;
-                gameState.totalBtc += hackReward;
-                gameState.pcsHacked++;
-
+                gameState.btc += hackReward; gameState.totalBtc += hackReward; gameState.pcsHacked++;
                 const increase = 0.01 + Math.random() * 0.02;
                 gameState.catchChanceBase += increase;
-
                 addLog(`💻 Hacked PC #${gameState.pcsHacked}! Earned ${hackReward.toFixed(8)} BTC`, 'purchase');
                 addLog(`⚠️ Catch chance: ${getCatchChance().toFixed(3)}%`, 'warning');
-
                 createFloatText(event, `+${hackReward.toFixed(8)} BTC`, 'btc');
 
-                const catchChance = getCatchChance();
-                if (Math.random() * 100 < catchChance) {
-                    triggerGameOver();
-                }
-
-                updateDisplay();
-                renderUpgrades();
+                if (Math.random() * 100 < getCatchChance()) triggerGameOver();
+                updateDisplay(); renderUpgrades();
             }, duration);
         }
 
@@ -655,113 +543,57 @@
 
         function triggerGameOver() {
             gameState.gameOver = true;
-            const stats = document.getElementById('gameoverStats');
-            stats.innerHTML = `
-                Total BTC Earned: ${gameState.totalBtc.toFixed(8)}<br>
-                Total Clicks: ${gameState.totalClicks.toLocaleString()}<br>
-                PCs Hacked: ${gameState.pcsHacked}<br>
-                Final Catch Chance: ${getCatchChance().toFixed(3)}%<br>
-                BTC Price: $${gameState.btcPrice.toLocaleString()}<br>
-                USD Wallet: $${gameState.usd.toFixed(2)}
+            document.getElementById('gameoverStats').innerHTML = `
+                Total BTC Earned: ${gameState.totalBtc.toFixed(8)}<br>Total Clicks: ${gameState.totalClicks.toLocaleString()}<br>
+                PCs Hacked: ${gameState.pcsHacked}<br>Final Catch Chance: ${getCatchChance().toFixed(3)}%<br>
+                BTC Price: $${gameState.btcPrice.toLocaleString()}<br>USD Wallet: $${gameState.usd.toFixed(2)}
             `;
             document.getElementById('gameoverOverlay').classList.add('show');
             addLog('🚨 GOVERNMENT RAIDED YOUR OPERATION. GAME OVER.', 'danger');
         }
 
         function restartGame() {
-            gameState = {
-                btc: 0, usd: 0, totalBtc: 0, totalClicks: 0,
-                btcPerClick: 0.00000001, btcPerSecond: 0, btcPrice: 0,
-                pcsHacked: 0, catchChanceBase: 0.01, upgradesOwned: 0,
-                frenzyMultiplier: 1, frenzyEndTime: 0, gameOver: false,
-                priceFetchFails: 0, priceSource: 'api'
-            };
-            upgrades.forEach(u => upgradesOwned[u.id] = { owned: 0 });
-            hackInProgress = false;
+            gameState = { btc: 0, usd: 0, totalBtc: 0, totalClicks: 0, btcPerClick: 0.00000001, btcPerSecond: 0, btcPrice: 0, pcsHacked: 0, catchChanceBase: 0.01, frenzyMultiplier: 1, frenzyEndTime: 0, gameOver: false, priceFetchFails: 0, priceSource: 'api', hasLivePrice: false };
+            upgradesOwned = getFreshState(); hackInProgress = false;
             document.getElementById('gameoverOverlay').classList.remove('show');
             document.getElementById('goldBtnContainer').classList.remove('visible');
             document.getElementById('logBox').innerHTML = '';
-            fetchBTCPrice();
-            scheduleGoldStar();
-            renderUpgrades();
-            updateDisplay();
+            fetchBTCPrice(); scheduleGoldStar(); renderUpgrades(); updateDisplay();
             addLog('System restarted. Mining node online.', 'success');
         }
 
-        // Gold Star
-        let goldStarVisible = false;
-        let goldSpawnTime = 0;
-        let goldTimeout = null;
-
-        function scheduleGoldStar() {
-            if (gameState.gameOver) return;
-            const delay = (25 + Math.random() * 55) * 1000;
-            goldTimeout = setTimeout(() => {
-                showGoldStar();
-            }, delay);
-        }
-
+        let goldStarVisible = false, goldSpawnTime = 0, goldTimeout = null;
+        function scheduleGoldStar() { if (gameState.gameOver) return; const delay = (25 + Math.random() * 55) * 1000; goldTimeout = setTimeout(() => showGoldStar(), delay); }
         function showGoldStar() {
             if (gameState.gameOver) return;
-            goldSpawnTime = Date.now();
-            goldStarVisible = true;
+            goldSpawnTime = Date.now(); goldStarVisible = true;
             const container = document.getElementById('goldBtnContainer');
-            
-            // Random position: 10% to 90% of viewport width and height
-            const randX = 10 + Math.random() * 80;
-            const randY = 10 + Math.random() * 80;
-            
-            container.style.left = randX + '%';
-            container.style.top = randY + '%';
-            
+            container.style.left = (10 + Math.random() * 80) + '%';
+            container.style.top = (10 + Math.random() * 80) + '%';
             container.classList.add('visible');
             addLog('★ Gold star appeared! Click it fast!', 'warning');
-
-            // Auto-hide after 4 seconds
-            setTimeout(() => {
-                if (goldStarVisible) {
-                    hideGoldStar();
-                    addLog('Gold star faded away... missed it!', 'warning');
-                    scheduleGoldStar();
-                }
-            }, 4000);
+            setTimeout(() => { if (goldStarVisible) { hideGoldStar(); addLog('Gold star faded away... missed it!', 'warning'); scheduleGoldStar(); } }, 4000);
         }
-
         function clickGoldStar() {
             if (!goldStarVisible || gameState.gameOver) return;
-
             const elapsed = (Date.now() - goldSpawnTime) / 1000;
-            let mult = 12.5 - (elapsed / 4) * 11;
-            mult = Math.max(1.5, Math.min(12.5, mult));
-            gameState.frenzyMultiplier = mult;
-            gameState.frenzyEndTime = Date.now() + 15000;
-
+            let mult = 12.5 - (elapsed / 4) * 11; mult = Math.max(1.5, Math.min(12.5, mult));
+            gameState.frenzyMultiplier = mult; gameState.frenzyEndTime = Date.now() + 15000;
             hideGoldStar();
             addLog(`★ GOLD STAR! Frenzy: ${mult.toFixed(1)}x for 15s!`, 'success');
             showToast(`⚡ FRENZY: ${mult.toFixed(1)}x multiplier for 15s!`);
-
-            updateDisplay();
-            scheduleGoldStar();
+            updateDisplay(); scheduleGoldStar();
         }
-
-        function hideGoldStar() {
-            goldStarVisible = false;
-            document.getElementById('goldBtnContainer').classList.remove('visible');
-        }
+        function hideGoldStar() { goldStarVisible = false; document.getElementById('goldBtnContainer').classList.remove('visible'); }
 
         setInterval(() => {
             if (gameState.gameOver) return;
             const now = Date.now();
             if (gameState.frenzyEndTime > now) {
-                const remaining = Math.ceil((gameState.frenzyEndTime - now) / 1000);
                 document.getElementById('frenzyDisplay').textContent = gameState.frenzyMultiplier.toFixed(1) + 'x';
-                document.getElementById('frenzyTimer').textContent = `${remaining}s remaining`;
+                document.getElementById('frenzyTimer').textContent = `${Math.ceil((gameState.frenzyEndTime - now) / 1000)}s remaining`;
             } else {
-                if (gameState.frenzyMultiplier > 1) {
-                    gameState.frenzyMultiplier = 1;
-                    addLog('Frenzy ended.', '');
-                    document.getElementById('frenzyTimer').textContent = 'no active frenzy';
-                }
+                if (gameState.frenzyMultiplier > 1) { gameState.frenzyMultiplier = 1; addLog('Frenzy ended.', ''); document.getElementById('frenzyTimer').textContent = 'no active frenzy'; }
                 document.getElementById('frenzyDisplay').textContent = '--';
             }
         }, 500);
@@ -776,118 +608,132 @@
 
             const catchChance = getCatchChance();
             document.getElementById('catchChance').textContent = catchChance.toFixed(3) + '%';
-            if (catchChance > 5) {
-                document.getElementById('riskDot').className = 'status-dot danger';
-            }
+            if (catchChance > 5) document.getElementById('riskDot').className = 'status-dot danger';
 
             let perClickText = `+${gameState.btcPerClick.toFixed(8)} BTC`;
-            if (gameState.frenzyMultiplier > 1) {
-                perClickText += ` <span class="frenzy">×${gameState.frenzyMultiplier.toFixed(1)}</span>`;
-            }
-            if (gameState.btcPrice > 0) {
-                const effectiveUSD = (gameState.btcPerClick * gameState.frenzyMultiplier * gameState.btcPrice).toFixed(4);
-                perClickText += ` ($${effectiveUSD})`;
-            }
+            if (gameState.frenzyMultiplier > 1) perClickText += ` <span class="frenzy">×${gameState.frenzyMultiplier.toFixed(1)}</span>`;
+            if (gameState.btcPrice > 0) perClickText += ` ($${(gameState.btcPerClick * gameState.frenzyMultiplier * gameState.btcPrice).toFixed(4)})`;
             document.getElementById('perClickDisplay').innerHTML = perClickText;
         }
 
         function renderUpgrades() {
-            const container = document.getElementById('upgradeList');
-            container.innerHTML = '';
+            const container = document.getElementById('upgradeList'); container.innerHTML = '';
             upgrades.forEach(upgrade => {
                 const owned = upgradesOwned[upgrade.id]?.owned || 0;
                 const cost = upgrade.baseCost * Math.pow(1.15, owned);
                 const canAfford = gameState.usd >= cost;
-
                 const card = document.createElement('div');
                 card.className = `upgrade-card ${canAfford ? 'affordable' : ''} ${!canAfford ? 'locked' : ''}`;
                 card.onclick = () => { if (canAfford) buyUpgrade(upgrade.id); };
-                card.innerHTML = `
-                    <div class="upgrade-top">
-                        <div class="upgrade-name">${upgrade.icon} ${upgrade.name}</div>
-                        <div class="upgrade-owned">x${owned}</div>
-                    </div>
-                    <div class="upgrade-desc">${upgrade.desc}</div>
-                    <div class="upgrade-cost">${canAfford ? '⬡' : '⚠'} $${cost.toFixed(2)} USD</div>
-                    <div class="upgrade-effect">${upgrade.effectText}</div>
-                `;
+                card.innerHTML = `<div class="upgrade-top"><div class="upgrade-name">${upgrade.icon} ${upgrade.name}</div><div class="upgrade-owned">x${owned}</div></div><div class="upgrade-desc">${upgrade.desc}</div><div class="upgrade-cost">${canAfford ? '⬡' : '⚠'} $${cost.toFixed(2)} USD</div><div class="upgrade-effect">${upgrade.effectText}</div>`;
                 container.appendChild(card);
             });
         }
 
         function buyUpgrade(id) {
-            const upgrade = upgrades.find(u => u.id === id);
-            if (!upgrade) return;
+            const upgrade = upgrades.find(u => u.id === id); if (!upgrade) return;
             const owned = upgradesOwned[id]?.owned || 0;
             const cost = upgrade.baseCost * Math.pow(1.15, owned);
-            if (gameState.usd < cost) {
-                showToast('⚠ Insufficient USD');
-                return;
-            }
+            if (gameState.usd < cost) { showToast('⚠ Insufficient USD'); return; }
             gameState.usd -= cost;
             if (!upgradesOwned[id]) upgradesOwned[id] = { owned: 0 };
             upgradesOwned[id].owned++;
-
             if (upgrade.type === 'click') gameState.btcPerClick += upgrade.value;
             else gameState.btcPerSecond += upgrade.value;
-
             addLog(`>> INSTALLED: ${upgrade.name} (${upgrade.icon})`, 'purchase');
             showToast(`✓ ${upgrade.name} installed!`);
-            updateDisplay();
-            renderUpgrades();
+            updateDisplay(); renderUpgrades();
         }
 
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2500);
-        }
-
+        function showToast(msg) { const toast = document.getElementById('toast'); toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
         function addLog(msg, type = '') {
-            const logBox = document.getElementById('logBox');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            const time = new Date().toTimeString().split(' ')[0];
-            entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
-            logBox.appendChild(entry);
-            logBox.scrollTop = logBox.scrollHeight;
+            const logBox = document.getElementById('logBox'); const entry = document.createElement('div'); entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="time">[${new Date().toTimeString().split(' ')[0]}]</span> ${msg}`;
+            logBox.appendChild(entry); logBox.scrollTop = logBox.scrollHeight;
             while (logBox.children.length > 50) logBox.removeChild(logBox.firstChild);
         }
 
         function initMatrix() {
-            const canvas = document.getElementById('matrix-bg');
-            const ctx = canvas.getContext('2d');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            const chars = '01アイウエオカキクケコ₿$#@!<>{}[]';
-            const fontSize = 14;
-            const columns = Math.floor(canvas.width / fontSize);
+            const canvas = document.getElementById('matrix-bg'); const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const chars = '01アイウエオカキクケコ₿$#@!<>{}[]'; const fontSize = 14; const columns = Math.floor(canvas.width / fontSize);
             const drops = new Array(columns).fill(1);
-
-            function draw() {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff41';
-                ctx.font = fontSize + 'px monospace';
-                for (let i = 0; i < drops.length; i++) {
-                    ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fontSize, drops[i] * fontSize);
-                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                    drops[i]++;
-                }
-            }
+            function draw() { ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#00ff41'; ctx.font = fontSize + 'px monospace'; for (let i = 0; i < drops.length; i++) { ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fontSize, drops[i] * fontSize); if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0; drops[i]++; } }
             setInterval(draw, 50);
             window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         }
 
+        document.addEventListener('keydown', (e) => { if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) { e.preventDefault(); const btn = document.getElementById('mineBtn'); const rect = btn.getBoundingClientRect(); mineBitcoin({ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }); } });
+
+        // ===== AES-GCM ENCRYPT/DECRYPT SYSTEM =====
+        function arrayBufferToBase64(buffer) { const bytes = new Uint8Array(buffer); let binary = ''; for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); }
+        function base64ToArrayBuffer(base64) { const binary = atob(base64); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i); return bytes.buffer; }
+
+        async function deriveKey(password, salt) {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
+            return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        }
+
+        async function encryptData(plaintext, password) {
+            const enc = new TextEncoder();
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await deriveKey(password, salt);
+            const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(plaintext));
+            return JSON.stringify({ salt: arrayBufferToBase64(salt), iv: arrayBufferToBase64(iv), data: arrayBufferToBase64(ciphertext) });
+        }
+
+        async function decryptData(encryptedJson, password) {
+            const parsed = JSON.parse(encryptedJson);
+            const salt = base64ToArrayBuffer(parsed.salt); const iv = base64ToArrayBuffer(parsed.iv); const ciphertext = base64ToArrayBuffer(parsed.data);
+            const key = await deriveKey(password, new Uint8Array(salt));
+            const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+            return new TextDecoder().decode(decrypted);
+        }
+
+        function openSaveModal() { document.getElementById('savePasswordInput').value = ''; document.getElementById('saveError').textContent = ''; document.getElementById('saveModal').classList.add('show'); setTimeout(() => document.getElementById('savePasswordInput').focus(), 100); }
+        function closeSaveModal() { document.getElementById('saveModal').classList.remove('show'); }
+        function openLoadModal() { document.getElementById('loadFileInput').value = ''; document.getElementById('loadPasswordInput').value = ''; document.getElementById('loadError').textContent = ''; document.getElementById('loadModal').classList.add('show'); setTimeout(() => document.getElementById('loadFileInput').focus(), 100); }
+        function closeLoadModal() { document.getElementById('loadModal').classList.remove('show'); }
+
         document.addEventListener('keydown', (e) => {
-            if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
-                e.preventDefault();
-                const btn = document.getElementById('mineBtn');
-                const rect = btn.getBoundingClientRect();
-                mineBitcoin({ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 });
-            }
+            if (e.key === 'Escape') { closeSaveModal(); closeLoadModal(); }
+            if (e.key === 'Enter') { if (document.getElementById('saveModal').classList.contains('show')) executeSave(); else if (document.getElementById('loadModal').classList.contains('show')) executeLoad(); }
         });
+
+        async function executeSave() {
+            const password = document.getElementById('savePasswordInput').value.trim();
+            if (!password) { document.getElementById('saveError').textContent = '⚠ Password cannot be empty.'; return; }
+            if (password.length < 3) { document.getElementById('saveError').textContent = '⚠ Password must be at least 3 characters.'; return; }
+            document.getElementById('saveBtn').disabled = true; document.getElementById('saveBtn').textContent = 'ENCRYPTING...'; document.getElementById('saveError').textContent = '';
+            try {
+                const saveData = { gameState: { btc: gameState.btc, usd: gameState.usd, totalBtc: gameState.totalBtc, totalClicks: gameState.totalClicks, btcPerClick: gameState.btcPerClick, btcPerSecond: gameState.btcPerSecond, btcPrice: gameState.btcPrice, pcsHacked: gameState.pcsHacked, catchChanceBase: gameState.catchChanceBase, priceSource: gameState.priceSource, hasLivePrice: gameState.hasLivePrice }, upgradesOwned: upgradesOwned, timestamp: Date.now(), version: '1.0' };
+                const encrypted = await encryptData(JSON.stringify(saveData), password);
+                const blob = new Blob([encrypted], { type: 'text/plain' }); const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `hackerclicker_save_${Date.now()}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                addLog('💾 Game saved & encrypted successfully.', 'success'); showToast('✓ Game encrypted & saved to file.'); closeSaveModal();
+            } catch (e) { document.getElementById('saveError').textContent = '⚠ Encryption failed: ' + e.message; }
+            finally { document.getElementById('saveBtn').disabled = false; document.getElementById('saveBtn').textContent = 'ENCRYPT & SAVE'; }
+        }
+
+        async function executeLoad() {
+            const fileInput = document.getElementById('loadFileInput'); const password = document.getElementById('loadPasswordInput').value.trim();
+            if (!fileInput.files || fileInput.files.length === 0) { document.getElementById('loadError').textContent = '⚠ Please select a save file.'; return; }
+            if (!password) { document.getElementById('loadError').textContent = '⚠ Password cannot be empty.'; return; }
+            document.getElementById('loadBtn').disabled = true; document.getElementById('loadBtn').textContent = 'DECRYPTING...'; document.getElementById('loadError').textContent = '';
+            try {
+                const file = fileInput.files[0]; const text = await file.text(); const decrypted = await decryptData(text, password); const saveData = JSON.parse(decrypted);
+                if (!saveData.gameState || !saveData.upgradesOwned) { document.getElementById('loadError').textContent = '⚠ Invalid save file format.'; return; }
+                Object.assign(gameState, saveData.gameState);
+                gameState.gameOver = false; gameState.frenzyMultiplier = 1; gameState.frenzyEndTime = 0; gameState.priceFetchFails = 0;
+                upgradesOwned = saveData.upgradesOwned;
+                document.getElementById('gameoverOverlay').classList.remove('show'); document.getElementById('goldBtnContainer').classList.remove('visible'); document.getElementById('logBox').innerHTML = '';
+                addLog('📂 Game loaded & decrypted successfully.', 'success'); addLog(`  ↳ Timestamp: ${new Date(saveData.timestamp).toLocaleString()}`, 'purchase'); showToast('✓ Game loaded from encrypted save.');
+                updateDisplay(); renderUpgrades(); closeLoadModal();
+            } catch (e) { if (e.name === 'OperationError' || e.message.includes('decrypt') || e.message.includes('tag')) { document.getElementById('loadError').textContent = '⚠ Decryption failed. Wrong password or corrupted file.'; } else { document.getElementById('loadError').textContent = '⚠ Load failed: ' + e.message; } }
+            finally { document.getElementById('loadBtn').disabled = false; document.getElementById('loadBtn').textContent = 'DECRYPT & LOAD'; }
+        }
 
         init();
     </script>
