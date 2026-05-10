@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UnB Games Loader</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #111;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      background: #000;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">Loading UnB Games...</div>
+<iframe id="frame"></iframe>
+
+<script>
+// Main GitHub Pages site
+const REPO = "https://unb-games.github.io";
+
+// Possible entry files
+const CANDIDATES = [
+  `${REPO}/index.html`,
+  `${REPO}/public/index.html`,
+  `${REPO}/games/index.html`
+];
+
+async function loadRepo() {
+  let html = null;
+  let usedURL = null;
+
+  // Try candidate pages
+  for (const url of CANDIDATES) {
+    try {
+      const res = await fetch(url);
+
+      if (res.ok) {
+        html = await res.text();
+        usedURL = url;
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (!html) {
+    document.getElementById("loading").innerText =
+      "Failed to load UnB Games";
+    return;
+  }
+
+  // Base path for assets
+  const base = usedURL.substring(0, usedURL.lastIndexOf("/") + 1);
+
+  // Inject <base>
+  html = html.replace(
+    /<head>/i,
+    `<head><base href="${base}">`
+  );
+
+  // Rewrite relative URLs
+  html = html.replace(
+    /(src|href)=["'](?!https?:\/\/|\/\/|data:|#|mailto:)(.*?)["']/gi,
+    (match, attr, path) => {
+      const clean = path.replace(/^\.?\//, "");
+      return `${attr}="${base}${clean}"`;
+    }
+  );
+
+  // Load into iframe
+  const iframe = document.getElementById("frame");
+  iframe.srcdoc = html;
+
+  iframe.onload = () => {
+    document.getElementById("loading").style.display = "none";
+  };
+}
+
+loadRepo();
+</script>
+
+</body>
+</html>
