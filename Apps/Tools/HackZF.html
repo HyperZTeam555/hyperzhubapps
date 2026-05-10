@@ -42,6 +42,8 @@
   .y {color:#fde047;}
   .r {color:#f87171;}
   .b {color:#60a5fa;}
+  .p {color:#c084fc;}
+  .o {color:#fb923c;}
 
   .term-input-row{
     flex-shrink:0;
@@ -57,7 +59,6 @@
     caret-color:#22c55e;
   }
 
-  /* scanline overlay */
   body::after{
     content:'';
     position:fixed;inset:0;
@@ -154,6 +155,13 @@ const ports_pool=[[21,'ftp','vsftpd 3.0'],[22,'ssh','OpenSSH 8.9'],[25,'smtp','P
 const ddos_methods=['UDP Flood','SYN Flood','HTTP Flood','DNS Amplification','NTP Amplification','Slowloris','ICMP Flood','Memcached Amplification','BGP Hijack','Layer 7 HTTP/2'];
 const lures=['Your account has been suspended','Verify your identity now','You have a pending refund of $847.00','Unusual login detected from Russia','You have won a $500 gift card','Action required: update billing info','Security alert: password changed','Your package could not be delivered'];
 const timezones=['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Phoenix','America/Detroit','America/Indianapolis','America/Anchorage','Pacific/Honolulu'];
+const social_plats=['Instagram','TikTok','Twitter/X','Facebook','Snapchat','LinkedIn','Reddit','Discord','Telegram','WhatsApp','YouTube','Twitch','Pinterest','BeReal','Threads'];
+const deface_msgs=["hacked by hackzf | your security is a joke","0wned by script kiddie supreme — get patched","pwned — ur firewall is made of paper","defaced by the elite | learn2code lmao","system compromised | nothing is safe","this site brought to you by hackzf v3.1.4"];
+const crypto_wallets=["Bitcoin","Ethereum","Solana","Dogecoin","Litecoin","Monero","Cardano","Polygon"];
+const wifi_names=["home_network","TP-LINK_5G","NETGEAR-2.4GHz","xfinitywifi","ATT-Wifi","SpectrumSetup","Fios-Setup","Linksys","ASUS_RT","ASUS_Guest","iPhone_Hotspot","Galaxy_Hotspot","Starbucks_Free_WiFi","Hotel_Guest","Airport_Free"];
+const wifi_passes=["password123","admin123","letmein","qwerty123456","changeme","default","guest1234","homepass","1234567890","password1","welcome123","network123","wifi1234","secure123","mywifipass"];
+const browser_sites=["google.com","youtube.com","reddit.com","twitter.com","instagram.com","tiktok.com","discord.com","facebook.com","amazon.com","netflix.com","twitch.tv","pornhub.com","xvideos.com","reddit.com/r/hacking","github.com","stackoverflow.com","4chan.org","kick.com","roblox.com","onlyfans.com"];
+const file_types=["document.pdf","photo.jpg","notes.txt","backup.zip","resume.docx","passwords.txt","crypto_wallet.dat","browser_history.db","chat_logs.txt","screenshot.png","voice_recording.mp3","video_2024.mp4","tax_return.pdf","diary.txt","private_notes.enc"];
 
 let userCity = null;
 let userState = null;
@@ -191,6 +199,15 @@ function generateTarget(k){
     phone:`(${sint(200,999,k,'ph1')}) ${sint(100,999,k,'ph2')}-${sint(1000,9999,k,'ph3')}`,
     dob:`${sint(1,12,k,'dobm')}/${sint(1,28,k,'dobd')}/${sint(1990,2005,k,'doby')}`,
     ssn:`***-**-${sint(1000,9999,k,'ssn')}`,
+    social_user:nf+sint(1,9999,k,'su'),
+    social_plat:sp(social_plats,k,'sp'),
+    wifi_name:sp(wifi_names,k,'wn'),
+    wifi_pass:sp(wifi_passes,k,'wp'),
+    wallet_addr:`${sint(1,999999,k,'wa1')}${sint(0,9999,k,'wa2')}${sint(0,9999,k,'wa3')}`.slice(0,16),
+    wallet_coin:sp(crypto_wallets,k,'wc'),
+    wallet_bal:`${sint(0,999,k,'wbal')}.${sint(0,9999,k,'wbald')}`,
+    browser_hist:browser_sites.filter((_,i)=>si(k+'bh'+i,2)===0).slice(0,6),
+    files:file_types.filter((_,i)=>si(k+'ft'+i,3)===0).slice(0,5),
   };
 }
 
@@ -230,6 +247,21 @@ async function cmdHelp(){
     ['  mitm <name>      — man-in-the-middle attack','g2'],
     ['  sql <name>       — SQL injection on target site','g2'],
     ['  brute <name>     — brute force target login portal','g2'],
+    ['  geo <name>       — geolocate target via IP triangulation','g2'],
+    ['  deface <url>     — deface a website','g2'],
+    ['  wifi <name>      — crack target WiFi network','g2'],
+    ['  cam <name>       — activate target webcam','g2'],
+    ['  wallet <name>    — crack target crypto wallet','g2'],
+    ['  phone <name>     — track target phone in real-time','g2'],
+    ['  decrypt <name>   — decrypt target encrypted files','g2'],
+    ['  history <name>   — extract target browser history','g2'],
+    ['  social <name>    — scrape target social media profiles','g2'],
+    ['  backdoor <name>  — deploy persistent backdoor','g2'],
+    ['  rootkit <name>   — install rootkit on target system','g2'],
+    ['  keylog <name>    — capture keystrokes from target','g2'],
+    ['  screen <name>    — screenshot target desktop','g2'],
+    ['  dns <name>       — DNS spoofing attack','g2'],
+    ['  spoof <name>     — spoof caller ID / email','g2'],
     ['  whoami           — display current user','g2'],
     ['  clear            — clear terminal','g2'],
     ['  help             — show this menu','g2'],
@@ -257,7 +289,7 @@ async function cmdScan(){
     [` │  Browser     : ${t.browser}`,'g2'],
     [` │  MAC         : ${t.mac}`,'g2'],
     [` │  VPN         : not active (rookie move)`,'y'],
-    [' └────────────────────────────────────────────────┘','g'],
+    [' └────────────────────────────────────────────────','g'],
     [' [!] ur fully exposed. get a VPN champ.','r'],
     ['','g3'],
   ]);
@@ -280,7 +312,7 @@ async function cmdFyfa(args){
     [` │  Email   : ${t.email}`,'g2'],
     [` │  Device  : ${t.device}`,'g2'],
     [` │  Status  : located ✓`,'g2'],
-    [' └──────────────────────────────────────────────────┘','g'],
+    [' └──────────────────────────────────────────────────','g'],
     [` [+] ${name} is cooked. gg.`,'y'],
     ['','g3'],
   ]);
@@ -440,7 +472,7 @@ async function cmdMitm(args){
   for(const p of intercepted){await dl(180);await print(p,p.includes('POST')?'r':'g2');}
   await print('');
   await tl([
-    [` ┌─ MITM SUMMARY ─────────────────────────────────┐`,'g'],
+    [` ┌─ MITM SUMMARY ─────────────────────────────────`,'g'],
     [` │  Gateway spoofed   : ✓`,'g2'],
     [` │  SSL stripped      : ✓`,'g2'],
     [` │  Credentials found : ${t.email} / ${t.password}`,'y'],
@@ -582,6 +614,393 @@ async function cmdWhoami(){
   ]);
 }
 
+// ─ NEW COMMANDS ──
+
+async function cmdGeo(args){
+  if(!args||!args.trim()){await print(' usage: geo <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` triangulating ${name}'s location via IP...`,7,130);
+  await dl(100);await progress(' querying cell tower databases...');
+  await dl(100);await progress(' cross-referencing WiFi BSSIDs...');
+  await dl(150);
+  const accuracy=sint(3,50,name,'acc');
+  await tl([
+    ['','g3'],
+    [` ┌─ GEOLOCATION REPORT ─────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  IP          : ${t.ip}`,'g2'],
+    [` │  Latitude    : ${t.lat}°N`,'g2'],
+    [` │  Longitude   : ${t.lon}°W`,'g2'],
+    [` │  City        : ${t.city}, ${t.state}`,'g2'],
+    [` │  ZIP         : ${t.zip}`,'g2'],
+    [` │  ISP         : ${t.isp}`,'g2'],
+    [` │  Accuracy    : ±${accuracy} meters`,'y'],
+    [` │  Cell Tower  : CELL-${sint(1000,9999,name,'ct')}`,'g2'],
+    [` │  WiFi BSSID  : ${t.mac}`,'g2'],
+    [` │  GPS Lock    : confirmed`,'g'],
+    [' ──────────────────────────────────────────────────┘','g'],
+    [` [+] ${name} located within ${accuracy}m. they're not getting away.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdDeface(args){
+  if(!args||!args.trim()){await print(' usage: deface <url>','r');return;}
+  const url=args.trim();const t=getTarget(url);
+  const msg=sp(deface_msgs,url,'defm');
+  await progress(` scanning ${url} for vulnerabilities...`);
+  await dl(100);await progress(' exploiting file upload bypass...');
+  await dl(100);await progress(' uploading deface page...');
+  await dl(150);
+  await print('');
+  await print(` ┌──────────────────────────────────────────────────┐`,'r');
+  await print(` │                                                  │`,'r');
+  await print(` │              H A C K E D                         │`,'r');
+  await print(` │                                                  │`,'r');
+  await print(` │  ${msg}`.padEnd(48)+' │','r');
+  await print(` │                                                  │`,'r');
+  await print(` │  site: ${url}`.padEnd(48)+' │','g2');
+  await print(` │  ip: ${t.ip}`.padEnd(48)+' │','g2');
+  await print(` │  time: ${new Date().toLocaleTimeString()}`.padEnd(48)+' │','y');
+  await print(` │                                                  │`,'r');
+  await print(` │               hackzf v3.1.4                      │`,'r');
+  await print(` │                                                  │`,'r');
+  await print(` └──────────────────────────────────────────────────┘`,'r');
+  await print('');
+  await print(` [+] ${url} defaced successfully. admin has been notified (they crying).`,'y');
+  await print('','g3');
+}
+
+async function cmdWifi(args){
+  if(!args||!args.trim()){await print(' usage: wifi <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const bssid=t.mac.toUpperCase();
+  const channel=sint(1,11,name,'ch');
+  const enc=sint(0,2,name,'enc')===0?'WPA2':'WPA3';
+  await progress(` scanning for ${name}'s WiFi networks...`);
+  await dl(100);await progress(` capturing WPA handshake on channel ${channel}...`);
+  await dl(150);await progress(` cracking with hashcat (RTX 4090 cluster)...`);
+  await dl(200);
+  await tl([
+    ['','g3'],
+    [` ┌─ WiFi CRACK ───────────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  SSID        : ${t.wifi_name}`,'g2'],
+    [` │  BSSID       : ${bssid}`,'g2'],
+    [` │  Channel     : ${channel}`,'g2'],
+    [` │  Encryption  : ${enc}`,'y'],
+    [` │  Signal      : -${sint(20,80,name,'sig')} dBm`,'g2'],
+    [` │  Password    : ${t.wifi_pass}`,'r'],
+    [` │  Handshake   : captured`,'g'],
+    [` │  Crack Time  : ${sint(1,59,name,'wct')}s`,'g2'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${name}'s WiFi is ours now. ur welcome.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdCam(args){
+  if(!args||!args.trim()){await print(' usage: cam <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` accessing ${t.device} camera...`,7,130);
+  await dl(100);await progress(' bypassing OS camera permission prompt...');
+  await dl(100);await progress(' establishing RTSP stream...');
+  await dl(150);
+  const scenes=['person at desk typing','person sleeping on couch','person eating cereal','dark room - nothing visible','person watching TV','person on phone','person doing homework','empty room - camera pointed at wall'];
+  const scene=sp(scenes,name,'scene');
+  await tl([
+    ['','g3'],
+    [` ┌─ WEBCAM ACCESS ────────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  Device      : ${t.device}`,'g2'],
+    [` │  Camera      : front-facing (720p)`,'g2'],
+    [` │  Stream      : active (rtsp://${t.ip}:554)`,'r'],
+    [` │  Current     : ${scene}`,'y'],
+    [` │  Recording   : saving to /tmp/hackzf_${name}.mp4`,'r'],
+    [` │  IR Mode     : available`,'g2'],
+    [` │  Microphone  : also active`,'r'],
+    [' └────────────────────────────────────────────────','g'],
+    [` [+] ${name}'s cam is live. say hi ${name} 👋`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdWallet(args){
+  if(!args||!args.trim()){await print(' usage: wallet <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` scanning ${name}'s device for crypto wallets...`);
+  await dl(100);await progress(' dumping keystore files...');
+  await dl(100);await progress(` cracking ${t.wallet_coin} private key...`);
+  await dl(150);
+  const balUsd=(parseFloat(t.wallet_bal)*sint(10,50000,name,'rate')/10).toFixed(2);
+  await tl([
+    ['','g3'],
+    [` ┌─ WALLET CRACK ─────────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  Coin        : ${t.wallet_coin}`,'g2'],
+    [` │  Address     : 0x${t.wallet_addr}...`,'g2'],
+    [` │  Private Key : 0x${sint(100000,999999,name,'pk').toString(16)}...`,'r'],
+    [` │  Balance     : ${t.wallet_bal} ${t.wallet_coin.slice(0,3).toUpperCase()}`,'y'],
+    [` │  USD Value   : $${balUsd}`,'r'],
+    [` │  TX Count    : ${sint(0,500,name,'txc')}`,'g2'],
+    [` │  Last TX     : ${sint(1,90,name,'ltx')} days ago`,'g2'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${name}'s wallet drained. $${balUsd} is ours. gg.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdPhone(args){
+  if(!args||!args.trim()){await print(' usage: phone <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const carrier=sint(0,3,name,'car')===0?'Verizon':sint(0,1,name,'car')===0?'AT&T':'T-Mobile';
+  const cellId=`CELL-${sint(1000,9999,name,'cid')}`;
+  await progress(` pinging ${name}'s phone number...`);
+  await dl(100);await progress(' querying SS7 signaling network...');
+  await dl(100);await progress(' triangulating via cell towers...');
+  await dl(150);
+  const lastSeen=sint(1,59,name,'ls');
+  await tl([
+    ['','g3'],
+    [` ┌─ PHONE TRACKING ───────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  Phone       : ${t.phone}`,'g2'],
+    [` │  Carrier     : ${carrier}`,'g2'],
+    [` │  IMSI        : ${sint(310,316,name,'imsi')}${sint(100,999,name,'imsi2')}${sint(10000000,99999999,name,'imsi3')}`,'g2'],
+    [` │  Cell Tower  : ${cellId}`,'g2'],
+    [` │  Location    : ${t.city}, ${t.state}`,'y'],
+    [` │  Accuracy    : ±${sint(10,200,name,'pacc')}m`,'y'],
+    [` │  Last Seen   : ${lastSeen} min ago`,'g2'],
+    [` │  Status      : device online`,'g'],
+    [` │  Call Record : ${sint(0,1,name,'cr')===0?'recording incoming':'no active calls'}`,'g2'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${name}'s phone tracked. they don't know we watching.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdDecrypt(args){
+  if(!args||!args.trim()){await print(' usage: decrypt <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  const files=t.files.slice(0,3);
+  await progress(` analyzing ${name}'s encrypted files...`);
+  await dl(100);await progress(' brute-forcing AES-256 keys...');
+  await dl(100);await progress(' applying dictionary attack...');
+  await dl(150);
+  await print('');
+  await print(` ┌─ DECRYPTION RESULTS ───────────────────────────────────┐`,'g');
+  for(const f of files){
+    const decKey=sp(words,name+f,'dk');
+    await dl(100);
+    await print(` │  ${f.padEnd(24)} → key: "${decKey}"`,'g2');
+  }
+  await print(' └──────────────────────────────────────────────────────┘','g');
+  await print('');
+  await print(` [+] ${files.length} files decrypted. ${name} thought AES would save them. lol.`,'r');
+  await print('','g3');
+}
+
+async function cmdHistory(args){
+  if(!args||!args.trim()){await print(' usage: history <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` extracting ${name}'s browser history...`,7,120);
+  await dl(100);await progress(' reading SQLite database...');
+  await dl(100);await progress(' parsing visited URLs...');
+  await dl(150);
+  await print('');
+  await print(` [*] ${t.browser} history for ${name}:`,'g');
+  await print('');
+  const sites=t.browser_hist;
+  for(let i=0;i<sites.length;i++){
+    const vis=sint(1,500,name,'vis'+i);
+    const last=sint(1,90,name,'lv'+i);
+    await dl(80);
+    await print(`  ${String(i+1).padStart(2)}. ${sites[i].padEnd(24)} (${vis} visits, last ${last}d ago)`,sites[i].includes('porn')||sites[i].includes('xvideo')?'r':sites[i].includes('4chan')||sites[i].includes('onlyfans')?'o':'g2');
+  }
+  await print('');
+  await print(` [+] ${sites.length} entries extracted. ${name}'s browser history is WILD lmao.`,'r');
+  await print('','g3');
+}
+
+async function cmdSocial(args){
+  if(!args||!args.trim()){await print(' usage: social <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` scraping ${name}'s social media profiles...`,8,110);
+  await dl(100);await progress(' querying platform APIs...');
+  await dl(100);await progress(' cross-referencing usernames...');
+  await dl(150);
+  const foundProfiles=social_plats.filter((_,i)=>si(name+'so'+i,2)===0).slice(0,5);
+  await tl([
+    ['','g3'],
+    [` ┌─ SOCIAL MEDIA PROFILES ──────────────────────────┐`,'g'],
+    [` │  Target Username: @${t.social_user}`,'g2'],
+    [` │  Primary Platform: ${t.social_plat}`,'g2'],
+    [' │  ',''],
+  ]);
+  for(const plat of foundProfiles){
+    const followers=sint(0,50000,name,'fl'+plat);
+    const following=sint(0,5000,name,'fw'+plat);
+    await dl(80);
+    await print(` │  ${plat.padEnd(12)} @${t.social_user} — ${followers.toLocaleString()} followers`,'g2');
+  }
+  await tl([
+    [' │  ',''],
+    [` │  DMs Scraped  : ${sint(50,5000,name,'dms')}`,'r'],
+    [` │  Photos Dumped: ${sint(10,500,name,'photos')}`,'r'],
+    [` │  Status       : fully scraped`,'g'],
+    [' └──────────────────────────────────────────────────┘','g'],
+    [` [+] ${name}'s entire social life is ours. cringe alert.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdBackdoor(args){
+  if(!args||!args.trim()){await print(' usage: backdoor <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` crafting backdoor for ${t.os}...`,8,110);
+  await dl(100);await progress(' embedding in legitimate binary...');
+  await dl(100);await progress(' setting up C2 callback...');
+  await dl(150);
+  const c2Port=sint(40000,65000,name,'c2p');
+  const interval=sint(5,60,name,'cbi');
+  await tl([
+    ['','g3'],
+    [` ┌─ BACKDOOR DEPLOYMENT ────────────────────────────┐`,'g'],
+    [` │  Target      : ${name} (${t.ip})`,'g2'],
+    [` │  OS          : ${t.os}`,'g2'],
+    [` │  Binary      : ${sint(0,1,name,'bn')===0?'svchost.exe':'systemd-service'}`,'g2'],
+    [` │  C2 Server   : hackzf-c2.onion:${c2Port}`,'r'],
+    [` │  Callback    : every ${interval}s`,'y'],
+    [` │  Persistence : registry + scheduled task`,'r'],
+    [` │  Evasion     : AMSI bypassed ✓`,'r'],
+    [` │  Status      : ACTIVE`,'g'],
+    [' └──────────────────────────────────────────────────┘','g'],
+    [` [+] backdoor planted. ${name} will never know we here.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdRootkit(args){
+  if(!args||!args.trim()){await print(' usage: rootkit <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` compiling rootkit for ${t.os} kernel...`,8,120);
+  await dl(100);await progress(' hooking syscalls...');
+  await dl(100);await progress(' hiding processes + files...');
+  await dl(100);await progress(' establishing persistence...');
+  await dl(150);
+  const hiddenFiles=sint(3,15,name,'hf');
+  const hiddenProcs=sint(2,8,name,'hp');
+  await tl([
+    ['','g3'],
+    [` ┌─ ROOTKIT INSTALLATION ───────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  OS          : ${t.os}`,'g2'],
+    [` │  Rootkit     : hackzf_rk_${sint(1,9,name,'rkv')}.${sint(0,9,name,'rkvm')}`,'g2'],
+    [` │  Syscall Hooks: ${sint(5,25,name,'sch')}`,'r'],
+    [` │  Hidden Files: ${hiddenFiles}`,'r'],
+    [` │  Hidden Procs: ${hiddenProcs}`,'r'],
+    [` │  Anti-AV     : driver signed (stolen cert)`,'r'],
+    [` │  Persistence : bootloader modification`,'r'],
+    [` │  Status      : kernel-level ✓`,'g'],
+    [' └──────────────────────────────────────────────────┘','g'],
+    [` [+] rootkit installed. ${name}'s system is permanently owned.`,'r'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdKeylog(args){
+  if(!args||!args.trim()){await print(' usage: keylog <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` deploying keylogger on ${t.device}...`,7,130);
+  await dl(100);await progress(' capturing keystroke buffer...');
+  await dl(150);
+  const keys=['password123','hello world','https://gmail.com',t.password,`user: ${t.email}`,`cc: ${sint(4000,5999,name,'cc1')} ${sint(1000,9999,name,'cc2')} ${sint(1000,9999,name,'cc3')} ${sint(1000,9999,name,'cc4')}`,`${name} is dumb lol`];
+  const captured=keys.slice(0,sint(3,6,name,'kc'));
+  await print('');
+  await print(` [*] keystrokes from ${name}:`,'g');
+  await print('');
+  for(const key of captured){
+    await dl(120);
+    await print(`  → ${key}`,key.includes(t.password)||key.includes('cc:')?'r':'g2');
+  }
+  await print('');
+  await print(` [+] ${captured.length} keystrokes captured. ${name}'s passwords are ours.`,'r');
+  await print('','g3');
+}
+
+async function cmdScreen(args){
+  if(!args||!args.trim()){await print(' usage: screen <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` capturing ${t.device} screen...`);
+  await dl(100);await progress(' encoding screenshot (PNG)...');
+  await dl(100);await progress(' transferring via covert channel...');
+  await dl(150);
+  const screens=['desktop with 47 browser tabs open','VS Code with TODO: fix this later','Netflix paused at 2:34:11','Discord DM with embarrassing messages','blank desktop - literally no apps open','Photoshop with unfinished meme','terminal with "rm -rf /" typed but not entered'];
+  const screen=sp(screens,name,'scr');
+  const res=t.device.includes('iPhone')||t.device.includes('Galaxy')||t.device.includes('Pixel')?'1179x2556':'1920x1080';
+  await tl([
+    ['','g3'],
+    [` ─ SCREENSHOT CAPTURE ─────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  Device      : ${t.device}`,'g2'],
+    [` │  Resolution  : ${res}`,'g2'],
+    [` │  Format      : PNG (lossless)`,'g2'],
+    [` │  Size        : ${sint(500,5000,name,'sz')} KB`,'g2'],
+    [` │  Content     : ${screen}`,'y'],
+    [` │  Saved to    : /loot/${name}_screen_${Date.now()}.png`,'r'],
+    [' └──────────────────────────────────────────────────┘','g'],
+    [` [+] screenshot captured. ${name}'s screen is ours now.`,'y'],
+    ['','g3'],
+  ]);
+}
+
+async function cmdDns(args){
+  if(!args||!args.trim()){await print(' usage: dns <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` setting up DNS spoofing for ${t.ip}...`,7,130);
+  await dl(100);await progress(' poisoning DNS cache...');
+  await dl(100);await progress(' redirecting traffic...');
+  await dl(150);
+  const spoofedSites=['google.com','facebook.com','banking-site.com','gmail.com','amazon.com'];
+  const fakeIPs=spoofedSites.map((_,i)=>`10.${sint(0,255,name,'dns'+i)}.${sint(0,255,name,'dns2'+i)}.${sint(0,255,name,'dns3'+i)}`);
+  await print('');
+  await print(` ┌─ DNS SPOOFING TABLE ─────────────────────────────────┐`,'g');
+  await print(` │  Original DNS          →  Spoofed IP                  │`,'g3');
+  for(let i=0;i<spoofedSites.length;i++){
+    await dl(80);
+    await print(` │  ${spoofedSites[i].padEnd(20)} →  ${fakeIPs[i]}`,'y');
+  }
+  await print(' └──────────────────────────────────────────────────────┘','g');
+  await print('');
+  await print(` [+] DNS cache poisoned. ${name} is browsing OUR servers now. gg.`,'r');
+  await print('','g3');
+}
+
+async function cmdSpoof(args){
+  if(!args||!args.trim()){await print(' usage: spoof <name>','r');return;}
+  const name=args.trim();const t=getTarget(name);
+  await progress(` preparing spoofing attack for ${name}...`,7,130);
+  await dl(100);await progress(' generating spoofed identities...');
+  await dl(150);
+  const spoofEmail=`${sint(0,1,name,'se')===0?'noreply':'support'}@${['apple.com','amazon.com','netflix.com','paypal.com','microsoft.com'][sint(0,4,name,'sp')]}`;
+  const spoofPhone=`(${sint(200,999,name,'sp1')}) ${sint(100,999,name,'sp2')}-${sint(1000,9999,name,'sp3')}`;
+  const spoofMethod=sint(0,1,name,'sm')===0?'caller ID':'email';
+  await tl([
+    ['','g3'],
+    [` ┌─ SPOOFING ATTACK ──────────────────────────────┐`,'g'],
+    [` │  Target      : ${name}`,'g2'],
+    [` │  Method      : ${spoofMethod}`,'g2'],
+    [` │  Spoofed From: ${spoofMethod==='caller ID'?spoofPhone:spoofEmail}`,'y'],
+    [` │  Caller Name : ${['Apple Support','Amazon Security','Netflix Billing','PayPal Fraud Dept','Microsoft Help'][sint(0,4,name,'cn')]}`,'g2'],
+    [` │  Target Num  : ${t.phone}`,'g2'],
+    [` │  Target Email: ${t.email}`,'g2'],
+    [` │  Status      : spoof active`,'g'],
+    [' └────────────────────────────────────────────────┘','g'],
+    [` [+] ${spoofMethod} spoofed. ${name} won't suspect a thing.`,'y'],
+    ['','g3'],
+  ]);
+}
+
 async function detectCity(){
   try{
     const r=await fetch('https://ipapi.co/json/');
@@ -636,6 +1055,21 @@ inp.addEventListener('keydown',async(e)=>{
     case 'trace':  await cmdTrace(args);break;
     case 'crack':  await cmdCrack(args);break;
     case 'nmap':   await cmdNmap(args);break;
+    case 'geo':    await cmdGeo(args);break;
+    case 'deface': await cmdDeface(args);break;
+    case 'wifi':   await cmdWifi(args);break;
+    case 'cam':    await cmdCam(args);break;
+    case 'wallet': await cmdWallet(args);break;
+    case 'phone':  await cmdPhone(args);break;
+    case 'decrypt':await cmdDecrypt(args);break;
+    case 'history':await cmdHistory(args);break;
+    case 'social': await cmdSocial(args);break;
+    case 'backdoor':await cmdBackdoor(args);break;
+    case 'rootkit':await cmdRootkit(args);break;
+    case 'keylog': await cmdKeylog(args);break;
+    case 'screen': await cmdScreen(args);break;
+    case 'dns':    await cmdDns(args);break;
+    case 'spoof':  await cmdSpoof(args);break;
     case 'whoami': await cmdWhoami();break;
     case 'clear':  out.innerHTML='';break;
     default: await print(` command not found: ${cmd}. type 'help'.`,'r');
@@ -647,3 +1081,4 @@ boot();inp.focus();
 </script>
 </body>
 </html>
+
