@@ -19,6 +19,9 @@
   .nav-btn{background:none;border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--sub);font-size:13px;cursor:pointer;transition:all .2s;display:none}
   .nav-btn.visible{display:block}
   .nav-btn:hover{border-color:var(--primary);color:var(--text)}
+  .nav-btn.upload-active{border-color:var(--primary);color:var(--primary)}
+  .upload-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;border:1px solid var(--border);border-radius:20px;padding:8px 18px;font-size:13px;color:var(--text);z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+  .upload-toast.show{opacity:1}
   main{flex:1;padding:20px 24px 100px;transition:margin-right .3s}
   main.shifted{margin-right:var(--sidebar-w)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
@@ -111,6 +114,8 @@
     <option value="netease">NetEase</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
+  <button class="nav-btn visible" id="uploadBtn">Upload</button>
+  <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
   <button class="nav-btn visible" id="plBtn">Playlists</button>
 </header>
 <main id="main"><div class="grid" id="grid"><div class="loading">Loading tracks...</div></div></main>
@@ -159,6 +164,7 @@
 </div>
 <audio id="audio" crossorigin="anonymous"></audio>
 <div class="dropdown" id="gridDropdown"></div>
+<div class="upload-toast" id="uploadToast"></div>
 
 <script>
 const REPO='hyperzteam555/hyperzhubapps',FOLDER='Music',BRANCH='main';
@@ -172,24 +178,92 @@ const progFill=$('#pFill'),pBar=$('#pBar'),cTime=$('#cTime'),dTime=$('#dTime');
 const repBtn=$('#repBtn'),prevBtn=$('#prevBtn'),nextBtn=$('#nextBtn');
 const search=$('#searchInput'),plBtn=$('#plBtn'),plModal=$('#plModal'),plList=$('#plList');
 const sbDropdown=$('#sbDropdown'),gridDropdown=$('#gridDropdown');
+const uploadBtn=$('#uploadBtn'),fileInput=$('#fileInput'),uploadToast=$('#uploadToast');
 
 let currentApi='native';
 let tracks=[];
-let playTracks=null; // tracks currently being played (may differ from grid tracks)
+let playTracks=null;
 let playlists=[];
 let curPlId=null,curIdx=-1,repeating=false,curTrack=null;
+let localBlobURLs={}; // filename -> blob URL (in-memory, per session)
 
 function getTracks(){return playTracks||tracks}
 
-async function fetchNative(){
-  const url=`https://api.github.com/repos/${REPO}/contents/${FOLDER}?_t=${Date.now()}`;
-  const res=await fetch(url,{cache:'no-store',headers:{'Accept':'application/vnd.github.v3+json'}});
-  if(!res.ok) throw new Error(`GitHub API Error ${res.status}`);
-  const files=await res.json();
-  if(!Array.isArray(files)) throw new Error('Invalid directory');
-  return files.filter(f=>f.type==='file'&&/\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(f.name))
-    .map(f=>({name:f.name.replace(/\.[^.]+$/,''),file:f.name,cdn:0,isNative:true}));
+// ── IndexedDB helpers ──────────────────────────────────────────────────────
+const DB_NAME='ZMusicDB',DB_VERSION=1,STORE='tracks';
+let db=null;
+function openDB(){
+  return new Promise((res,rej)=>{
+    if(db)return res(db);
+    const req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore(STORE,{keyPath:'name'})};
+    req.onsuccess=e=>{db=e.target.result;res(db)};
+    req.onerror=()=>rej(req.error);
+  });
 }
+function dbGetAll(){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(STORE,'readonly');
+    const req=tx.objectStore(STORE).getAll();
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  }));
+}
+function dbPut(record){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(STORE,'readwrite');
+    const req=tx.objectStore(STORE).put(record);
+    req.onsuccess=()=>res();
+    req.onerror=()=>rej(req.error);
+  }));
+}
+function dbDelete(name){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(STORE,'readwrite');
+    const req=tx.objectStore(STORE).delete(name);
+    req.onsuccess=()=>res();
+    req.onerror=()=>rej(req.error);
+  }));
+}
+
+// ── Toast helper ───────────────────────────────────────────────────────────
+let toastT;
+function toast(msg){
+  uploadToast.textContent=msg;uploadToast.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>uploadToast.classList.remove('show'),2500);
+}
+
+// ── Native: load from IndexedDB ────────────────────────────────────────────
+async function fetchNative(){
+  const rows=await dbGetAll();
+  return rows.map(r=>({
+    name:r.name.replace(/\.[^.]+$/,''),
+    file:r.name,
+    isNative:true,
+    isLocal:true,
+    blob:r.blob
+  }));
+}
+
+// ── Upload handler ─────────────────────────────────────────────────────────
+uploadBtn.onclick=()=>fileInput.click();
+fileInput.onchange=async()=>{
+  const files=[...fileInput.files].filter(f=>/\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(f.name));
+  if(!files.length){toast('No supported audio files selected');return}
+  uploadBtn.classList.add('upload-active');
+  uploadBtn.textContent='Uploading…';
+  let added=0;
+  for(const f of files){
+    const buf=await f.arrayBuffer();
+    await dbPut({name:f.name,blob:new Blob([buf],{type:f.type||'audio/mpeg'})});
+    added++;
+  }
+  fileInput.value='';
+  uploadBtn.textContent='Upload';
+  uploadBtn.classList.remove('upload-active');
+  toast(`Added ${added} track${added!==1?'s':''}`);
+  if(currentApi==='native'){tracks=await fetchNative();renderGrid()}
+};
 
 async function fetchAudius(q){
   const res=await fetch(`https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=30&_=${Date.now()}`);
@@ -231,7 +305,13 @@ async function loadOrSearch(){
   }
   grid.innerHTML='<div class="loading">Loading tracks...</div>';
   try{
-    if(currentApi==='native') tracks=await fetchNative();
+    if(currentApi==='native'){
+      tracks=await fetchNative();
+      if(!tracks.length){
+        grid.innerHTML='<div class="empty">No tracks yet — click <strong>Upload</strong> to add your music</div>';
+        return;
+      }
+    }
     else if(currentApi==='audius') tracks=await fetchAudius(q);
     else if(currentApi==='itunes') tracks=await fetchITunes(q);
     else if(currentApi==='deezer') tracks=await fetchDeezer(q);
@@ -245,20 +325,31 @@ async function loadOrSearch(){
 
 function play(i){
   const t=getTracks()[i];if(!t)return;
-  audio.pause();audio.src='';
+  audio.pause();
+  // revoke previous blob URL if any
+  if(audio._blobURL){URL.revokeObjectURL(audio._blobURL);audio._blobURL=null}
+  audio.src='';
   curIdx=i;curTrack=t;
-  if(t.isNative)t.cdn=0;
   player.style.display='flex';
   pTitle.textContent=t.name;
-  pCtx.textContent=currentApi==='native'?'Library':currentApi.charAt(0).toUpperCase()+currentApi.slice(1);
+  pCtx.textContent='Library';
   cTime.textContent='0:00';dTime.textContent='0:00';progFill.style.width='0';
-  
-  if(t.isNative) audio.src=t.cdn===0?CDN1(t.file):CDN2(t.file);
-  else audio.src=t.url;
-  
+
+  if(t.isLocal&&t.blob){
+    const url=URL.createObjectURL(t.blob);
+    audio._blobURL=url;
+    audio.src=url;
+  } else if(t.isNative){
+    t.cdn=0;
+    audio.src=CDN1(t.file);
+  } else {
+    pCtx.textContent=currentApi.charAt(0).toUpperCase()+currentApi.slice(1);
+    audio.src=t.url;
+  }
+
   audio.load();
   audio.play().catch(()=>{
-    if(t.isNative){t.cdn=1;audio.src=CDN2(t.file);audio.play().catch(()=>nextBtn.click())}
+    if(t.isNative&&!t.isLocal){t.cdn=1;audio.src=CDN2(t.file);audio.play().catch(()=>nextBtn.click())}
   });
   updateUI();
 }
@@ -284,7 +375,7 @@ function renderGrid(){
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
-      <div class="card-sub">${t.isNative?'Native':'Stream'}</div>
+      <div class="card-sub">${t.isLocal?'Local':t.isNative?'Native':'Stream'}</div>
     </div>`;
   }).join('');
   $$('.card').forEach(c=>{
@@ -346,18 +437,29 @@ function renderSb(){
 }
 
 function showGridDD(idx,btn){
-  gridDropdown.innerHTML=playlists.map(p=>{
-    const inPl=p.tracks.some(t=>t.file===tracks[idx].file);
+  const t=tracks[idx];
+  const plItems=playlists.map(p=>{
+    const inPl=p.tracks.some(x=>x.file===t.file);
     return`<div class="dd-item ${inPl?'disabled':''}" data-id="${p.id}">${inPl?'✓':'+ '}${p.name}</div>`;
   }).join('');
+  const delItem=t?.isLocal?`<div class="dd-item dd-del" style="color:#f55;margin-top:4px;border-top:1px solid var(--border)">🗑 Remove from library</div>`:'';
+  gridDropdown.innerHTML=plItems+(playlists.length?'':`<div class="dd-item disabled">No playlists</div>`)+delItem;
   const r=btn.getBoundingClientRect();
   gridDropdown.style.top=`${r.bottom+6}px`;gridDropdown.style.left=`${Math.min(r.left,innerWidth-180)}px`;
   gridDropdown.classList.add('show');
-  gridDropdown.querySelectorAll('.dd-item:not(.disabled)').forEach(d=>d.onclick=()=>{
+  gridDropdown.querySelectorAll('.dd-item:not(.disabled):not(.dd-del)').forEach(d=>d.onclick=()=>{
     const p=playlists.find(x=>x.id===+d.dataset.id);
     if(p&&tracks[idx]){p.tracks.push({...tracks[idx]})}
     gridDropdown.classList.remove('show');
   });
+  const delBtn=gridDropdown.querySelector('.dd-del');
+  if(delBtn)delBtn.onclick=async()=>{
+    gridDropdown.classList.remove('show');
+    await dbDelete(t.file);
+    if(curTrack?.file===t.file){audio.pause();audio.src='';player.style.display='none';}
+    tracks=await fetchNative();renderGrid();
+    toast(`Removed "${t.name}"`);
+  };
 }
 
 $('#sbAddBtn').onclick=e=>{
@@ -380,7 +482,7 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;plBtn.classList.toggle('visible',currentApi==='native');if(currentApi!=='native')closeSb();loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isNative=currentApi==='native';plBtn.classList.toggle('visible',isNative);uploadBtn.classList.toggle('visible',isNative);if(!isNative)closeSb();loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
@@ -410,7 +512,7 @@ audio.onpause=()=>updateUI();
 audio.onwaiting=()=>{playIc.style.display='none';pauseIc.style.display='none'};
 audio.ontimeupdate=()=>{if(!audio.duration||!isFinite(audio.duration))return;cTime.textContent=fmt(audio.currentTime);progFill.style.width=(audio.currentTime/audio.duration*100)+'%';if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
 audio.onended=()=>{if(repeating){audio.currentTime=0;audio.play().catch(()=>{})}else nextBtn.click()};
-audio.onerror=()=>{if(curTrack?.isNative){curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click())}};
+audio.onerror=()=>{if(curTrack?.isNative&&!curTrack?.isLocal){curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click())}};
 
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec}
 
