@@ -100,6 +100,12 @@
   .dd-item{padding:8px 12px;font-size:13px;cursor:pointer;display:flex;gap:8px}
   .dd-item:hover{background:var(--hover)}
   .dd-item.disabled{color:var(--sub);pointer-events:none}
+  .card-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;margin-top:4px;letter-spacing:.5px}
+  .badge-live{background:#e22;color:#fff}
+  .badge-kbps{background:#333;color:var(--sub)}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#e22;display:inline-block;margin-right:5px;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .prog-wrap.hidden{visibility:hidden}
   @media(max-width:600px){header{padding:12px;gap:8px;flex-wrap:wrap}.search-wrap{order:3;min-width:100%}main{padding:12px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.player{flex-wrap:wrap;gap:6px;padding:8px 12px}.prog-wrap{order:10;width:100%;max-width:100%}.vol-wrap{display:none}.player.shifted{right:0}main.shifted{margin-right:0}.sidebar{width:100%}}
 </style>
 </head>
@@ -108,6 +114,7 @@
   <div class="logo">ZMusic</div>
   <select id="apiSelect">
     <option value="online" selected>Online</option>
+    <option value="radio">Radio</option>
     <option value="local">Local</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
@@ -349,16 +356,64 @@ async function fetchCCMixter(q){
   });
 }
 
+// ── Internet Archive — public domain & CC audio, no key ───────────────────
+async function fetchArchive(q){
+  const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}+AND+mediatype:audio&fl[]=identifier,title,creator,subject&rows=20&output=json`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok) throw null;
+  const d=await res.json();
+  const items=d.response?.docs||[];
+  // For each item, build a direct mp3 stream URL using the known permalink pattern
+  // archive.org/download/IDENTIFIER will redirect to first audio file
+  return items.map(it=>({
+    id:it.identifier,
+    name:it.title||it.identifier,
+    artist:Array.isArray(it.creator)?it.creator[0]:it.creator||'Internet Archive',
+    url:`https://archive.org/download/${it.identifier}`,
+    art:`https://archive.org/services/get-item-image.php?identifier=${it.identifier}`,
+    provider:'Archive',isNative:false,isArchive:true
+  }));
+}
+
 async function fetchOnline(q){
-  // All sources in parallel; order: Audius, iTunes, Deezer, Jamendo, ccMixter
+  // All sources in parallel; order: Audius, iTunes, Deezer, Jamendo, ccMixter, Archive
   const results=await Promise.allSettled([
     fetchAudius(q),
     fetchITunes(q),
     fetchDeezer(q),
     fetchJamendo(q),
-    fetchCCMixter(q)
+    fetchCCMixter(q),
+    fetchArchive(q)
   ]);
   return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+}
+
+// ── RadioBrowser — global radio stations, no key ───────────────────────────
+// Use the stable anycast DNS-resolved mirror
+const RB='https://de1.api.radio-browser.info';
+async function fetchRadio(q){
+  // Search by name and tag simultaneously, deduplicate by stationuuid
+  const params=`hidebroken=true&lastcheckok=1&limit=60&order=clickcount&reverse=true`;
+  const byName=fetch(`${RB}/json/stations/search?name=${encodeURIComponent(q)}&${params}`,{headers:{'User-Agent':'ZMusic/1.0'},cache:'no-store'}).then(r=>r.json()).catch(()=>[]);
+  const byTag =fetch(`${RB}/json/stations/search?tag=${encodeURIComponent(q)}&${params}`,{headers:{'User-Agent':'ZMusic/1.0'},cache:'no-store'}).then(r=>r.json()).catch(()=>[]);
+  const [names,tags]=await Promise.all([byName,byTag]);
+  const seen=new Set();
+  return [...names,...tags].filter(s=>{
+    if(!s.url_resolved&&!s.url)return false;
+    if(seen.has(s.stationuuid))return false;
+    seen.add(s.stationuuid);
+    return true;
+  }).map(s=>({
+    id:s.stationuuid,
+    name:s.name||'Unknown Station',
+    artist:s.country||'',
+    url:s.url_resolved||s.url,
+    art:s.favicon||'',
+    tags:s.tags||'',
+    bitrate:s.bitrate||0,
+    codec:s.codec||'',
+    provider:'Radio',isNative:false,isRadio:true
+  }));
 }
 
 async function loadOrSearch(){
@@ -366,6 +421,11 @@ async function loadOrSearch(){
   if(currentApi==='online'&&!q){
     tracks=[];
     grid.innerHTML='<div class="empty">Type something to search...</div>';
+    return;
+  }
+  if(currentApi==='radio'&&!q){
+    tracks=[];
+    grid.innerHTML='<div class="empty">Search for a station, genre, or country...</div>';
     return;
   }
   grid.innerHTML='<div class="loading">Loading tracks...</div>';
@@ -376,6 +436,8 @@ async function loadOrSearch(){
         grid.innerHTML='<div class="empty">No tracks yet — click <strong>Upload</strong> to add your music</div>';
         return;
       }
+    } else if(currentApi==='radio'){
+      tracks=await fetchRadio(q);
     } else {
       tracks=await fetchOnline(q);
     }
