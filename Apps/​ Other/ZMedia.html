@@ -20,6 +20,8 @@
   .nav-btn.visible{display:block}
   .nav-btn:hover{border-color:var(--primary);color:var(--text)}
   .nav-btn.upload-active{border-color:var(--primary);color:var(--primary)}
+  .inline-btn{background:none;border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--sub);font-size:13px;cursor:pointer;transition:all .2s}
+  .inline-btn:hover{border-color:var(--primary);color:var(--text)}
   .upload-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;border:1px solid var(--border);border-radius:20px;padding:8px 18px;font-size:13px;color:var(--text);z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
   .upload-toast.show{opacity:1}
   main{flex:1;padding:20px 24px 100px;transition:margin-right .3s}
@@ -36,7 +38,9 @@
   .card:hover .card-add{display:flex}
   .card-add:hover{background:var(--primary)}
   .card-add svg{width:14px;height:14px;fill:#fff}
-  .playing-card{box-shadow:inset 0 0 0 2px var(--primary)}
+  .card-save{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.75);border:1px solid var(--border);border-radius:12px;padding:3px 8px;font-size:10px;color:var(--sub);cursor:pointer;display:none;align-items:center;gap:4px;transition:all .2s;white-space:nowrap}
+  .card:hover .card-save{display:flex}
+  .card-save:hover{background:var(--primary);color:#000;border-color:var(--primary)}
   .sidebar{position:fixed;top:0;right:calc(var(--sidebar-w)*-1);width:var(--sidebar-w);height:100%;background:#151515;border-left:1px solid var(--border);z-index:40;transition:right .3s;display:flex;flex-direction:column}
   .sidebar.open{right:0}
   .sb-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
@@ -121,6 +125,12 @@
   .badge-ted{background:#3a1a1a;color:#f87171}
   .badge-vimeo{background:#1a2a3a;color:#60a5fa}
   .badge-wikimedia-a{background:#2a2a1a;color:#fbbf24}
+  .ng-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(480px,94vw);padding:20px;display:flex;flex-direction:column;gap:10px}
+  .ng-header{display:flex;align-items:center;justify-content:space-between}
+  .ng-title{font-size:15px;font-weight:700}
+  .ng-hint{font-size:12px;color:var(--sub);line-height:1.6;margin:0}
+  .ng-hint code{background:var(--card);padding:1px 4px;border-radius:3px;font-size:11px}
+  .ng-row{display:flex;gap:8px;align-items:center}
   .badge-wikimedia{background:#2a2a1a;color:#fbbf24}
   .badge-nasa{background:#1a1a3a;color:#a78bfa}
   .badge-mixcloud{background:#1a1a2e;color:#67e8f9}
@@ -136,6 +146,7 @@
     <option value="video">Videos</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
+  <button class="inline-btn" id="ngBtn" style="display:none">Newgrounds</button>
   <button class="nav-btn" id="uploadBtn">Upload</button>
   <input type="file" id="fileInput" accept="audio/*,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm,.mov,.m4a,.3gp,.3g2" multiple style="display:none">
   <button class="nav-btn" id="plBtn">Playlists</button>
@@ -187,6 +198,26 @@
 <audio id="audio" crossorigin="anonymous"></audio>
 <div class="dropdown" id="gridDropdown"></div>
 <div class="upload-toast" id="uploadToast"></div>
+
+<!-- Newgrounds modal -->
+<div class="modal" id="ngModal">
+  <div class="ng-box">
+    <div class="ng-header">
+      <div class="ng-title">🎵 Newgrounds Audio</div>
+      <button class="video-modal-close" id="ngModalClose">✕</button>
+    </div>
+    <p class="ng-hint">Enter a Newgrounds Audio Portal song ID to play it directly.<br>Find IDs at <a href="https://www.newgrounds.com/audio" target="_blank" style="color:var(--primary)">newgrounds.com/audio</a> — the number in the URL after <code>/view/</code>.</p>
+    <div class="ng-row">
+      <input type="number" id="ngIdInput" placeholder="e.g. 1234567" min="1" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;font-size:14px">
+      <button class="nav-btn" id="ngPlayBtn">Play</button>
+    </div>
+    <div id="ngStatus" style="font-size:12px;color:var(--sub);margin-top:8px;min-height:16px"></div>
+    <div id="ngPlayer" style="display:none;margin-top:12px">
+      <iframe id="ngFrame" scrolling="no" frameborder="0" style="display:none"></iframe>
+      <button class="inline-btn" id="ngSaveBtn" style="margin-top:10px;width:100%;justify-content:center">⬇ Save to Local</button>
+    </div>
+  </div>
+</div>
 
 <!-- Video modal -->
 <div class="modal" id="videoModal">
@@ -263,7 +294,25 @@ function dbDelete(name){
   }));
 }
 
-// ── Toast helper ───────────────────────────────────────────────────────────
+// ── Save to Local helper ───────────────────────────────────────────────────
+async function saveToLocal(t,btnEl){
+  if(!t.url){toast('No direct URL to save');return}
+  if(btnEl){btnEl.textContent='Saving…';btnEl.style.pointerEvents='none'}
+  try{
+    const res=await fetch(t.url);
+    if(!res.ok)throw new Error('Fetch failed');
+    const buf=await res.arrayBuffer();
+    const ext=t.url.split('?')[0].match(/\.[a-z0-9]+$/i)?.[0]||'.mp3';
+    const safeName=(t.name||'track').replace(/[/\\:*?"<>|]/g,'_').slice(0,80)+ext;
+    const blob=new Blob([buf],{type:res.headers.get('content-type')||'audio/mpeg'});
+    await dbPut({name:safeName,blob});
+    toast(`Saved "${t.name}" to Local`);
+    if(btnEl){btnEl.textContent='✓ Saved';btnEl.style.color='var(--primary)'}
+  }catch(e){
+    toast('Could not save — track may be protected');
+    if(btnEl){btnEl.textContent='Save to Local';btnEl.style.pointerEvents=''}
+  }
+}
 let toastT;
 function toast(msg){
   uploadToast.textContent=msg;uploadToast.classList.add('show');
@@ -705,7 +754,100 @@ async function fetchVideoAll(q){
   return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
 }
 
-// ── Video modal ────────────────────────────────────────────────────────────
+$('#ngBtn').style.display='block';  // visible by default since Music is default mode
+const ngModal=$('#ngModal'),ngFrame=$('#ngFrame'),ngStatus=$('#ngStatus'),ngPlayer=$('#ngPlayer');
+$('#ngBtn').onclick=()=>ngModal.classList.add('open');
+$('#ngModalClose').onclick=()=>{
+  ngModal.classList.remove('open');
+  ngFrame.src='';
+  ngPlayer.style.display='none';
+  ngStatus.textContent='';
+  const a=document.getElementById('ngAudioEl');
+  if(a){a.pause();a.src=''}
+};
+ngModal.onclick=e=>{
+  if(e.target===ngModal){
+    ngModal.classList.remove('open');
+    ngFrame.src='';
+    ngPlayer.style.display='none';
+    ngStatus.textContent='';
+    const a=document.getElementById('ngAudioEl');
+    if(a){a.pause();a.src=''}
+  }
+};
+$('#ngIdInput').onkeydown=e=>{if(e.key==='Enter')$('#ngPlayBtn').click()};
+$('#ngPlayBtn').onclick=async()=>{
+  const id=$('#ngIdInput').value.trim();
+  if(!id||isNaN(id)){ngStatus.textContent='Please enter a valid song ID.';return}
+  ngStatus.textContent='Fetching song…';
+  ngPlayer.style.display='none';
+  const saveBtn=$('#ngSaveBtn');
+  saveBtn.textContent='⬇ Save to Local';
+  saveBtn.style.color='';
+  saveBtn.style.pointerEvents='';
+  saveBtn.dataset.ngid=id;
+  saveBtn.dataset.ngurl='';
+  try{
+    // Fetch NG audio page via CORS proxy and extract og:audio MP3 URL
+    const proxy='https://proxy.corsfix.com/?';
+    const pageUrl=`https://www.newgrounds.com/audio/listen/${id}`;
+    const res=await fetch(proxy+pageUrl,{cache:'no-store'});
+    if(!res.ok)throw new Error('Page not found');
+    const html=await res.text();
+    // Extract og:audio meta tag content
+    const match=html.match(/<meta\s+property="og:audio"\s+content="([^"]+)"/i)
+                ||html.match(/<meta\s+content="([^"]+)"\s+property="og:audio"/i);
+    const titleMatch=html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
+                   ||html.match(/<meta\s+content="([^"]+)"\s+property="og:title"/i);
+    if(!match||!match[1])throw new Error('Could not find audio URL');
+    const mp3Url=match[1].replace(/&amp;/g,'&');
+    const songTitle=titleMatch?titleMatch[1].replace(/&amp;/g,'&').replace(/&#039;/g,"'"):`Newgrounds #${id}`;
+    saveBtn.dataset.ngurl=mp3Url;
+    saveBtn.dataset.ngtitle=songTitle;
+    // Play in the existing audio element and show mini player
+    ngFrame.src='';
+    ngFrame.style.display='none';
+    const ngAudio=document.getElementById('ngAudioEl')||document.createElement('audio');
+    ngAudio.id='ngAudioEl';
+    ngAudio.controls=true;
+    ngAudio.style.cssText='width:100%;margin-top:0;border-radius:8px';
+    ngAudio.src=mp3Url;
+    const ngAudioWrap=document.getElementById('ngAudioWrap')||document.createElement('div');
+    ngAudioWrap.id='ngAudioWrap';
+    if(!document.getElementById('ngAudioEl')){
+      ngAudioWrap.appendChild(ngAudio);
+      ngPlayer.insertBefore(ngAudioWrap,ngPlayer.firstChild);
+    }
+    ngAudioWrap.style.display='block';
+    ngAudio.load();
+    ngAudio.play().catch(()=>{});
+    ngStatus.textContent=songTitle;
+    ngPlayer.style.display='block';
+  }catch(e){
+    ngStatus.textContent='Could not load — check the ID or try another song.';
+  }
+};
+$('#ngSaveBtn').onclick=async function(){
+  const url=this.dataset.ngurl;
+  const id=this.dataset.ngid;
+  const title=this.dataset.ngtitle||`Newgrounds_${id}`;
+  if(!url&&!id)return;
+  this.textContent='Saving…';this.style.pointerEvents='none';
+  try{
+    const srcUrl=url||`https://www.newgrounds.com/audio/download/${id}`;
+    const res=await fetch(url?url:`https://proxy.corsfix.com/?${srcUrl}`,{credentials:'omit'});
+    if(!res.ok)throw new Error();
+    const buf=await res.arrayBuffer();
+    const blob=new Blob([buf],{type:'audio/mpeg'});
+    const safeName=title.replace(/[/\\:*?"<>|]/g,'_').slice(0,80)+'.mp3';
+    await dbPut({name:safeName,blob});
+    toast(`Saved "${title}" to Local`);
+    this.textContent='✓ Saved';this.style.color='var(--primary)';
+  }catch(e){
+    toast('Could not save — try again later');
+    this.textContent='⬇ Save to Local';this.style.pointerEvents='';
+  }
+};
 const videoModal=$('#videoModal'),videoFrame=$('#videoFrame'),videoEl=$('#videoEl');
 $('#videoModalClose').onclick=closeVideoModal;
 videoModal.onclick=e=>{if(e.target===videoModal)closeVideoModal()};
@@ -899,18 +1041,23 @@ function renderGrid(){
       if(!cls)return'';
       return`<span class="card-badge ${cls}">${t.provider}</span>`;
     })();
+    const saveBtn=(!t.isNative&&!t.isLocal&&t.url&&!t.isArchive)?
+      `<button class="card-save" data-sidx="${real}">⬇ Save to Local</button>`:'';
     return`<div class="card" data-idx="${real}">
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
       <div class="card-sub">${t.isLocalVideo?'Local Video':t.isLocal?'Local':t.provider?(t.artist?`${t.provider} · ${t.artist}`:t.provider):'Online'}</div>
       ${providerBadge}
+      ${saveBtn}
     </div>`;
   }).join('');
   $$('.card').forEach(c=>{
-    c.onclick=e=>{if(!e.target.closest('.card-add'))play(+c.dataset.idx)};
+    c.onclick=e=>{if(!e.target.closest('.card-add')&&!e.target.closest('.card-save'))play(+c.dataset.idx)};
     const add=c.querySelector('.card-add');
     if(add) add.onclick=e=>{e.stopPropagation();showGridDD(+c.dataset.idx,add)};
+    const save=c.querySelector('.card-save');
+    if(save) save.onclick=e=>{e.stopPropagation();saveToLocal(tracks[+save.dataset.sidx],save)};
   });
   updateUI();
 }
@@ -1011,7 +1158,7 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();if(currentApi!=='video')closeVideoModal();loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();if(currentApi!=='video')closeVideoModal();$('#ngBtn').style.display=currentApi==='online'?'block':'none';loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
