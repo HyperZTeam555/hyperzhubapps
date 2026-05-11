@@ -120,6 +120,10 @@
   .badge-peertube{background:#1a3a1a;color:#4ade80}
   .badge-ted{background:#3a1a1a;color:#f87171}
   .badge-vimeo{background:#1a2a3a;color:#60a5fa}
+  .badge-mixcloud{background:#1a1a2e;color:#67e8f9}
+  .badge-wikimedia-a{background:#2a2a1a;color:#fbbf24}
+  .badge-wikimedia{background:#2a2a1a;color:#fbbf24}
+  .badge-nasa{background:#1a1a3a;color:#a78bfa}
 </style>
 </head>
 <body>
@@ -133,7 +137,7 @@
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
   <button class="nav-btn" id="uploadBtn">Upload</button>
-  <input type="file" id="fileInput" accept="audio/*,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm,.mov,.m4a" multiple style="display:none">
+  <input type="file" id="fileInput" accept="audio/*,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm,.mov,.m4a,.3gp,.3g2" multiple style="display:none">
   <button class="nav-btn" id="plBtn">Playlists</button>
 </header>
 <main id="main"><div class="grid" id="grid"><div class="loading">Loading tracks...</div></div></main>
@@ -282,7 +286,7 @@ async function fetchNative(){
 // ── Upload handler ─────────────────────────────────────────────────────────
 uploadBtn.onclick=()=>fileInput.click();
 fileInput.onchange=async()=>{
-  const files=[...fileInput.files].filter(f=>/\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4|mov|mkv|avi)$/i.test(f.name));
+  const files=[...fileInput.files].filter(f=>/\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4|mov|mkv|avi|3gp|3g2)$/i.test(f.name));
   if(!files.length){toast('No supported audio/video files selected');return}
   uploadBtn.classList.add('upload-active');
   uploadBtn.textContent='Uploading…';
@@ -421,14 +425,56 @@ async function resolveArchiveUrl(t){
   return t.url;
 }
 
+// ── Mixcloud — DJ mixes, radio shows, podcasts — open search, no key ────────
+async function fetchMixcloud(q){
+  const url=`https://api.mixcloud.com/search/?q=${encodeURIComponent(q)}&type=cloudcast&limit=20`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  return (d.data||[]).map(c=>({
+    id:c.key,                        // e.g. "/username/slug/"
+    name:c.name||'Unknown',
+    artist:c.user?.name||c.user?.username||'',
+    url:`https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=${encodeURIComponent(c.key)}`,
+    art:c.pictures?.large||c.pictures?.medium||'',
+    provider:'Mixcloud',isNative:false,isMixcloud:true
+  }));
+}
+
+// ── Wikimedia Commons audio — CC/PD recordings, no key, MediaWiki API ───────
+async function fetchWikimediaAudio(q){
+  const url=`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=20&prop=imageinfo|pageimages&iiprop=url|mime&pithumbsize=300&format=json&origin=*`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  const pages=Object.values(d.query?.pages||{});
+  return pages.filter(p=>{
+    const mime=p.imageinfo?.[0]?.mime||'';
+    return /^audio\//.test(mime)||/\.(mp3|ogg|flac|wav|oga)$/i.test(p.imageinfo?.[0]?.url||'');
+  }).map(p=>{
+    const ii=p.imageinfo?.[0]||{};
+    const title=p.title?.replace(/^File:/,'');
+    return{
+      id:p.pageid,
+      name:title?.replace(/\.[^.]+$/,'')||'Unknown',
+      artist:'Wikimedia Commons',
+      url:ii.url||'',
+      art:p.thumbnail?.source||'',
+      provider:'Wikimedia',isNative:false
+    };
+  }).filter(t=>t.url);
+}
+
 async function fetchOnline(q){
-  // All sources in parallel; order: Audius, iTunes, Deezer, Jamendo, ccMixter, Archive
+  // All sources in parallel
   const results=await Promise.allSettled([
     fetchAudius(q),
     fetchITunes(q),
     fetchDeezer(q),
     fetchJamendo(q),
     fetchCCMixter(q),
+    fetchMixcloud(q),
+    fetchWikimediaAudio(q),
     fetchArchive(q)
   ]);
   return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
@@ -575,12 +621,84 @@ async function fetchVimeo(q){
   }catch(e){return []}
 }
 
+// ── Dailymotion — public data API, no key required for search ──────────────
+async function fetchDailymotion(q){
+  const url=`https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&fields=id,title,owner.screenname,thumbnail_360_url,embed_url&limit=20&family_filter=1`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  return (d.list||[]).filter(v=>v.id&&v.embed_url).map(v=>({
+    id:v.id,
+    name:v.title||'Unknown',
+    artist:v['owner.screenname']||'Dailymotion',
+    description:'',
+    thumb:v.thumbnail_360_url||'',
+    embedUrl:v.embed_url+'?autoplay=1&quality=380',
+    pageUrl:`https://www.dailymotion.com/video/${v.id}`,
+    provider:'Dailymotion',isVideo:true
+  }));
+}
+
+// ── Wikimedia Commons — public domain / CC video via MediaWiki API ─────────
+async function fetchWikimediaVideo(q){
+  const url=`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=20&prop=imageinfo|pageimages&iiprop=url|mime|extmetadata&iiextmetadatafilter=License,LicenseShortName,ImageDescription&pithumbsize=360&format=json&origin=*`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  const pages=Object.values(d.query?.pages||{});
+  return pages.filter(p=>{
+    const mime=p.imageinfo?.[0]?.mime||'';
+    return /^video\//.test(mime);
+  }).map(p=>{
+    const ii=p.imageinfo?.[0]||{};
+    const title=p.title?.replace(/^File:/,'');
+    const desc=ii.extmetadata?.ImageDescription?.value?.replace(/<[^>]+>/g,'')||'';
+    return{
+      id:p.pageid,
+      name:title?.replace(/\.[^.]+$/,'')||'Unknown',
+      artist:'Wikimedia Commons',
+      description:desc,
+      thumb:p.thumbnail?.source||'',
+      embedUrl:`https://commons.wikimedia.org/wiki/File:${encodeURIComponent(title)}?embedplayer=yes`,
+      pageUrl:`https://commons.wikimedia.org/wiki/File:${encodeURIComponent(title)}`,
+      provider:'Wikimedia',isVideo:true
+    };
+  });
+}
+
+// ── NASA Image & Video Library — completely open API, no key ───────────────
+async function fetchNASA(q){
+  const url=`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=video&page_size=20`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  const items=(d.collection?.items||[]).filter(it=>it.links&&it.data?.[0]);
+  return items.map(it=>{
+    const meta=it.data[0];
+    const thumb=(it.links||[]).find(l=>l.rel==='preview')?.href||'';
+    const nasaId=meta.nasa_id||'';
+    return{
+      id:nasaId,
+      name:meta.title||'Unknown',
+      artist:meta.center||'NASA',
+      description:meta.description||'',
+      thumb,
+      embedUrl:`https://images-assets.nasa.gov/video/${nasaId}/${nasaId}~orig.mp4`,
+      pageUrl:`https://images.nasa.gov/details/${nasaId}`,
+      provider:'NASA',isVideo:true,isNasaVideo:true
+    };
+  });
+}
+
 async function fetchVideoAll(q){
   const results=await Promise.allSettled([
     fetchArchiveVideo(q),
     fetchPeerTube(q),
     fetchTED(q),
-    fetchVimeo(q)
+    fetchVimeo(q),
+    fetchDailymotion(q),
+    fetchWikimediaVideo(q),
+    fetchNASA(q)
   ]);
   return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
 }
@@ -593,12 +711,26 @@ videoModal.onclick=e=>{if(e.target===videoModal)closeVideoModal()};
 function openVideoModal(v){
   $('#videoModalTitle').textContent=v.name;
   $('#videoModalSub').textContent=v.artist?(v.artist+' · '+(v.provider||'Local')):v.provider||'Local';
-  if(v.blobUrl){
-    // Local video file — use <video> element
+  if(v.blobUrl||v.isNasaVideo){
+    // Local blob or NASA direct MP4 — use <video> element
     videoFrame.style.display='none';
     videoFrame.src='';
     videoEl.style.display='block';
-    videoEl.src=v.blobUrl;
+    if(v.blobUrl){
+      videoEl.src=v.blobUrl;
+    } else {
+      // NASA: try orig MP4, fallback to preview URL
+      videoEl.src=v.embedUrl;
+      videoEl.onerror=()=>{
+        // Try the collection JSON to find the real mp4
+        fetch(`https://images-api.nasa.gov/asset/${v.id}`,{cache:'no-store'})
+          .then(r=>r.json()).then(d=>{
+            const mp4=(d.collection?.items||[]).find(i=>/\.mp4$/i.test(i.href));
+            if(mp4)videoEl.src=mp4.href;
+          }).catch(()=>{});
+        videoEl.onerror=null;
+      };
+    }
     videoEl.play().catch(()=>{});
   } else {
     // Remote embed — use iframe
@@ -624,7 +756,10 @@ function renderVideoGrid(list){
     'Archive Video':'badge-archive-v',
     'PeerTube':'badge-peertube',
     'TED':'badge-ted',
-    'Vimeo':'badge-vimeo'
+    'Vimeo':'badge-vimeo',
+    'Dailymotion':'badge-dailymotion',
+    'Wikimedia':'badge-wikimedia',
+    'NASA':'badge-nasa'
   };
   grid.innerHTML=list.map((v,i)=>{
     const bc=badgeClass[v.provider]||'';
@@ -709,6 +844,11 @@ async function play(i){
     player.style.display='none';
     openVideoModal({name:t.name,artist:'Local Library',blobUrl});
     return;
+  } else if(t.isMixcloud){
+    // Mixcloud — audio embed in video modal (no direct stream allowed)
+    player.style.display='none';
+    openVideoModal({name:t.name,artist:t.artist,provider:'Mixcloud',embedUrl:t.url});
+    return;
   } else if(t.isLocal&&t.blob){
     const url=URL.createObjectURL(t.blob);
     audio._blobURL=url;
@@ -753,11 +893,20 @@ function renderGrid(){
     const real=tracks.indexOf(t);
     const icon=t.isNative?`<div class="card-icon">${t.isLocalVideo?`<svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>`:`<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`}</div>`:
       `<div class="card-icon"><img src="${t.art||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><svg viewBox="0 0 24 24" style="display:none"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>`;
+    const providerBadge=(()=>{
+      if(t.isLocal||t.isNative)return'';
+      const bc={'Mixcloud':'badge-mixcloud','Wikimedia':'badge-wikimedia-a','Jamendo':'','ccMixter':'','Archive':'','Audius':'','iTunes':'','Deezer':''};
+      const cls=bc[t.provider];
+      if(cls===undefined)return`<span class="card-badge" style="background:#1a2a3a;color:#93c5fd">${t.provider}</span>`;
+      if(!cls)return'';
+      return`<span class="card-badge ${cls}">${t.provider}</span>`;
+    })();
     return`<div class="card" data-idx="${real}">
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
-      <div class="card-sub">${t.isLocalVideo?'Local Video':t.isLocal?'Local':t.provider||'Online'}</div>
+      <div class="card-sub">${t.isLocalVideo?'Local Video':t.isLocal?'Local':t.artist||t.provider||'Online'}</div>
+      ${providerBadge}
     </div>`;
   }).join('');
   $$('.card').forEach(c=>{
