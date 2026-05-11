@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZMusic Player</title>
+<title>ZMedia Player</title>
 <style>
   :root{--bg:#121212;--surface:#181818;--hover:#282828;--primary:#1DB954;--text:#fff;--sub:#a7a7a7;--border:#333;--sidebar-w:340px}
   *{margin:0;padding:0;box-sizing:border-box}
@@ -107,19 +107,33 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .prog-wrap.hidden{visibility:hidden}
   @media(max-width:600px){header{padding:12px;gap:8px;flex-wrap:wrap}.search-wrap{order:3;min-width:100%}main{padding:12px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.player{flex-wrap:wrap;gap:6px;padding:8px 12px}.prog-wrap{order:10;width:100%;max-width:100%}.vol-wrap{display:none}.player.shifted{right:0}main.shifted{margin-right:0}.sidebar{width:100%}}
+  .video-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+  .video-modal-header{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .video-modal-title{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .video-modal-sub{font-size:11px;color:var(--sub);white-space:nowrap}
+  .video-modal-close{background:none;border:none;color:var(--sub);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px}
+  .video-modal-close:hover{color:var(--text)}
+  .video-iframe-wrap{position:relative;width:100%;padding-top:56.25%;flex-shrink:0}
+  .video-iframe-wrap iframe{position:absolute;inset:0;width:100%;height:100%;background:#000}
+  .video-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;margin-top:4px;letter-spacing:.5px;background:#1a3a5c;color:#6ab4ff}
+  .badge-archive-v{background:#2a1a3a;color:#c084fc}
+  .badge-peertube{background:#1a3a1a;color:#4ade80}
+  .badge-ted{background:#3a1a1a;color:#f87171}
+  .badge-vimeo{background:#1a2a3a;color:#60a5fa}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">ZMusic</div>
+  <div class="logo">ZMedia</div>
   <select id="apiSelect">
-    <option value="online" selected>Online</option>
-    <option value="radio">Radio</option>
+    <option value="online" selected>Music</option>
     <option value="local">Local</option>
+    <option value="radio">Radio</option>
+    <option value="video">Videos</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
   <button class="nav-btn" id="uploadBtn">Upload</button>
-  <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+  <input type="file" id="fileInput" accept="audio/*,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm,.mov,.m4a" multiple style="display:none">
   <button class="nav-btn" id="plBtn">Playlists</button>
 </header>
 <main id="main"><div class="grid" id="grid"><div class="loading">Loading tracks...</div></div></main>
@@ -169,6 +183,21 @@
 <audio id="audio" crossorigin="anonymous"></audio>
 <div class="dropdown" id="gridDropdown"></div>
 <div class="upload-toast" id="uploadToast"></div>
+
+<!-- Video modal -->
+<div class="modal" id="videoModal">
+  <div class="video-modal-box">
+    <div class="video-modal-header">
+      <div class="video-modal-title" id="videoModalTitle"></div>
+      <div class="video-modal-sub" id="videoModalSub"></div>
+      <button class="video-modal-close" id="videoModalClose">✕</button>
+    </div>
+    <div class="video-iframe-wrap">
+      <iframe id="videoFrame" allowfullscreen allow="autoplay; fullscreen; encrypted-media" frameborder="0"></iframe>
+      <video id="videoEl" controls style="display:none;position:absolute;inset:0;width:100%;height:100%;background:#000"></video>
+    </div>
+  </div>
+</div>
 
 <script>
 const REPO='hyperzteam555/hyperzhubapps',FOLDER='Music',BRANCH='main';
@@ -245,6 +274,7 @@ async function fetchNative(){
     file:r.name,
     isNative:true,
     isLocal:true,
+    isLocalVideo:/\.(mp4|webm|mov|mkv|avi)$/i.test(r.name),
     blob:r.blob
   }));
 }
@@ -252,8 +282,8 @@ async function fetchNative(){
 // ── Upload handler ─────────────────────────────────────────────────────────
 uploadBtn.onclick=()=>fileInput.click();
 fileInput.onchange=async()=>{
-  const files=[...fileInput.files].filter(f=>/\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(f.name));
-  if(!files.length){toast('No supported audio files selected');return}
+  const files=[...fileInput.files].filter(f=>/\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4|mov|mkv|avi)$/i.test(f.name));
+  if(!files.length){toast('No supported audio/video files selected');return}
   uploadBtn.classList.add('upload-active');
   uploadBtn.textContent='Uploading…';
   let added=0;
@@ -265,7 +295,7 @@ fileInput.onchange=async()=>{
   fileInput.value='';
   uploadBtn.textContent='Upload';
   uploadBtn.classList.remove('upload-active');
-  toast(`Added ${added} track${added!==1?'s':''}`);
+  toast(`Added ${added} file${added!==1?'s':''}`);
   if(currentApi==='local'){tracks=await fetchNative();renderGrid()}
 };
 
@@ -358,21 +388,37 @@ async function fetchCCMixter(q){
 
 // ── Internet Archive — public domain & CC audio, no key ───────────────────
 async function fetchArchive(q){
-  const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}+AND+mediatype:audio&fl[]=identifier,title,creator,subject&rows=20&output=json`;
+  const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}+AND+mediatype:audio&fl[]=identifier,title,creator&rows=12&output=json`;
   const res=await fetch(url,{cache:'no-store'});
   if(!res.ok) throw null;
   const d=await res.json();
   const items=d.response?.docs||[];
-  // For each item, build a direct mp3 stream URL using the known permalink pattern
-  // archive.org/download/IDENTIFIER will redirect to first audio file
+  // Return items immediately; actual audio URL is resolved lazily in playArchive()
   return items.map(it=>({
     id:it.identifier,
     name:it.title||it.identifier,
     artist:Array.isArray(it.creator)?it.creator[0]:it.creator||'Internet Archive',
-    url:`https://archive.org/download/${it.identifier}`,
+    url:null, // resolved at play time
     art:`https://archive.org/services/get-item-image.php?identifier=${it.identifier}`,
     provider:'Archive',isNative:false,isArchive:true
   }));
+}
+
+// Resolve the real audio file URL for an Archive item on demand
+async function resolveArchiveUrl(t){
+  if(t.url)return t.url;
+  const meta=await fetch(`https://archive.org/metadata/${t.id}`,{cache:'no-store'});
+  if(!meta.ok)throw new Error('Archive metadata failed');
+  const m=await meta.json();
+  const files=m.files||[];
+  const pick=files.find(f=>/\.mp3$/i.test(f.name))||
+             files.find(f=>/\.ogg$/i.test(f.name))||
+             files.find(f=>/\.(opus|flac|m4a|wav)$/i.test(f.name));
+  if(!pick)throw new Error('No audio file found');
+  const server=m.server||'ia803400.us.archive.org';
+  const dir=m.dir||`/0/items/${t.id}`;
+  t.url=`https://${server}${dir}/${encodeURIComponent(pick.name)}`;
+  return t.url;
 }
 
 async function fetchOnline(q){
@@ -416,7 +462,185 @@ async function fetchRadio(q){
   }));
 }
 
+let searchToken=0;
+
+// ── Video sources ──────────────────────────────────────────────────────────
+
+// Internet Archive Videos — public domain movies, CC films, no key
+async function fetchArchiveVideo(q){
+  const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}+AND+mediatype:movies&fl[]=identifier,title,creator,description&rows=12&output=json`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  return (d.response?.docs||[]).map(it=>({
+    id:it.identifier,
+    name:it.title||it.identifier,
+    artist:Array.isArray(it.creator)?it.creator[0]:it.creator||'Internet Archive',
+    description:it.description||'',
+    thumb:`https://archive.org/services/get-item-image.php?identifier=${it.identifier}`,
+    embedUrl:`https://archive.org/embed/${it.identifier}`,
+    pageUrl:`https://archive.org/details/${it.identifier}`,
+    provider:'Archive Video',isVideo:true
+  }));
+}
+
+// PeerTube — SepiaSearch indexes thousands of federated instances, no key
+async function fetchPeerTube(q){
+  const url=`https://sepiasearch.org/api/v1/search/videos?search=${encodeURIComponent(q)}&count=20&sort=-match&nsfw=false`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)throw null;
+  const d=await res.json();
+  return (d.data||[]).filter(v=>v.uuid&&v.embedPath).map(v=>{
+    const host=v.account?.host||'peer.tube';
+    const thumb=v.thumbnailPath?`https://${host}${v.thumbnailPath}`:'';
+    return{
+      id:v.uuid,
+      name:v.name||'Unknown',
+      artist:v.account?.displayName||v.account?.name||'',
+      description:v.description||'',
+      thumb,
+      embedUrl:`https://${host}/videos/embed/${v.uuid}?title=0&warningTitle=0`,
+      pageUrl:`https://${host}/videos/watch/${v.uuid}`,
+      provider:'PeerTube',isVideo:true
+    };
+  });
+}
+
+// TED Talks — oEmbed for known slugs; search via their open search endpoint
+async function fetchTED(q){
+  // TED's website search returns JSON at this undocumented but stable endpoint
+  const url=`https://api.ted.com/v2/talks?q=${encodeURIComponent(q)}&per_page=20&fields=slug,title,speaker_name,thumb,description`;
+  // Fallback: use their public search page via a CORS proxy
+  const proxyUrl=`https://proxy.corsfix.com/?https://www.ted.com/talks?q=${encodeURIComponent(q)}&per_page=12`;
+  try{
+    // Try the undocumented v2 API first (no key required for reads)
+    const res=await fetch(url,{cache:'no-store'});
+    if(res.ok){
+      const d=await res.json();
+      if(d.talks&&d.talks.length){
+        return d.talks.map(t=>({
+          id:t.slug,
+          name:t.title||'Unknown',
+          artist:t.speaker_name||'TED',
+          description:t.description||'',
+          thumb:t.thumb||'',
+          embedUrl:`https://embed.ted.com/talks/${t.slug}`,
+          pageUrl:`https://www.ted.com/talks/${t.slug}`,
+          provider:'TED',isVideo:true
+        }));
+      }
+    }
+  }catch(e){}
+  // Fallback: search TED's public search JSON (RSS/API)
+  const rss=await fetch(`https://www.ted.com/talks.json?search=${encodeURIComponent(q)}&page=1`,{cache:'no-store'}).catch(()=>null);
+  if(rss?.ok){
+    const d=await rss.json();
+    return (d.talks||[]).map(t=>({
+      id:t.slug,
+      name:t.title||'Unknown',
+      artist:t.speakers?.map(s=>s.name).join(', ')||'TED',
+      description:t.description||'',
+      thumb:t.thumbnails?.find(x=>x.type==='small')?.src||'',
+      embedUrl:`https://embed.ted.com/talks/${t.slug}`,
+      pageUrl:`https://www.ted.com/talks/${t.slug}`,
+      provider:'TED',isVideo:true
+    }));
+  }
+  return [];
+}
+
+// Vimeo — oEmbed is free, but search requires a token.
+// We use their open search-by-tag endpoint via the public Vimeo site search
+// which is accessible without auth at the /videos/ endpoint with a CORS proxy.
+async function fetchVimeo(q){
+  // Vimeo's API requires a token for search. Use their public oEmbed + search proxy.
+  const url=`https://proxy.corsfix.com/?https://vimeo.com/api/rest/v2?method=vimeo.videos.search&query=${encodeURIComponent(q)}&per_page=20&format=json`;
+  try{
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)throw null;
+    const d=await res.json();
+    const videos=d.videos?.video;
+    if(!Array.isArray(videos))return [];
+    return videos.map(v=>({
+      id:v.id,
+      name:v.title||'Unknown',
+      artist:v.owner?.realname||v.owner?.display_name||'Vimeo',
+      description:v.description||'',
+      thumb:(v.thumbnails?.thumbnail||[]).find(t=>t._content)?.['url']||
+            (Array.isArray(v.thumbnails?.thumbnail)?v.thumbnails.thumbnail.slice(-1)[0]?._content:'')||'',
+      embedUrl:`https://player.vimeo.com/video/${v.id}?title=0&byline=0`,
+      pageUrl:`https://vimeo.com/${v.id}`,
+      provider:'Vimeo',isVideo:true
+    }));
+  }catch(e){return []}
+}
+
+async function fetchVideoAll(q){
+  const results=await Promise.allSettled([
+    fetchArchiveVideo(q),
+    fetchPeerTube(q),
+    fetchTED(q),
+    fetchVimeo(q)
+  ]);
+  return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+}
+
+// ── Video modal ────────────────────────────────────────────────────────────
+const videoModal=$('#videoModal'),videoFrame=$('#videoFrame'),videoEl=$('#videoEl');
+$('#videoModalClose').onclick=closeVideoModal;
+videoModal.onclick=e=>{if(e.target===videoModal)closeVideoModal()};
+
+function openVideoModal(v){
+  $('#videoModalTitle').textContent=v.name;
+  $('#videoModalSub').textContent=v.artist?(v.artist+' · '+(v.provider||'Local')):v.provider||'Local';
+  if(v.blobUrl){
+    // Local video file — use <video> element
+    videoFrame.style.display='none';
+    videoFrame.src='';
+    videoEl.style.display='block';
+    videoEl.src=v.blobUrl;
+    videoEl.play().catch(()=>{});
+  } else {
+    // Remote embed — use iframe
+    videoEl.style.display='none';
+    videoEl.src='';
+    videoFrame.style.display='block';
+    videoFrame.src=v.embedUrl;
+  }
+  videoModal.classList.add('open');
+}
+function closeVideoModal(){
+  videoModal.classList.remove('open');
+  videoFrame.src='';
+  videoEl.pause();
+  videoEl.src='';
+  // Revoke any local blob URL
+  if(videoEl._blobURL){URL.revokeObjectURL(videoEl._blobURL);videoEl._blobURL=null}
+}
+
+function renderVideoGrid(list){
+  if(!list.length){grid.innerHTML='<div class="empty">No videos found</div>';return}
+  const badgeClass={
+    'Archive Video':'badge-archive-v',
+    'PeerTube':'badge-peertube',
+    'TED':'badge-ted',
+    'Vimeo':'badge-vimeo'
+  };
+  grid.innerHTML=list.map((v,i)=>{
+    const bc=badgeClass[v.provider]||'';
+    const thumb=v.thumb?`<img src="${v.thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
+    return`<div class="card video-card" data-vidx="${i}" style="cursor:pointer">
+      <div class="card-icon" style="width:100%;height:90px;border-radius:6px;margin-bottom:10px">${thumb}</div>
+      <div class="card-title">${v.name}</div>
+      <div class="card-sub">${v.artist||''}</div>
+      <span class="card-badge ${bc}">${v.provider}</span>
+    </div>`;
+  }).join('');
+  $$('.video-card').forEach(c=>c.onclick=()=>openVideoModal(list[+c.dataset.vidx]));
+}
+
 async function loadOrSearch(){
+  const token=++searchToken;
   const q=search.value.trim();
   if(currentApi==='online'&&!q){
     tracks=[];
@@ -428,27 +652,45 @@ async function loadOrSearch(){
     grid.innerHTML='<div class="empty">Search for a station, genre, or country...</div>';
     return;
   }
-  grid.innerHTML='<div class="loading">Loading tracks...</div>';
+  if(currentApi==='video'&&!q){
+    tracks=[];
+    grid.innerHTML='<div class="empty">Search for a video, topic, or talk...</div>';
+    return;
+  }
+  grid.innerHTML='<div class="loading">Loading...</div>';
   try{
+    let result;
     if(currentApi==='local'){
-      tracks=await fetchNative();
+      result=await fetchNative();
+      if(token!==searchToken)return;
+      tracks=result;
       if(!tracks.length){
         grid.innerHTML='<div class="empty">No tracks yet — click <strong>Upload</strong> to add your music</div>';
         return;
       }
     } else if(currentApi==='radio'){
-      tracks=await fetchRadio(q);
+      result=await fetchRadio(q);
+      if(token!==searchToken)return;
+      tracks=result;
+    } else if(currentApi==='video'){
+      result=await fetchVideoAll(q);
+      if(token!==searchToken)return;
+      renderVideoGrid(result);
+      return;
     } else {
-      tracks=await fetchOnline(q);
+      result=await fetchOnline(q);
+      if(token!==searchToken)return;
+      tracks=result;
     }
     renderGrid();
   }catch(e){
+    if(token!==searchToken)return;
     console.error(e);
     grid.innerHTML=`<div class="empty">Error: ${e.message}</div>`;
   }
 }
 
-function play(i){
+async function play(i){
   const t=getTracks()[i];if(!t)return;
   audio.pause();
   // revoke previous blob URL if any
@@ -460,13 +702,29 @@ function play(i){
   pCtx.textContent=t.isLocal?'Local Library':t.provider||'Online';
   cTime.textContent='0:00';dTime.textContent='0:00';progFill.style.width='0';
 
-  if(t.isLocal&&t.blob){
+  if(t.isLocalVideo&&t.blob){
+    // Local video — show in video modal, not audio player
+    const blobUrl=URL.createObjectURL(t.blob);
+    videoEl._blobURL=blobUrl;
+    player.style.display='none';
+    openVideoModal({name:t.name,artist:'Local Library',blobUrl});
+    return;
+  } else if(t.isLocal&&t.blob){
     const url=URL.createObjectURL(t.blob);
     audio._blobURL=url;
     audio.src=url;
   } else if(t.isNative){
     t.cdn=0;
     audio.src=CDN1(t.file);
+  } else if(t.isArchive){
+    try{
+      const resolved=await resolveArchiveUrl(t);
+      // bail if user already moved on to another track
+      if(curTrack!==t)return;
+      audio.src=resolved;
+    }catch(e){
+      toast('Could not load Archive track');nextBtn.click();return;
+    }
   } else {
     audio.src=t.url;
   }
@@ -493,13 +751,13 @@ function renderGrid(){
   if(!list.length){grid.innerHTML='<div class="empty">No tracks found</div>';return}
   grid.innerHTML=list.map((t,i)=>{
     const real=tracks.indexOf(t);
-    const icon=t.isNative?`<div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>`:
+    const icon=t.isNative?`<div class="card-icon">${t.isLocalVideo?`<svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>`:`<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`}</div>`:
       `<div class="card-icon"><img src="${t.art||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><svg viewBox="0 0 24 24" style="display:none"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>`;
     return`<div class="card" data-idx="${real}">
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
-      <div class="card-sub">${t.isLocal?'Local':t.provider||'Online'}</div>
+      <div class="card-sub">${t.isLocalVideo?'Local Video':t.isLocal?'Local':t.provider||'Online'}</div>
     </div>`;
   }).join('');
   $$('.card').forEach(c=>{
@@ -606,16 +864,20 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();if(currentApi!=='video')closeVideoModal();loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
 $('#newPlInput').onkeydown=e=>{if(e.key==='Enter')$('#createPl').click()};
 $('#sbClose').onclick=closeSb;
-document.querySelector('.logo').onclick=closeSb;
+document.querySelector('.logo').onclick=()=>{closeSb();closeVideoModal()};
 
 let searchT;
 search.oninput=()=>{clearTimeout(searchT);searchT=setTimeout(()=>currentApi==='local'?renderGrid():loadOrSearch(),300)};
+$('#apiSelect').addEventListener('change',()=>{
+  const placeholders={online:'Search tracks...',radio:'Search stations...',video:'Search videos...',local:'Filter local tracks...'};
+  search.placeholder=placeholders[currentApi]||'Search...';
+});
 
 ppBtn.onclick=()=>{
   if(!audio.src)return;
@@ -636,7 +898,7 @@ audio.onpause=()=>updateUI();
 audio.onwaiting=()=>{playIc.style.display='none';pauseIc.style.display='none'};
 audio.ontimeupdate=()=>{if(!audio.duration||!isFinite(audio.duration))return;cTime.textContent=fmt(audio.currentTime);progFill.style.width=(audio.currentTime/audio.duration*100)+'%';if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
 audio.onended=()=>{if(repeating){audio.currentTime=0;audio.play().catch(()=>{})}else nextBtn.click()};
-audio.onerror=()=>{if(curTrack?.isNative&&!curTrack?.isLocal){curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click())}};
+audio.onerror=()=>{if(curTrack?.isNative&&!curTrack?.isLocal){curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click())}else if(curTrack?.isArchive&&!curTrack?._archiveFallback){curTrack._archiveFallback=true;audio.src=`https://archive.org/download/${curTrack.id}`;audio.load();audio.play().catch(()=>nextBtn.click())}};
 
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec}
 
