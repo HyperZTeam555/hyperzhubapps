@@ -107,16 +107,13 @@
 <header>
   <div class="logo">ZMusic</div>
   <select id="apiSelect">
-    <option value="native">Native</option>
-    <option value="audius">Audius</option>
-    <option value="itunes">iTunes</option>
-    <option value="deezer">Deezer</option>
-    <option value="netease">NetEase</option>
+    <option value="online" selected>Online</option>
+    <option value="local">Local</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
-  <button class="nav-btn visible" id="uploadBtn">Upload</button>
+  <button class="nav-btn" id="uploadBtn">Upload</button>
   <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
-  <button class="nav-btn visible" id="plBtn">Playlists</button>
+  <button class="nav-btn" id="plBtn">Playlists</button>
 </header>
 <main id="main"><div class="grid" id="grid"><div class="loading">Loading tracks...</div></div></main>
 
@@ -180,7 +177,7 @@ const search=$('#searchInput'),plBtn=$('#plBtn'),plModal=$('#plModal'),plList=$(
 const sbDropdown=$('#sbDropdown'),gridDropdown=$('#gridDropdown');
 const uploadBtn=$('#uploadBtn'),fileInput=$('#fileInput'),uploadToast=$('#uploadToast');
 
-let currentApi='native';
+let currentApi='online';
 let tracks=[];
 let playTracks=null;
 let playlists=[];
@@ -262,60 +259,126 @@ fileInput.onchange=async()=>{
   uploadBtn.textContent='Upload';
   uploadBtn.classList.remove('upload-active');
   toast(`Added ${added} track${added!==1?'s':''}`);
-  if(currentApi==='native'){tracks=await fetchNative();renderGrid()}
+  if(currentApi==='local'){tracks=await fetchNative();renderGrid()}
 };
 
+// ── Audius — open music platform, full streams, no key needed ─────────────
 async function fetchAudius(q){
-  const res=await fetch(`https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=30&_=${Date.now()}`);
-  if(!res.ok) throw new Error('Audius API error');
+  // api.audius.co is the stable gateway; add app_name as requested by their docs
+  const res=await fetch(`https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=20&app_name=ZMusic`,{cache:'no-store'});
+  if(!res.ok) throw null;
   const d=await res.json();
-  return d.data.map(t=>({
-    id:t.id,name:t.title||'Unknown',
-    url:`https://api.audius.co/v1/tracks/${t.id}/stream`,
-    art:t.artwork?.['480x480']||t.artwork?.['150x150']||'',
-    isNative:false
+  return (d.data||[]).filter(t=>t.id).map(t=>({
+    id:t.id,
+    name:t.title||'Unknown',
+    artist:t.user?.name||'',
+    url:`https://api.audius.co/v1/tracks/${t.id}/stream?app_name=ZMusic`,
+    art:t.artwork?.['480x480']||t.artwork?.['150x150']||t.artwork?.['_']||'',
+    provider:'Audius',isNative:false
   }));
 }
 
+// ── iTunes — 30s previews, CORS-friendly, no key needed ───────────────────
 async function fetchITunes(q){
-  const res=await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=30&_=${Date.now()}`,{cache:'no-store'});
+  const res=await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=20`,{cache:'no-store'});
+  if(!res.ok) throw null;
   const d=await res.json();
-  return d.results.map(t=>({id:t.trackId,name:t.trackName||'Unknown',url:t.previewUrl,art:t.artworkUrl100?.replace('100x100','300x300')||'',isNative:false}));
+  return (d.results||[]).filter(t=>t.previewUrl).map(t=>({
+    id:t.trackId,
+    name:t.trackName||'Unknown',
+    artist:t.artistName||'',
+    url:t.previewUrl,
+    art:(t.artworkUrl100||'').replace('100x100bb','300x300bb'),
+    provider:'iTunes',isNative:false
+  }));
 }
 
+// ── Deezer — 30s previews, needs CORS proxy ───────────────────────────────
 async function fetchDeezer(q){
-  const res=await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=30&_=${Date.now()}`,{cache:'no-store'});
-  if(!res.ok) throw new Error('Deezer API unavailable');
+  const target=`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=20`;
+  const res=await fetch(`https://proxy.corsfix.com/?${target}`,{cache:'no-store'});
+  if(!res.ok) throw null;
   const d=await res.json();
-  return d.data.map(t=>({id:t.id,name:t.title,artist:t.artist.name,url:t.preview,art:t.album.cover_medium,isNative:false}));
+  return (d.data||[]).filter(t=>t.preview).map(t=>({
+    id:t.id,
+    name:t.title||'Unknown',
+    artist:t.artist?.name||'',
+    url:t.preview,
+    art:t.album?.cover_medium||'',
+    provider:'Deezer',isNative:false
+  }));
 }
 
-async function fetchNetEase(q){
-  const res=await fetch(`https://api.imjad.cn/cloudmusic/?type=search&keyword=${encodeURIComponent(q)}&limit=30&_=${Date.now()}`,{cache:'no-store'});
+// ── Jamendo — full CC tracks, free test client ID ─────────────────────────
+async function fetchJamendo(q){
+  const res=await fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=709fa152&format=json&limit=20&namesearch=${encodeURIComponent(q)}&audioformat=mp32`,{cache:'no-store'});
+  if(!res.ok) throw null;
   const d=await res.json();
-  return (d.result?.songs||[]).map(t=>({id:t.id,name:t.name,url:`https://music.163.com/song/media/outer/url?id=${t.id}.mp3`,art:(t.al?.picUrl||'').replace('http:','https:'),isNative:false}));
+  return (d.results||[]).filter(t=>t.audio).map(t=>({
+    id:t.id,
+    name:t.name||'Unknown',
+    artist:t.artist_name||'',
+    url:t.audio,
+    art:t.album_image||'',
+    provider:'Jamendo',isNative:false
+  }));
+}
+
+// ── ccMixter — CC remix community, full tracks, no key ────────────────────
+async function fetchCCMixter(q){
+  // Returns JSONP-style array; f=json gives raw JSON array
+  const res=await fetch(`https://ccmixter.org/api/query?search=${encodeURIComponent(q)}&format=json&limit=20&type=any`,{cache:'no-store'});
+  if(!res.ok) throw null;
+  let text=await res.text();
+  // ccMixter JSON can have bad octals — strip them safely
+  text=text.replace(/\\[0-7]{3}/g,'');
+  const data=JSON.parse(text);
+  return (Array.isArray(data)?data:[]).filter(t=>{
+    const mp3=t.files?.find?.(f=>f.download_url&&/\.mp3$/i.test(f.download_url));
+    return mp3;
+  }).map(t=>{
+    const mp3=t.files.find(f=>f.download_url&&/\.mp3$/i.test(f.download_url));
+    return{
+      id:t.upload_id,
+      name:t.upload_name||'Unknown',
+      artist:t.user_real_name||t.user_name||'',
+      url:mp3.download_url,
+      art:'',
+      provider:'ccMixter',isNative:false
+    };
+  });
+}
+
+async function fetchOnline(q){
+  // All sources in parallel; order: Audius, iTunes, Deezer, Jamendo, ccMixter
+  const results=await Promise.allSettled([
+    fetchAudius(q),
+    fetchITunes(q),
+    fetchDeezer(q),
+    fetchJamendo(q),
+    fetchCCMixter(q)
+  ]);
+  return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
 }
 
 async function loadOrSearch(){
   const q=search.value.trim();
-  if(currentApi!=='native'&&!q){
+  if(currentApi==='online'&&!q){
     tracks=[];
     grid.innerHTML='<div class="empty">Type something to search...</div>';
     return;
   }
   grid.innerHTML='<div class="loading">Loading tracks...</div>';
   try{
-    if(currentApi==='native'){
+    if(currentApi==='local'){
       tracks=await fetchNative();
       if(!tracks.length){
         grid.innerHTML='<div class="empty">No tracks yet — click <strong>Upload</strong> to add your music</div>';
         return;
       }
+    } else {
+      tracks=await fetchOnline(q);
     }
-    else if(currentApi==='audius') tracks=await fetchAudius(q);
-    else if(currentApi==='itunes') tracks=await fetchITunes(q);
-    else if(currentApi==='deezer') tracks=await fetchDeezer(q);
-    else tracks=await fetchNetEase(q);
     renderGrid();
   }catch(e){
     console.error(e);
@@ -332,7 +395,7 @@ function play(i){
   curIdx=i;curTrack=t;
   player.style.display='flex';
   pTitle.textContent=t.name;
-  pCtx.textContent='Library';
+  pCtx.textContent=t.isLocal?'Local Library':t.provider||'Online';
   cTime.textContent='0:00';dTime.textContent='0:00';progFill.style.width='0';
 
   if(t.isLocal&&t.blob){
@@ -343,7 +406,6 @@ function play(i){
     t.cdn=0;
     audio.src=CDN1(t.file);
   } else {
-    pCtx.textContent=currentApi.charAt(0).toUpperCase()+currentApi.slice(1);
     audio.src=t.url;
   }
 
@@ -375,7 +437,7 @@ function renderGrid(){
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
-      <div class="card-sub">${t.isLocal?'Local':t.isNative?'Native':'Stream'}</div>
+      <div class="card-sub">${t.isLocal?'Local':t.provider||'Online'}</div>
     </div>`;
   }).join('');
   $$('.card').forEach(c=>{
@@ -415,7 +477,7 @@ function closeSb(){
   sidebar.classList.remove('open');main.classList.remove('shifted');player.classList.remove('shifted');
   curPlId=null;
   playTracks=null;
-  if(currentApi==='native')renderGrid();
+  if(currentApi==='local')renderGrid();
 }
 
 function renderSb(){
@@ -482,7 +544,7 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isNative=currentApi==='native';plBtn.classList.toggle('visible',isNative);uploadBtn.classList.toggle('visible',isNative);if(!isNative)closeSb();loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
@@ -491,7 +553,7 @@ $('#sbClose').onclick=closeSb;
 document.querySelector('.logo').onclick=closeSb;
 
 let searchT;
-search.oninput=()=>{clearTimeout(searchT);searchT=setTimeout(()=>currentApi==='native'?renderGrid():loadOrSearch(),300)};
+search.oninput=()=>{clearTimeout(searchT);searchT=setTimeout(()=>currentApi==='local'?renderGrid():loadOrSearch(),300)};
 
 ppBtn.onclick=()=>{
   if(!audio.src)return;
