@@ -206,10 +206,11 @@
       <div class="ng-title">🎵 Newgrounds Audio</div>
       <button class="video-modal-close" id="ngModalClose">✕</button>
     </div>
-    <p class="ng-hint">Enter a Newgrounds Audio Portal song ID to play it directly.<br>Find IDs at <a href="https://www.newgrounds.com/audio" target="_blank" style="color:var(--primary)">newgrounds.com/audio</a> — the number in the URL after <code>/view/</code>.</p>
+    <p class="ng-hint">Enter the song ID and name from <a href="https://www.newgrounds.com/audio" target="_blank" style="color:var(--primary)">newgrounds.com/audio</a>.<br>ID = number in the URL · Name = song title</p>
     <div class="ng-row">
-      <input type="number" id="ngIdInput" placeholder="e.g. 1234567" min="1" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;font-size:14px">
-      <button class="nav-btn" id="ngPlayBtn">Play</button>
+      <input type="number" id="ngIdInput" placeholder="Song ID e.g. 32207" min="1" style="width:140px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;font-size:14px">
+      <input type="text" id="ngNameInput" placeholder="Song name e.g. Forsaken Neon" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;font-size:14px">
+      <button class="nav-btn visible" id="ngPlayBtn" style="display:block!important">Play</button>
     </div>
     <div id="ngStatus" style="font-size:12px;color:var(--sub);margin-top:8px;min-height:16px"></div>
     <div id="ngPlayer" style="display:none;margin-top:12px">
@@ -776,56 +777,89 @@ ngModal.onclick=e=>{
   }
 };
 $('#ngIdInput').onkeydown=e=>{if(e.key==='Enter')$('#ngPlayBtn').click()};
+$('#ngNameInput').onkeydown=e=>{if(e.key==='Enter')$('#ngPlayBtn').click()};
 $('#ngPlayBtn').onclick=async()=>{
   const id=$('#ngIdInput').value.trim();
+  const nameRaw=$('#ngNameInput').value.trim();
   if(!id||isNaN(id)){ngStatus.textContent='Please enter a valid song ID.';return}
-  ngStatus.textContent='Fetching song…';
-  ngPlayer.style.display='none';
+  if(!nameRaw){ngStatus.textContent='Please enter the song name too.';return}
+
   const saveBtn=$('#ngSaveBtn');
   saveBtn.textContent='⬇ Save to Local';
   saveBtn.style.color='';
   saveBtn.style.pointerEvents='';
   saveBtn.dataset.ngid=id;
-  saveBtn.dataset.ngurl='';
-  try{
-    // Fetch NG audio page via CORS proxy and extract og:audio MP3 URL
-    const proxy='https://proxy.corsfix.com/?';
-    const pageUrl=`https://www.newgrounds.com/audio/listen/${id}`;
-    const res=await fetch(proxy+pageUrl,{cache:'no-store'});
-    if(!res.ok)throw new Error('Page not found');
-    const html=await res.text();
-    // Extract og:audio meta tag content
-    const match=html.match(/<meta\s+property="og:audio"\s+content="([^"]+)"/i)
-                ||html.match(/<meta\s+content="([^"]+)"\s+property="og:audio"/i);
-    const titleMatch=html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
-                   ||html.match(/<meta\s+content="([^"]+)"\s+property="og:title"/i);
-    if(!match||!match[1])throw new Error('Could not find audio URL');
-    const mp3Url=match[1].replace(/&amp;/g,'&');
-    const songTitle=titleMatch?titleMatch[1].replace(/&amp;/g,'&').replace(/&#039;/g,"'"):`Newgrounds #${id}`;
-    saveBtn.dataset.ngurl=mp3Url;
-    saveBtn.dataset.ngtitle=songTitle;
-    // Play in the existing audio element and show mini player
-    ngFrame.src='';
-    ngFrame.style.display='none';
-    const ngAudio=document.getElementById('ngAudioEl')||document.createElement('audio');
+  saveBtn.dataset.ngtitle=nameRaw;
+
+  // Build the CDN URL using NG's known pattern:
+  // https://audio.ngfiles.com/{floor(id/1000)*1000}/{id}_{sanitized_name_max26}.mp3
+  // Sanitization: keep alphanumeric, hyphen, underscore; replace spaces with dashes; strip rest; max 26 chars
+  const folder=Math.floor(parseInt(id)/1000)*1000;
+  const base=`https://audio.ngfiles.com/${folder}/${id}`;
+
+  // NG sanitization (from AutoHotkey GD downloader source):
+  // spaces→dash, &→amp, <→lt, >→gt, "→quot, everything else non-word/dash deleted, max 26
+  const ngSanitize=(s,max=26)=>s
+    .replace(/&/g,'amp').replace(/</g,'lt').replace(/>/g,'gt').replace(/"/g,'quot')
+    .replace(/\s+/g,'-')
+    .replace(/[^\w-]/g,'')
+    .slice(0,max);
+
+  // Underscore variant (spaces→underscore, strip non-alphanum/underscore)
+  const ngUnderscore=(s,max=26)=>s
+    .replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'').slice(0,max);
+
+  // First 6 lowercase alphanumeric chars
+  const slug6=nameRaw.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,6);
+
+  const san26=ngSanitize(nameRaw,26);
+  const sanFull=ngSanitize(nameRaw,999);
+  const und26=ngUnderscore(nameRaw,26);
+  const undFull=ngUnderscore(nameRaw,999);
+
+  const variants=[
+    `${base}_${san26}.mp3`,                         // 467339_At-the-Speed-of-Light-FIN.mp3
+    `${base}_${sanFull}.mp3`,                        // short names: 723714_Epilogue.mp3
+    `${base}_newgrounds_${slug6}.mp3`,               // 32207_newgrounds_forsa.mp3
+    `${base}_${und26}.mp3`,                          // 467339_At_the_Speed_of_Light_FIN.mp3
+    `${base}_${undFull}.mp3`,                        // 723714_Epilogue.mp3 underscore
+    `${base}_${san26.toLowerCase()}.mp3`,            // lowercase dash variant
+    `${base}_${sanFull.toLowerCase()}.mp3`,          // lowercase dash full
+    `${base}_${und26.toLowerCase()}.mp3`,            // lowercase underscore truncated
+    `${base}_${undFull.toLowerCase()}.mp3`,          // lowercase underscore full
+  ];
+  const urls=[...new Set(variants)];
+  saveBtn.dataset.ngurl=urls[0];
+
+  let ngAudio=document.getElementById('ngAudioEl');
+  if(!ngAudio){
+    ngAudio=document.createElement('audio');
     ngAudio.id='ngAudioEl';
     ngAudio.controls=true;
-    ngAudio.style.cssText='width:100%;margin-top:0;border-radius:8px';
-    ngAudio.src=mp3Url;
-    const ngAudioWrap=document.getElementById('ngAudioWrap')||document.createElement('div');
-    ngAudioWrap.id='ngAudioWrap';
-    if(!document.getElementById('ngAudioEl')){
-      ngAudioWrap.appendChild(ngAudio);
-      ngPlayer.insertBefore(ngAudioWrap,ngPlayer.firstChild);
-    }
-    ngAudioWrap.style.display='block';
-    ngAudio.load();
-    ngAudio.play().catch(()=>{});
-    ngStatus.textContent=songTitle;
-    ngPlayer.style.display='block';
-  }catch(e){
-    ngStatus.textContent='Could not load — check the ID or try another song.';
+    ngAudio.style.cssText='width:100%;border-radius:8px';
+    const wrap=document.createElement('div');
+    wrap.id='ngAudioWrap';
+    wrap.appendChild(ngAudio);
+    ngPlayer.insertBefore(wrap,ngPlayer.firstChild);
   }
+
+  let tryIdx=0;
+  const tryNext=()=>{
+    if(tryIdx>=urls.length){
+      ngStatus.textContent=`Couldn't play — double-check the ID and name are correct.`;
+      ngPlayer.style.display='none';
+      return;
+    }
+    const u=urls[tryIdx++];
+    saveBtn.dataset.ngurl=u;
+    ngAudio.src=u;
+    ngAudio.load();
+  };
+  ngAudio.onerror=tryNext;
+  ngAudio.oncanplay=()=>{ngAudio.play().catch(()=>{})};
+  tryNext();
+  ngStatus.textContent=nameRaw;
+  ngPlayer.style.display='block';
 };
 $('#ngSaveBtn').onclick=async function(){
   const url=this.dataset.ngurl;
@@ -834,8 +868,8 @@ $('#ngSaveBtn').onclick=async function(){
   if(!url&&!id)return;
   this.textContent='Saving…';this.style.pointerEvents='none';
   try{
-    const srcUrl=url||`https://www.newgrounds.com/audio/download/${id}`;
-    const res=await fetch(url?url:`https://proxy.corsfix.com/?${srcUrl}`,{credentials:'omit'});
+    const fetchUrl=url||`https://proxy.corsfix.com/?https://www.newgrounds.com/audio/download/${id}`;
+    const res=await fetch(fetchUrl,{credentials:'omit'});
     if(!res.ok)throw new Error();
     const buf=await res.arrayBuffer();
     const blob=new Blob([buf],{type:'audio/mpeg'});
