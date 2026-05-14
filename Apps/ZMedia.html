@@ -323,14 +323,25 @@ function toast(msg){
 // ── Native: load from IndexedDB ────────────────────────────────────────────
 async function fetchNative(){
   const rows=await dbGetAll();
-  return rows.map(r=>({
-    name:r.name.replace(/\.[^.]+$/,''),
-    file:r.name,
-    isNative:true,
-    isLocal:true,
-    isLocalVideo:/\.(mp4|webm|mov|mkv|avi)$/i.test(r.name),
-    blob:r.blob
-  }));
+  return rows.map(r=>{
+    if(r.ngId){
+      // Newgrounds reference — no blob, play via CDN URL
+      return{
+        name:r.ngName||`Newgrounds #${r.ngId}`,
+        file:r.name,
+        isNative:true,isLocal:true,isNGRef:true,
+        ngId:r.ngId,ngName:r.ngName,
+        blob:null
+      };
+    }
+    return{
+      name:r.name.replace(/\.[^.]+$/,''),
+      file:r.name,
+      isNative:true,isLocal:true,
+      isLocalVideo:/\.(mp4|webm|mov|mkv|avi)$/i.test(r.name),
+      blob:r.blob
+    };
+  });
 }
 
 // ── Upload handler ─────────────────────────────────────────────────────────
@@ -818,15 +829,26 @@ $('#ngPlayBtn').onclick=async()=>{
   const undFull=ngUnderscore(nameRaw,999);
 
   const variants=[
-    `${base}_${san26}.mp3`,                         // 467339_At-the-Speed-of-Light-FIN.mp3
-    `${base}_${sanFull}.mp3`,                        // short names: 723714_Epilogue.mp3
-    `${base}_newgrounds_${slug6}.mp3`,               // 32207_newgrounds_forsa.mp3
-    `${base}_${und26}.mp3`,                          // 467339_At_the_Speed_of_Light_FIN.mp3
-    `${base}_${undFull}.mp3`,                        // 723714_Epilogue.mp3 underscore
-    `${base}_${san26.toLowerCase()}.mp3`,            // lowercase dash variant
-    `${base}_${sanFull.toLowerCase()}.mp3`,          // lowercase dash full
-    `${base}_${und26.toLowerCase()}.mp3`,            // lowercase underscore truncated
-    `${base}_${undFull.toLowerCase()}.mp3`,          // lowercase underscore full
+    // Dash-separated variants (AutoHotkey/GD downloader confirmed)
+    `${base}_${san26}.mp3`,
+    `${base}_${ngSanitize(nameRaw,28)}.mp3`,
+    `${base}_${ngSanitize(nameRaw,30)}.mp3`,
+    `${base}_${ngSanitize(nameRaw,32)}.mp3`,
+    `${base}_${sanFull}.mp3`,
+    // Underscore variants (user confirmed: At_the_Speed_of_Light_FINA)
+    `${base}_${und26}.mp3`,
+    `${base}_${ngUnderscore(nameRaw,28)}.mp3`,
+    `${base}_${ngUnderscore(nameRaw,30)}.mp3`,
+    `${base}_${ngUnderscore(nameRaw,32)}.mp3`,
+    `${base}_${undFull}.mp3`,
+    // newgrounds_ prefix (user confirmed: 32207_newgrounds_forsa)
+    `${base}_newgrounds_${slug6}.mp3`,
+    // Lowercase dash variants
+    `${base}_${san26.toLowerCase()}.mp3`,
+    `${base}_${sanFull.toLowerCase()}.mp3`,
+    // Lowercase underscore variants
+    `${base}_${und26.toLowerCase()}.mp3`,
+    `${base}_${undFull.toLowerCase()}.mp3`,
   ];
   const urls=[...new Set(variants)];
   saveBtn.dataset.ngurl=urls[0];
@@ -865,20 +887,14 @@ $('#ngSaveBtn').onclick=async function(){
   const url=this.dataset.ngurl;
   const id=this.dataset.ngid;
   const title=this.dataset.ngtitle||`Newgrounds_${id}`;
-  if(!url&&!id)return;
+  if(!id)return;
   this.textContent='Saving…';this.style.pointerEvents='none';
   try{
-    const fetchUrl=url||`https://proxy.corsfix.com/?https://www.newgrounds.com/audio/download/${id}`;
-    const res=await fetch(fetchUrl,{credentials:'omit'});
-    if(!res.ok)throw new Error();
-    const buf=await res.arrayBuffer();
-    const blob=new Blob([buf],{type:'audio/mpeg'});
-    const safeName=title.replace(/[/\\:*?"<>|]/g,'_').slice(0,80)+'.mp3';
-    await dbPut({name:safeName,blob});
+    await dbPut({name:`ng_${id}`,ngId:id,ngName:title,blob:null});
     toast(`Saved "${title}" to Local`);
     this.textContent='✓ Saved';this.style.color='var(--primary)';
   }catch(e){
-    toast('Could not save — try again later');
+    toast('Could not save');
     this.textContent='⬇ Save to Local';this.style.pointerEvents='';
   }
 };
@@ -1004,6 +1020,27 @@ async function loadOrSearch(){
   }
 }
 
+// ── Newgrounds CDN URL builder (shared by modal + play()) ─────────────────
+function buildNGUrls(id,nameRaw){
+  const folder=Math.floor(parseInt(id)/1000)*1000;
+  const base=`https://audio.ngfiles.com/${folder}/${id}`;
+  const ngSanitize=(s,max)=>s.replace(/&/g,'amp').replace(/</g,'lt').replace(/>/g,'gt').replace(/"/g,'quot').replace(/\s+/g,'-').replace(/[^\w-]/g,'').slice(0,max);
+  const ngUnderscore=(s,max)=>s.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'').slice(0,max);
+  const slug6=nameRaw.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,6);
+  const variants=[
+    ...[26,28,30,32].map(n=>`${base}_${ngSanitize(nameRaw,n)}.mp3`),
+    `${base}_${ngSanitize(nameRaw,999)}.mp3`,
+    `${base}_newgrounds_${slug6}.mp3`,
+    ...[26,28,30,32].map(n=>`${base}_${ngUnderscore(nameRaw,n)}.mp3`),
+    `${base}_${ngUnderscore(nameRaw,999)}.mp3`,
+    ...[26,28,30,32].map(n=>`${base}_${ngSanitize(nameRaw,n).toLowerCase()}.mp3`),
+    ...[26,28,30,32].map(n=>`${base}_${ngUnderscore(nameRaw,n).toLowerCase()}.mp3`),
+    `${base}_${ngSanitize(nameRaw,999).toLowerCase()}.mp3`,
+    `${base}_${ngUnderscore(nameRaw,999).toLowerCase()}.mp3`,
+  ];
+  return [...new Set(variants)];
+}
+
 async function play(i){
   const t=getTracks()[i];if(!t)return;
   audio.pause();
@@ -1022,6 +1059,14 @@ async function play(i){
     videoEl._blobURL=blobUrl;
     player.style.display='none';
     openVideoModal({name:t.name,artist:'Local Library',blobUrl});
+    return;
+  } else if(t.isNGRef){
+    player.style.display='flex';
+    t._ngUrls=buildNGUrls(t.ngId,t.ngName);
+    t._ngIdx=0;
+    audio.src=t._ngUrls[t._ngIdx++];
+    audio.load();
+    updateUI();
     return;
   } else if(t.isLocal&&t.blob){
     const url=URL.createObjectURL(t.blob);
@@ -1081,7 +1126,7 @@ function renderGrid(){
       ${t.isNative?`<button class="card-add"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>`:''}
       ${icon}
       <div class="card-title">${t.name}</div>
-      <div class="card-sub">${t.isLocalVideo?'Local Video':t.isLocal?'Local':t.provider?(t.artist?`${t.provider} · ${t.artist}`:t.provider):'Online'}</div>
+      <div class="card-sub">${t.isLocalVideo?'Local Video':t.isNGRef?'Newgrounds':t.isLocal?'Local':t.provider?(t.artist?`${t.provider} · ${t.artist}`:t.provider):'Online'}</div>
       ${providerBadge}
       ${saveBtn}
     </div>`;
@@ -1226,7 +1271,25 @@ audio.onpause=()=>updateUI();
 audio.onwaiting=()=>{playIc.style.display='none';pauseIc.style.display='none'};
 audio.ontimeupdate=()=>{if(!audio.duration||!isFinite(audio.duration))return;cTime.textContent=fmt(audio.currentTime);progFill.style.width=(audio.currentTime/audio.duration*100)+'%';if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
 audio.onended=()=>{if(repeating){audio.currentTime=0;audio.play().catch(()=>{})}else nextBtn.click()};
-audio.onerror=()=>{if(curTrack?.isNative&&!curTrack?.isLocal){curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click())}else if(curTrack?.isArchive&&!curTrack?._archiveFallback){curTrack._archiveFallback=true;audio.src=`https://archive.org/download/${curTrack.id}`;audio.load();audio.play().catch(()=>nextBtn.click())}};
+audio.oncanplay=()=>{if(curTrack?.isNGRef)audio.play().catch(()=>{})};
+audio.onerror=()=>{
+  if(curTrack?.isNGRef){
+    if(!curTrack._ngUrls){
+      curTrack._ngUrls=buildNGUrls(curTrack.ngId,curTrack.ngName);
+      curTrack._ngIdx=0;
+    }
+    if(curTrack._ngIdx<curTrack._ngUrls.length){
+      audio.src=curTrack._ngUrls[curTrack._ngIdx++];
+      audio.load();
+    } else {
+      toast('Could not play — check the song name is correct');
+    }
+  } else if(curTrack?.isNative&&!curTrack?.isLocal){
+    curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click());
+  } else if(curTrack?.isArchive&&!curTrack?._archiveFallback){
+    curTrack._archiveFallback=true;audio.src=`https://archive.org/download/${curTrack.id}`;audio.load();audio.play().catch(()=>nextBtn.click());
+  }
+};
 
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec}
 
