@@ -76,9 +76,11 @@
   .btn.active{color:var(--primary)}
   .btn-play{width:32px;height:32px;border-radius:50%;background:#fff}
   .btn-play svg{fill:#000;width:14px;height:14px}
-  .vol-wrap{display:flex;align-items:center;gap:6px;min-width:90px}
+  .vol-wrap{display:flex;align-items:center;gap:6px;min-width:140px}
   .vol-wrap svg{width:14px;height:14px;fill:var(--sub)}
-  .vol-wrap input[type=range]{flex:1;accent-color:var(--primary);height:3px}
+  .vol-slider-wrap{position:relative;flex:1;display:flex;align-items:center}
+  .vol-snap-line{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:10px;background:var(--primary);opacity:0.5;border-radius:1px;pointer-events:none}
+  .vol-wrap input[type=range]{width:100%;accent-color:var(--primary);height:3px;cursor:pointer}
   .prog-wrap{flex:1;max-width:360px;display:flex;align-items:center;gap:6px}
   .prog-wrap span{font-size:10px;color:var(--sub);min-width:28px;text-align:center}
   .prog-bar{flex:1;height:3px;background:#404040;border-radius:2px;cursor:pointer}
@@ -191,8 +193,16 @@
     <span id="dTime">0:00</span>
   </div>
   <div class="vol-wrap">
-    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-    <input type="range" id="volRange" min="0" max="1" step="0.01" value="0.8">
+    <button id="volIconBtn" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center">
+      <svg id="volIcon" viewBox="0 0 24 24" style="width:14px;height:14px;fill:var(--sub)">
+        <path id="volIconPath" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+    </button>
+    <div class="vol-slider-wrap">
+      <div class="vol-snap-line" id="volSnapLine"></div>
+      <input type="range" id="volRange" min="0" max="200" step="1" value="100">
+    </div>
+    <span id="volPct" style="font-size:11px;color:var(--sub);min-width:32px;text-align:left">100%</span>
   </div>
 </div>
 <audio id="audio" crossorigin="anonymous"></audio>
@@ -1043,9 +1053,16 @@ function buildNGUrls(id,nameRaw){
 
 async function play(i){
   const t=getTracks()[i];if(!t)return;
+  // Stop and clear any active NG proxy
+  if(audio._ngProxy){
+    const p=audio._ngProxy;
+    p.pause();p.src='';p.onerror=null;p.ontimeupdate=null;p.onended=null;
+    audio._ngProxy=null;
+  }
   audio.pause();
-  // revoke previous blob URL if any
   if(audio._blobURL){URL.revokeObjectURL(audio._blobURL);audio._blobURL=null}
+  // Temporarily disable onerror to prevent empty-src from triggering chain
+  audio.onerror=null;
   audio.src='';
   curIdx=i;curTrack=t;
   player.style.display='flex';
@@ -1061,11 +1078,38 @@ async function play(i){
     openVideoModal({name:t.name,artist:'Local Library',blobUrl});
     return;
   } else if(t.isNGRef){
+    const urls=buildNGUrls(t.ngId,t.ngName);
+    let idx=0;
+    let ngLocal=document.getElementById('ngLocalAudio');
+    if(!ngLocal){
+      ngLocal=document.createElement('audio');
+      ngLocal.id='ngLocalAudio';
+      ngLocal.style.display='none';
+      document.body.appendChild(ngLocal);
+    }
+    ngLocal.pause();
+    ngLocal.src='';
+    ngLocal.onerror=null;ngLocal.oncanplay=null;ngLocal.ontimeupdate=null;ngLocal.onended=null;ngLocal.onplay=null;ngLocal.onpause=null;
+    const tryNext=()=>{
+      if(idx>=urls.length)return;
+      ngLocal.src=urls[idx++];
+      ngLocal.load();
+    };
+    ngLocal.onerror=tryNext;
+    ngLocal.oncanplay=()=>{ngLocal.play().catch(()=>{});ngLocal.oncanplay=null;};
+    ngLocal.ontimeupdate=()=>{
+      if(ngLocal.duration){
+        progFill.style.width=(ngLocal.currentTime/ngLocal.duration*100)+'%';
+        cTime.textContent=fmt(ngLocal.currentTime);
+        dTime.textContent=fmt(ngLocal.duration);
+      }
+    };
+    ngLocal.onended=()=>{if(repeating){ngLocal.currentTime=0;ngLocal.play().catch(()=>{})}else nextBtn.click()};
+    ngLocal.onplay=()=>updateUI();
+    ngLocal.onpause=()=>updateUI();
+    audio._ngProxy=ngLocal;
     player.style.display='flex';
-    t._ngUrls=buildNGUrls(t.ngId,t.ngName);
-    t._ngIdx=0;
-    audio.src=t._ngUrls[t._ngIdx++];
-    audio.load();
+    tryNext();
     updateUI();
     return;
   } else if(t.isLocal&&t.blob){
@@ -1088,6 +1132,7 @@ async function play(i){
     audio.src=t.url;
   }
 
+  audio.onerror=ngOnerror;
   audio.load();
   audio.play().catch(()=>{
     if(t.isNative&&!t.isLocal){t.cdn=1;audio.src=CDN2(t.file);audio.play().catch(()=>nextBtn.click())}
@@ -1096,7 +1141,8 @@ async function play(i){
 }
 
 function updateUI(){
-  const playing=!audio.paused&&!audio.ended&&audio.readyState>2;
+  const a=audio._ngProxy||audio;
+  const playing=!a.paused&&!a.ended&&a.readyState>2;
   playIc.style.display=playing?'none':'block';
   pauseIc.style.display=playing?'block':'none';
   repBtn.classList.toggle('active',repeating);
@@ -1253,15 +1299,103 @@ $('#apiSelect').addEventListener('change',()=>{
 });
 
 ppBtn.onclick=()=>{
-  if(!audio.src)return;
-  if(audio.paused){audio.play().catch(()=>{}).then(()=>updateUI())}
-  else{audio.pause();updateUI()}
+  const a=audio._ngProxy||audio;
+  if(!a.src)return;
+  if(a.paused){a.play().catch(()=>{}).then(()=>updateUI())}
+  else{a.pause();updateUI()}
 };
 prevBtn.onclick=()=>{const t=getTracks();if(t.length)play((curIdx-1+t.length)%t.length)};
 nextBtn.onclick=()=>{const t=getTracks();if(t.length)play((curIdx+1)%t.length)};
 repBtn.onclick=()=>{repeating=!repeating;updateUI()};
-$('#volRange').oninput=()=>audio.volume=$('#volRange').value;
-pBar.onclick=e=>{const r=pBar.getBoundingClientRect();if(audio.duration)audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration};
+// ── Volume with Web Audio boost ────────────────────────────────────────────
+let audioCtx=null,gainNode=null;
+
+function ensureAudioCtx(){
+  if(audioCtx)return;
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    gainNode=audioCtx.createGain();
+    gainNode.gain.value=1;
+    gainNode.connect(audioCtx.destination);
+    const src=audioCtx.createMediaElementSource(audio);
+    src.connect(gainNode);
+  }catch(e){audioCtx=null;gainNode=null;}
+}
+
+// Init Web Audio on first user gesture so it's ready before playback
+document.addEventListener('click',function initCtx(){
+  ensureAudioCtx();
+  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  document.removeEventListener('click',initCtx);
+},{once:true});
+
+const VOL_ICONS={
+  mute:'M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z',
+  low:'M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z',
+  mid:'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z',
+  high:'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z'
+};
+let isMuted=false,premuteVol=100;
+
+function setVolume(pct){
+  pct=Math.max(0,Math.min(200,pct));
+  if(pct<=100){
+    // Normal range — pure native volume, no Web Audio needed
+    audio.volume=pct/100;
+    if(audio._ngProxy)audio._ngProxy.volume=pct/100;
+    if(gainNode)gainNode.gain.value=1;
+  } else {
+    // Boost range — native at 1.0, gain node multiplies
+    audio.volume=1;
+    if(audio._ngProxy)audio._ngProxy.volume=1;
+    ensureAudioCtx();
+    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    if(gainNode)gainNode.gain.value=pct/100;
+  }
+  // Icon state
+  const path=document.getElementById('volIconPath');
+  if(path){
+    if(pct===0)path.setAttribute('d',VOL_ICONS.mute);
+    else if(pct<=50)path.setAttribute('d',VOL_ICONS.low);
+    else if(pct<=100)path.setAttribute('d',VOL_ICONS.mid);
+    else path.setAttribute('d',VOL_ICONS.high);
+  }
+  // Label
+  const lbl=$('#volPct');
+  if(lbl){lbl.textContent=pct+'%';lbl.style.color=pct>100?'var(--primary)':'var(--sub)';}
+}
+
+$('#volRange').oninput=e=>{
+  let v=parseInt(e.target.value);
+  if(Math.abs(v-100)<=3){v=100;e.target.value=100;}
+  isMuted=false;
+  premuteVol=v;
+  setVolume(v);
+};
+
+$('#volIconBtn').onclick=()=>{
+  if(isMuted){
+    isMuted=false;
+    $('#volRange').value=premuteVol;
+    setVolume(premuteVol);
+  } else {
+    premuteVol=parseInt($('#volRange').value);
+    isMuted=true;
+    audio.volume=0;
+    if(audio._ngProxy)audio._ngProxy.volume=0;
+    if(gainNode)gainNode.gain.value=0;
+    const path=document.getElementById('volIconPath');
+    if(path)path.setAttribute('d',VOL_ICONS.mute);
+    const lbl=$('#volPct');
+    if(lbl){lbl.textContent='0%';lbl.style.color='var(--sub)';}
+  }
+};
+setVolume(100);
+pBar.onclick=e=>{
+  const a=audio._ngProxy||audio;
+  const r=pBar.getBoundingClientRect();
+  if(a.duration)a.currentTime=((e.clientX-r.left)/r.width)*a.duration;
+};
 
 audio.onloadedmetadata=()=>{if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
 audio.ondurationchange=()=>{if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
@@ -1272,7 +1406,7 @@ audio.onwaiting=()=>{playIc.style.display='none';pauseIc.style.display='none'};
 audio.ontimeupdate=()=>{if(!audio.duration||!isFinite(audio.duration))return;cTime.textContent=fmt(audio.currentTime);progFill.style.width=(audio.currentTime/audio.duration*100)+'%';if(audio.duration&&isFinite(audio.duration))dTime.textContent=fmt(audio.duration)};
 audio.onended=()=>{if(repeating){audio.currentTime=0;audio.play().catch(()=>{})}else nextBtn.click()};
 audio.oncanplay=()=>{if(curTrack?.isNGRef)audio.play().catch(()=>{})};
-audio.onerror=()=>{
+function ngOnerror(){
   if(curTrack?.isNGRef){
     if(!curTrack._ngUrls){
       curTrack._ngUrls=buildNGUrls(curTrack.ngId,curTrack.ngName);
@@ -1281,15 +1415,14 @@ audio.onerror=()=>{
     if(curTrack._ngIdx<curTrack._ngUrls.length){
       audio.src=curTrack._ngUrls[curTrack._ngIdx++];
       audio.load();
-    } else {
-      toast('Could not play — check the song name is correct');
     }
   } else if(curTrack?.isNative&&!curTrack?.isLocal){
     curTrack.cdn=1;audio.src=CDN2(curTrack.file);audio.play().catch(()=>nextBtn.click());
   } else if(curTrack?.isArchive&&!curTrack?._archiveFallback){
     curTrack._archiveFallback=true;audio.src=`https://archive.org/download/${curTrack.id}`;audio.load();audio.play().catch(()=>nextBtn.click());
   }
-};
+}
+audio.onerror=ngOnerror;
 
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec}
 
