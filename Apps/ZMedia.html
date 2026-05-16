@@ -852,10 +852,22 @@ async function fetchNASA(q){
 
 const VIDEO_PROVIDER_TIMEOUT=9000;
 const EXTRA_YOUTUBE_TIMEOUT=5000;
+const DEEP_YOUTUBE_TIMEOUT=3000;
+const FAST_YOUTUBE_TIMEOUT=1500;
+const QUICK_YOUTUBE_TIMEOUT=1000;
+const BLINK_YOUTUBE_TIMEOUT=500;
 const VIDEO_PROVIDERS=[
   {label:'YouTube',fetcher:q=>fetchInvidiousYouTube(q,1)},
   {label:'YouTube page 2',fetcher:q=>fetchInvidiousYouTube(q,2),timeout:EXTRA_YOUTUBE_TIMEOUT},
   {label:'YouTube page 3',fetcher:q=>fetchInvidiousYouTube(q,3),timeout:EXTRA_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 4',fetcher:q=>fetchInvidiousYouTube(q,4),timeout:DEEP_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 5',fetcher:q=>fetchInvidiousYouTube(q,5),timeout:DEEP_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 6',fetcher:q=>fetchInvidiousYouTube(q,6),timeout:FAST_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 7',fetcher:q=>fetchInvidiousYouTube(q,7),timeout:FAST_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 8',fetcher:q=>fetchInvidiousYouTube(q,8),timeout:QUICK_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 9',fetcher:q=>fetchInvidiousYouTube(q,9),timeout:QUICK_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 10',fetcher:q=>fetchInvidiousYouTube(q,10),timeout:BLINK_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 11',fetcher:q=>fetchInvidiousYouTube(q,11),timeout:BLINK_YOUTUBE_TIMEOUT},
   {label:'Archive Video',fetcher:fetchArchiveVideo},
   {label:'PeerTube',fetcher:fetchPeerTube},
   {label:'TED',fetcher:fetchTED},
