@@ -137,6 +137,40 @@
   .badge-nasa{background:#1a1a3a;color:#a78bfa}
   .badge-mixcloud{background:#1a1a2e;color:#67e8f9}
   .badge-youtube{background:#3a1a1a;color:#ff6b6b}
+  .channel-strip{grid-column:1/-1;display:flex;gap:12px;overflow-x:auto;padding:0 0 8px}
+  .channel-card{min-width:260px;background:linear-gradient(135deg,#201515,#181818);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:background .2s,border-color .2s}
+  .channel-card:hover{background:#242020;border-color:#ff6b6b}
+  .channel-avatar{width:56px;height:56px;border-radius:50%;background:#222;object-fit:cover;flex-shrink:0}
+  .channel-info{min-width:0;flex:1}
+  .channel-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .channel-meta{font-size:11px;color:var(--sub);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .channel-desc{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .channel-body>.channel-desc{font-size:13px;display:block;-webkit-line-clamp:unset;white-space:pre-wrap;overflow:visible}
+  .channel-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(940px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+  .channel-body{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+  .channel-hero{display:flex;gap:14px;align-items:flex-start}
+  .channel-hero .channel-avatar{width:72px;height:72px}
+  .channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .channel-actions a{text-decoration:none}
+  .channel-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;overflow-x:auto}
+  .channel-tab{background:#242424;border:1px solid var(--border);border-radius:18px;color:var(--sub);padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s}
+  .channel-tab:hover{border-color:#ff6b6b;color:var(--text)}
+  .channel-tab.active{background:#3a1a1a;border-color:#ff6b6b;color:#ffb3b3}
+  .channel-section{border-top:1px solid var(--border);padding-top:14px}
+  .channel-panel{display:none}
+  .channel-panel.active{display:block}
+  .channel-section-title{font-size:13px;font-weight:800;margin-bottom:10px;color:var(--text)}
+  .channel-mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .channel-status{font-size:12px;color:var(--sub);padding:12px 2px}
+  .channel-mini-card{background:var(--surface);border-radius:8px;padding:8px;cursor:pointer;transition:background .2s}
+  .channel-mini-card:hover{background:var(--hover)}
+  .channel-mini-thumb{width:100%;aspect-ratio:16/9;background:#0b0b0b;border-radius:6px;overflow:hidden;margin-bottom:8px;display:flex;align-items:center;justify-content:center}
+  .channel-mini-thumb img{width:100%;height:100%;object-fit:cover}
+  .channel-post{background:var(--surface);border-radius:8px;padding:12px;margin-bottom:10px}
+  .channel-post-text{font-size:13px;line-height:1.45;white-space:pre-wrap}
+  .channel-post-meta{font-size:11px;color:var(--sub);margin-top:8px}
+  .channel-post-media{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .channel-post-media img{max-width:170px;border-radius:6px;border:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -243,6 +277,47 @@
     <div class="video-iframe-wrap">
       <iframe id="videoFrame" allowfullscreen allow="autoplay; fullscreen; encrypted-media" frameborder="0"></iframe>
       <video id="videoEl" controls style="display:none;position:absolute;inset:0;width:100%;height:100%;background:#000"></video>
+    </div>
+  </div>
+</div>
+
+<!-- YouTube channel modal -->
+<div class="modal" id="channelModal">
+  <div class="channel-modal-box">
+    <div class="video-modal-header">
+      <div class="video-modal-title" id="channelModalTitle">Channel</div>
+      <div class="video-modal-sub" id="channelModalSub"></div>
+      <button class="video-modal-close" id="channelModalClose">✕</button>
+    </div>
+    <div class="channel-body">
+      <div class="channel-hero">
+        <img class="channel-avatar" id="channelAvatar" alt="">
+        <div class="channel-info">
+          <div class="channel-name" id="channelName"></div>
+          <div class="channel-meta" id="channelStats"></div>
+          <div class="channel-actions">
+            <a class="inline-btn" id="channelYoutubeLink" target="_blank" rel="noopener">View on YouTube</a>
+          </div>
+        </div>
+      </div>
+      <div class="channel-desc" id="channelDescription"></div>
+      <div class="channel-tabs" id="channelTabs">
+        <button class="channel-tab active" data-channel-tab="videos">Videos</button>
+        <button class="channel-tab" data-channel-tab="streams">Livestreams</button>
+        <button class="channel-tab" data-channel-tab="posts">Posts</button>
+      </div>
+      <div class="channel-panel active" data-channel-panel="videos">
+        <div class="channel-mini-grid" id="channelLatest"></div>
+        <div class="channel-status" id="channelLatestStatus"></div>
+      </div>
+      <div class="channel-panel" data-channel-panel="streams">
+        <div class="channel-mini-grid" id="channelStreams"></div>
+        <div class="channel-status" id="channelStreamsStatus"></div>
+      </div>
+      <div class="channel-panel" data-channel-panel="posts">
+        <div id="channelPosts"></div>
+        <div class="channel-status" id="channelPostsStatus"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -611,6 +686,15 @@ function compactDuration(seconds){
   return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
 }
 
+function compactNumber(n){
+  n=Number(n);
+  if(!n||!isFinite(n))return '';
+  if(n>=1e9)return `${(n/1e9).toFixed(n>=1e10?0:1)}B`;
+  if(n>=1e6)return `${(n/1e6).toFixed(n>=1e7?0:1)}M`;
+  if(n>=1e3)return `${(n/1e3).toFixed(n>=1e4?0:1)}K`;
+  return String(n);
+}
+
 async function getInvidiousInstances(){
   if(invidiousInstancesCache)return invidiousInstancesCache;
   const found=[];
@@ -642,6 +726,59 @@ function pickInvidiousThumb(thumbnails,instance){
   return url;
 }
 
+function mapInvidiousVideo(v,instance,provider='YouTube'){
+  const duration=compactDuration(v.lengthSeconds);
+  return{
+    id:v.videoId,
+    name:v.title||'Untitled YouTube video',
+    artist:[v.author||provider,duration||v.publishedText].filter(Boolean).join(' · '),
+    description:v.description||'',
+    thumb:pickInvidiousThumb(v.videoThumbnails,instance),
+    embedUrl:`https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&rel=0`,
+    pageUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`,
+    provider,isVideo:true,
+    liveNow:!!v.liveNow
+  };
+}
+
+async function fetchInvidiousJson(path,preferredInstance='',timeout=8000){
+  const instances=await getInvidiousInstances();
+  const ordered=[...new Set([preferredInstance,...instances].filter(Boolean))];
+  for(const instance of ordered){
+    try{
+      const res=await withTimeout(fetch(`${instance}${path}`,{cache:'no-store'}),timeout);
+      if(!res.ok)continue;
+      return {data:await res.json(),instance};
+    }catch(e){}
+  }
+  throw new Error('Invidious request failed');
+}
+
+async function fetchInvidiousChannels(q){
+  const instances=await getInvidiousInstances();
+  for(const instance of instances){
+    try{
+      const params=new URLSearchParams({q,type:'channel',page:'1',region:'US'});
+      const res=await withTimeout(fetch(`${instance}/api/v1/search?${params}`,{cache:'no-store'}),5000);
+      if(!res.ok)continue;
+      const data=await res.json();
+      const channels=(Array.isArray(data)?data:[]).filter(c=>c.type==='channel'&&c.authorId);
+      if(!channels.length)continue;
+      return channels.slice(0,4).map(c=>({
+        id:c.authorId,
+        name:c.author||'YouTube Channel',
+        thumb:pickInvidiousThumb(c.authorThumbnails,instance),
+        description:c.description||'',
+        subCount:c.subCount||0,
+        videoCount:c.videoCount||0,
+        pageUrl:`https://www.youtube.com/channel/${encodeURIComponent(c.authorId)}`,
+        instance
+      }));
+    }catch(e){}
+  }
+  return [];
+}
+
 // YouTube search through public Invidious instances; playback uses YouTube Embed.
 async function fetchInvidiousYouTube(q,page=1){
   const instances=await getInvidiousInstances();
@@ -653,19 +790,7 @@ async function fetchInvidiousYouTube(q,page=1){
       const data=await res.json();
       const videos=(Array.isArray(data)?data:[]).filter(v=>v.type==='video'&&v.videoId&&!v.paid&&!v.premium);
       if(!videos.length)continue;
-      return videos.slice(0,20).map(v=>{
-        const duration=compactDuration(v.lengthSeconds);
-        return{
-          id:v.videoId,
-          name:v.title||'Untitled YouTube video',
-          artist:[v.author||'YouTube',duration].filter(Boolean).join(' · '),
-          description:v.description||'',
-          thumb:pickInvidiousThumb(v.videoThumbnails,instance),
-          embedUrl:`https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&rel=0`,
-          pageUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`,
-          provider:'YouTube',isVideo:true
-        };
-      });
+      return videos.slice(0,20).map(v=>mapInvidiousVideo(v,instance));
     }catch(e){}
   }
   return [];
@@ -1112,9 +1237,235 @@ function closeVideoModal(){
   if(videoEl._blobURL){URL.revokeObjectURL(videoEl._blobURL);videoEl._blobURL=null}
 }
 
-function renderVideoGrid(list,statusText='',emptyText='No videos found'){
+const channelModal=$('#channelModal'),channelAvatar=$('#channelAvatar'),channelLatest=$('#channelLatest'),channelStreams=$('#channelStreams'),channelPosts=$('#channelPosts');
+const channelLatestStatus=$('#channelLatestStatus'),channelStreamsStatus=$('#channelStreamsStatus'),channelPostsStatus=$('#channelPostsStatus');
+const channelTabBtns=$$('.channel-tab'),channelPanels=$$('.channel-panel');
+let channelModalToken=0,channelPostVideos=[],channelState=null;
+const CHANNEL_PAGE_TIMEOUTS=[8000,5000,5000,3000,3000,1500,1500,1000,1000,500,500];
+$('#channelModalClose').onclick=closeChannelModal;
+channelModal.onclick=e=>{if(e.target===channelModal)closeChannelModal()};
+channelTabBtns.forEach(btn=>btn.onclick=()=>showChannelTab(btn.dataset.channelTab));
+
+function closeChannelModal(){
+  channelModal.classList.remove('open');
+  channelModalToken++;
+  channelState=null;
+}
+
+function renderChannelStrip(channels){
+  if(!channels?.length)return '';
+  return`<div class="channel-strip">${channels.map((ch,i)=>{
+    const sub=ch.subCount?`${compactNumber(ch.subCount)} subscribers`:'YouTube channel';
+    const vids=ch.videoCount?` · ${compactNumber(ch.videoCount)} videos`:'';
+    const avatar=ch.thumb?`<img class="channel-avatar" src="${escapeHtml(ch.thumb)}" alt="">`:`<div class="channel-avatar"></div>`;
+    return`<div class="channel-card" data-cidx="${i}">
+      ${avatar}
+      <div class="channel-info">
+        <div class="channel-name">${escapeHtml(ch.name)}</div>
+        <div class="channel-meta">${escapeHtml(sub+vids)}</div>
+        <div class="channel-desc">${escapeHtml(ch.description||'View channel details, latest videos, livestreams, and community posts.')}</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function bindChannelCards(channels){
+  $$('.channel-card').forEach(c=>c.onclick=()=>openChannelModal(channels[+c.dataset.cidx]));
+}
+
+function renderChannelVideoCards(el,videos,emptyText){
+  if(!videos?.length){el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(emptyText)}</div>`;return}
+  el.innerHTML=videos.map((v,i)=>{
+    const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" alt="">`:'';
+    return`<div class="channel-mini-card" data-vidx="${i}">
+      <div class="channel-mini-thumb">${thumb}</div>
+      <div class="card-title">${escapeHtml(v.name)}</div>
+      <div class="card-sub">${escapeHtml(v.artist||'')}</div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.channel-mini-card').forEach(c=>c.onclick=()=>{
+    closeChannelModal();
+    openVideoModal(videos[+c.dataset.vidx]);
+  });
+}
+
+function renderChannelPosts(posts,instance){
+  channelPostVideos=[];
+  const rows=Array.isArray(posts)?posts:[];
+  if(!rows.length){channelPosts.innerHTML='<div class="empty" style="padding:18px">No community posts found</div>';return}
+  channelPosts.innerHTML=rows.map(post=>{
+    const attachments=[];
+    const attach=post.attachment;
+    if(attach?.type==='video'&&attach.videoId){
+      const idx=channelPostVideos.push(mapInvidiousVideo(attach,instance))-1;
+      attachments.push(`<button class="inline-btn channel-post-video" data-post-video="${idx}">Watch attached video</button>`);
+    }else if(attach?.type==='image'){
+      const img=pickInvidiousThumb(attach.imageThumbnails||attach.thumbnails,instance)||attach.url||'';
+      if(img)attachments.push(`<img src="${escapeHtml(img)}" alt="">`);
+    }else if(attach?.type==='multiImage'&&Array.isArray(attach.images)){
+      attach.images.slice(0,4).forEach(imgObj=>{
+        const img=pickInvidiousThumb(Array.isArray(imgObj)?imgObj:(imgObj.imageThumbnails||imgObj.thumbnails),instance)||imgObj.url||'';
+        if(img)attachments.push(`<img src="${escapeHtml(img)}" alt="">`);
+      });
+    }else if(attach?.type==='poll'&&Array.isArray(attach.choices)){
+      attachments.push(`<div class="channel-post-meta">${escapeHtml(attach.choices.map(c=>c.text||c).join(' · '))}</div>`);
+    }
+    const meta=[post.publishedText,post.likeCount?`${compactNumber(post.likeCount)} likes`:null].filter(Boolean).join(' · ');
+    return`<div class="channel-post">
+      <div class="channel-post-text">${escapeHtml(post.content||post.contentHtml?.replace(/<[^>]+>/g,'')||'')}</div>
+      ${attachments.length?`<div class="channel-post-media">${attachments.join('')}</div>`:''}
+      <div class="channel-post-meta">${escapeHtml(meta)}</div>
+    </div>`;
+  }).join('');
+  channelPosts.querySelectorAll('.channel-post-video').forEach(btn=>btn.onclick=()=>{
+    closeChannelModal();
+    openVideoModal(channelPostVideos[+btn.dataset.postVideo]);
+  });
+}
+
+function makeChannelState(ch,instance){
+  const id=encodeURIComponent(ch.id);
+  return{
+    id,instance:instance||ch.instance,active:'videos',
+    tabs:{
+      videos:{kind:'videos',label:'Videos',basePath:`/api/v1/channels/${id}/videos?sort_by=newest`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelLatest,statusEl:channelLatestStatus,emptyText:'No latest videos found'},
+      streams:{kind:'streams',label:'Livestreams',basePath:`/api/v1/channels/${id}/streams?sort_by=newest`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelStreams,statusEl:channelStreamsStatus,emptyText:'No livestreams found'},
+      posts:{kind:'posts',label:'Posts',basePath:`/api/v1/channels/${id}/community`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelPosts,statusEl:channelPostsStatus,emptyText:'No community posts found'}
+    }
+  };
+}
+
+function setChannelTab(kind){
+  channelTabBtns.forEach(btn=>btn.classList.toggle('active',btn.dataset.channelTab===kind));
+  channelPanels.forEach(panel=>panel.classList.toggle('active',panel.dataset.channelPanel===kind));
+}
+
+function setChannelStatus(sec,msg){
+  if(sec?.statusEl)sec.statusEl.textContent=msg||'';
+}
+
+function renderChannelSection(kind){
+  if(!channelState)return;
+  const sec=channelState.tabs[kind];
+  if(!sec)return;
+  if(!sec.items.length&&sec.loading){
+    sec.el.innerHTML=`<div class="loading">Loading ${escapeHtml(sec.label.toLowerCase())}...</div>`;
+  }else if(sec.kind==='posts'){
+    renderChannelPosts(sec.items,channelState.instance);
+  }else{
+    renderChannelVideoCards(sec.el,sec.items,sec.emptyText);
+  }
+}
+
+function showChannelTab(kind){
+  if(!channelState?.tabs[kind])return;
+  channelState.active=kind;
+  setChannelTab(kind);
+  renderChannelSection(kind);
+  if(!channelState.tabs[kind].started)loadChannelTabPages(kind,channelModalToken);
+}
+
+function channelPagePath(sec){
+  if(!sec.continuation)return sec.basePath;
+  return `${sec.basePath}${sec.basePath.includes('?')?'&':'?'}continuation=${encodeURIComponent(sec.continuation)}`;
+}
+
+function addChannelItems(sec,data,instance){
+  const rows=sec.kind==='posts'?(data.comments||[]):(data.videos||[]);
+  for(const item of rows){
+    const key=sec.kind==='posts'
+      ?(item.commentId||`${item.published||''}:${item.content||''}`)
+      :`${item.videoId||''}:${item.title||''}`;
+    if(sec.keys.has(key))continue;
+    sec.keys.add(key);
+    sec.items.push(sec.kind==='posts'?item:mapInvidiousVideo(item,instance));
+  }
+  sec.continuation=data.continuation||'';
+  sec.done=!sec.continuation||!rows.length;
+}
+
+async function loadChannelTabPages(kind,token){
+  if(!channelState?.tabs[kind])return;
+  const sec=channelState.tabs[kind];
+  if(sec.loading||sec.done)return;
+  sec.loading=true;
+  sec.started=true;
+  renderChannelSection(kind);
+  while(token===channelModalToken&&!sec.done&&sec.pagesLoaded<CHANNEL_PAGE_TIMEOUTS.length){
+    const page=sec.pagesLoaded+1;
+    setChannelStatus(sec,`Loading ${sec.label} page ${page}...`);
+    try{
+      const res=await fetchInvidiousJson(channelPagePath(sec),channelState.instance,CHANNEL_PAGE_TIMEOUTS[sec.pagesLoaded]);
+      if(token!==channelModalToken)return;
+      channelState.instance=res.instance||channelState.instance;
+      sec.pagesLoaded++;
+      addChannelItems(sec,res.data||{},channelState.instance);
+      renderChannelSection(kind);
+    }catch(e){
+      console.warn(`${sec.label} page ${page} failed`,e);
+      sec.done=true;
+      break;
+    }
+  }
+  sec.loading=false;
+  if(token!==channelModalToken)return;
+  renderChannelSection(kind);
+  if(sec.items.length){
+    setChannelStatus(sec,sec.done?`Loaded ${sec.pagesLoaded} page${sec.pagesLoaded!==1?'s':''}.`:`Loaded ${sec.pagesLoaded} pages.`);
+  }else{
+    setChannelStatus(sec,sec.done?`No ${sec.label.toLowerCase()} found.`:`Could not load ${sec.label.toLowerCase()}.`);
+  }
+}
+
+async function openChannelModal(ch){
+  if(!ch)return;
+  const token=++channelModalToken;
+  $('#channelModalTitle').textContent=ch.name;
+  $('#channelModalSub').textContent='YouTube Channel';
+  $('#channelName').textContent=ch.name;
+  $('#channelStats').textContent=[ch.subCount?`${compactNumber(ch.subCount)} subscribers`:null,ch.videoCount?`${compactNumber(ch.videoCount)} videos`:null].filter(Boolean).join(' · ')||'Loading channel stats...';
+  $('#channelDescription').textContent=ch.description||'Loading description...';
+  $('#channelYoutubeLink').href=ch.pageUrl||`https://www.youtube.com/channel/${encodeURIComponent(ch.id)}`;
+  if(ch.thumb){channelAvatar.src=ch.thumb}else{channelAvatar.removeAttribute('src')}
+  channelState=makeChannelState(ch,ch.instance);
+  channelLatest.innerHTML='';
+  channelStreams.innerHTML='';
+  channelPosts.innerHTML='';
+  channelLatestStatus.textContent='';
+  channelStreamsStatus.textContent='';
+  channelPostsStatus.textContent='';
+  channelModal.classList.add('open');
+  showChannelTab('videos');
+  try{
+    const id=encodeURIComponent(ch.id);
+    const about=await fetchInvidiousJson(`/api/v1/channels/${id}`,ch.instance,8000).catch(()=>({data:null,instance:ch.instance}));
+    if(token!==channelModalToken)return;
+    const info=about.data||{};
+    const instance=about.instance||ch.instance;
+    if(channelState)channelState.instance=instance;
+    const name=info.author||ch.name;
+    $('#channelModalTitle').textContent=name;
+    $('#channelName').textContent=name;
+    $('#channelStats').textContent=[
+      (info.subCount||ch.subCount)?`${compactNumber(info.subCount||ch.subCount)} subscribers`:null,
+      (info.totalViews)?`${compactNumber(info.totalViews)} views`:null,
+      (info.videoCount||ch.videoCount)?`${compactNumber(info.videoCount||ch.videoCount)} videos`:null
+    ].filter(Boolean).join(' · ')||'YouTube Channel';
+    $('#channelDescription').textContent=info.description||ch.description||'No description available.';
+    const avatar=pickInvidiousThumb(info.authorThumbnails,instance)||ch.thumb;
+    if(avatar)channelAvatar.src=avatar;
+  }catch(e){
+    console.warn('Channel details failed',e);
+    if(token!==channelModalToken)return;
+    setChannelStatus(channelState?.tabs.videos,'Could not load channel details.');
+  }
+}
+
+function renderVideoGrid(list,statusText='',emptyText='No videos found',channels=[]){
+  const channelHtml=renderChannelStrip(channels);
   if(!list.length){
-    grid.innerHTML=statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:`<div class="empty">${escapeHtml(emptyText)}</div>`;
+    grid.innerHTML=channelHtml+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:`<div class="empty">${escapeHtml(emptyText)}</div>`);
+    bindChannelCards(channels);
     return;
   }
   const badgeClass={
@@ -1138,7 +1489,8 @@ function renderVideoGrid(list,statusText='',emptyText='No videos found'){
       <span class="card-badge ${bc}">${escapeHtml(v.provider)}</span>
     </div>`;
   }).join('');
-  grid.innerHTML=cards+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:'');
+  grid.innerHTML=channelHtml+cards+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:'');
+  bindChannelCards(channels);
   $$('.video-card').forEach(c=>c.onclick=()=>openVideoModal(list[+c.dataset.vidx]));
 }
 
@@ -1181,11 +1533,19 @@ async function loadOrSearch(){
       if(token!==searchToken)return;
       tracks=result;
     } else if(currentApi==='video'){
+      let channelResults=[],partialVideos=[];
+      const channelLoad=withTimeout(fetchInvidiousChannels(q),5000).then(channels=>{
+        if(token!==searchToken)return;
+        channelResults=channels;
+        renderVideoGrid(partialVideos,'Searching YouTube...','No videos found',channelResults);
+      }).catch(()=>[]);
       result=await fetchVideoAll(q,(partial,status)=>{
-        if(token===searchToken)renderVideoGrid(partial,status);
+        partialVideos=partial;
+        if(token===searchToken)renderVideoGrid(partial,status,'No videos found',channelResults);
       },()=>token===searchToken);
+      await channelLoad;
       if(token!==searchToken)return;
-      renderVideoGrid(result);
+      renderVideoGrid(result,'','No videos found',channelResults);
       return;
     } else if(currentApi==='podcast'){
       result=await fetchPodcastAll(q,(partial,status)=>{
@@ -1460,13 +1820,13 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();closeVideoModal();$('#ngBtn').style.display=currentApi==='online'?'block':'none';loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();closeVideoModal();closeChannelModal();$('#ngBtn').style.display=currentApi==='online'?'block':'none';loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
 $('#newPlInput').onkeydown=e=>{if(e.key==='Enter')$('#createPl').click()};
 $('#sbClose').onclick=closeSb;
-document.querySelector('.logo').onclick=()=>{closeSb();closeVideoModal()};
+document.querySelector('.logo').onclick=()=>{closeSb();closeVideoModal();closeChannelModal()};
 
 let searchT;
 search.oninput=()=>{clearTimeout(searchT);searchT=setTimeout(()=>currentApi==='local'?renderGrid():loadOrSearch(),300)};
