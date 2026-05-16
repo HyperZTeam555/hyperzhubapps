@@ -136,6 +136,7 @@
   .badge-wikimedia{background:#2a2a1a;color:#fbbf24}
   .badge-nasa{background:#1a1a3a;color:#a78bfa}
   .badge-mixcloud{background:#1a1a2e;color:#67e8f9}
+  .badge-youtube{background:#3a1a1a;color:#ff6b6b}
 </style>
 </head>
 <body>
@@ -146,6 +147,7 @@
     <option value="local">Local</option>
     <option value="radio">Radio</option>
     <option value="video">Videos</option>
+    <option value="podcast">Podcasts</option>
   </select>
   <div class="search-wrap"><input type="text" id="searchInput" placeholder="Search tracks..."></div>
   <button class="inline-btn" id="ngBtn" style="display:none">Newgrounds</button>
@@ -496,7 +498,7 @@ async function resolveArchiveUrl(t){
   return t.url;
 }
 
-// ── Mixcloud — DJ mixes, radio shows — open search, no key — VIDEO provider ──
+// ── Mixcloud — DJ mixes, podcasts, radio shows — open search, no key ───────
 async function fetchMixcloud(q){
   const url=`https://api.mixcloud.com/search/?q=${encodeURIComponent(q)}&type=cloudcast&limit=20`;
   const res=await fetch(url,{cache:'no-store'});
@@ -582,6 +584,92 @@ async function fetchRadio(q){
 let searchToken=0;
 
 // ── Video sources ──────────────────────────────────────────────────────────
+
+const INVIDIOUS_FALLBACK_INSTANCES=[
+  'https://inv.thepixora.com',
+  'https://yt.chocolatemoo53.com',
+  'https://invidious.nerdvpn.de'
+];
+let invidiousInstancesCache=null;
+
+function escapeHtml(v){
+  return String(v??'').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  })[ch]);
+}
+
+function compactDuration(seconds){
+  seconds=Number(seconds);
+  if(!seconds||!isFinite(seconds))return '';
+  const h=Math.floor(seconds/3600);
+  const m=Math.floor((seconds%3600)/60);
+  const s=Math.floor(seconds%60);
+  return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+}
+
+async function getInvidiousInstances(){
+  if(invidiousInstancesCache)return invidiousInstancesCache;
+  const found=[];
+  try{
+    const res=await fetch('https://api.invidious.io/instances.json',{cache:'no-store'});
+    if(res.ok){
+      const rows=await res.json();
+      found.push(...(Array.isArray(rows)?rows:[])
+        .map(row=>row?.[1])
+        .filter(info=>info?.uri&&info.type==='https'&&info.api!==false&&info.cors!==false&&info.monitor?.down!==true)
+        .sort((a,b)=>(b.monitor?.uptime||0)-(a.monitor?.uptime||0))
+        .map(info=>info.uri.replace(/\/$/,'')));
+    }
+  }catch(e){}
+  invidiousInstancesCache=[...new Set([...INVIDIOUS_FALLBACK_INSTANCES,...found])];
+  return invidiousInstancesCache;
+}
+
+function pickInvidiousThumb(thumbnails,instance){
+  const list=Array.isArray(thumbnails)?thumbnails:[];
+  const pick=list.find(t=>/mqdefault|medium/i.test(t.quality||''))||
+             list.find(t=>/hqdefault|high/i.test(t.quality||''))||
+             list[list.length-1]||list[0];
+  const url=pick?.url||'';
+  if(!url)return '';
+  if(/^https?:\/\//i.test(url))return url;
+  if(url.startsWith('//'))return `https:${url}`;
+  if(url.startsWith('/'))return `${instance}${url}`;
+  return url;
+}
+
+// YouTube search through public Invidious instances; playback uses YouTube Embed.
+async function fetchInvidiousYouTube(q,page=1){
+  const instances=await getInvidiousInstances();
+  for(const instance of instances){
+    try{
+      const params=new URLSearchParams({q,type:'video',page:String(page),region:'US'});
+      const res=await fetch(`${instance}/api/v1/search?${params}`,{cache:'no-store'});
+      if(!res.ok)continue;
+      const data=await res.json();
+      const videos=(Array.isArray(data)?data:[]).filter(v=>v.type==='video'&&v.videoId&&!v.paid&&!v.premium);
+      if(!videos.length)continue;
+      return videos.slice(0,20).map(v=>{
+        const duration=compactDuration(v.lengthSeconds);
+        return{
+          id:v.videoId,
+          name:v.title||'Untitled YouTube video',
+          artist:[v.author||'YouTube',duration].filter(Boolean).join(' · '),
+          description:v.description||'',
+          thumb:pickInvidiousThumb(v.videoThumbnails,instance),
+          embedUrl:`https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&rel=0`,
+          pageUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`,
+          provider:'YouTube',isVideo:true
+        };
+      });
+    }catch(e){}
+  }
+  return [];
+}
 
 // Internet Archive Videos — public domain movies, CC films, no key
 async function fetchArchiveVideo(q){
@@ -762,18 +850,76 @@ async function fetchNASA(q){
   });
 }
 
-async function fetchVideoAll(q){
-  const results=await Promise.allSettled([
-    fetchArchiveVideo(q),
-    fetchPeerTube(q),
-    fetchTED(q),
-    fetchVimeo(q),
-    fetchDailymotion(q),
-    fetchWikimediaVideo(q),
-    fetchNASA(q),
-    fetchMixcloud(q)
+const VIDEO_PROVIDER_TIMEOUT=9000;
+const EXTRA_YOUTUBE_TIMEOUT=5000;
+const VIDEO_PROVIDERS=[
+  {label:'YouTube',fetcher:q=>fetchInvidiousYouTube(q,1)},
+  {label:'YouTube page 2',fetcher:q=>fetchInvidiousYouTube(q,2),timeout:EXTRA_YOUTUBE_TIMEOUT},
+  {label:'YouTube page 3',fetcher:q=>fetchInvidiousYouTube(q,3),timeout:EXTRA_YOUTUBE_TIMEOUT},
+  {label:'Archive Video',fetcher:fetchArchiveVideo},
+  {label:'PeerTube',fetcher:fetchPeerTube},
+  {label:'TED',fetcher:fetchTED},
+  {label:'Vimeo',fetcher:fetchVimeo},
+  {label:'Dailymotion',fetcher:fetchDailymotion},
+  {label:'Wikimedia',fetcher:fetchWikimediaVideo},
+  {label:'NASA',fetcher:fetchNASA}
+];
+const PODCAST_PROVIDERS=[
+  {label:'Mixcloud',fetcher:fetchMixcloud}
+];
+
+function withTimeout(promise,ms){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timed out')),ms))
   ]);
-  return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+}
+
+function addUniqueVideos(target,items,seen){
+  for(const v of (Array.isArray(items)?items:[])){
+    const key=`${v.provider||''}:${v.id||v.embedUrl||v.pageUrl||v.name}`;
+    if(seen.has(key))continue;
+    seen.add(key);
+    target.push(v);
+  }
+}
+
+async function fetchVideoAll(q,onUpdate,isCurrent){
+  const all=[];
+  const seen=new Set();
+  for(const provider of VIDEO_PROVIDERS){
+    if(isCurrent&&!isCurrent())return all;
+    if(onUpdate)onUpdate(all,`Searching ${provider.label}...`);
+    try{
+      const items=await withTimeout(provider.fetcher(q),provider.timeout||VIDEO_PROVIDER_TIMEOUT);
+      if(isCurrent&&!isCurrent())return all;
+      addUniqueVideos(all,items,seen);
+      if(onUpdate)onUpdate(all,`Loaded ${provider.label}`);
+    }catch(e){
+      if(onUpdate)onUpdate(all,`Skipped ${provider.label}`);
+      console.warn(`${provider.label} video search failed`,e);
+    }
+  }
+  return all;
+}
+
+async function fetchPodcastAll(q,onUpdate,isCurrent){
+  const all=[];
+  const seen=new Set();
+  for(const provider of PODCAST_PROVIDERS){
+    if(isCurrent&&!isCurrent())return all;
+    if(onUpdate)onUpdate(all,`Searching ${provider.label}...`);
+    try{
+      const items=await withTimeout(provider.fetcher(q),provider.timeout||VIDEO_PROVIDER_TIMEOUT);
+      if(isCurrent&&!isCurrent())return all;
+      addUniqueVideos(all,items,seen);
+      if(onUpdate)onUpdate(all,`Loaded ${provider.label}`);
+    }catch(e){
+      if(onUpdate)onUpdate(all,`Skipped ${provider.label}`);
+      console.warn(`${provider.label} podcast search failed`,e);
+    }
+  }
+  return all;
 }
 
 $('#ngBtn').style.display='block';  // visible by default since Music is default mode
@@ -954,8 +1100,11 @@ function closeVideoModal(){
   if(videoEl._blobURL){URL.revokeObjectURL(videoEl._blobURL);videoEl._blobURL=null}
 }
 
-function renderVideoGrid(list){
-  if(!list.length){grid.innerHTML='<div class="empty">No videos found</div>';return}
+function renderVideoGrid(list,statusText='',emptyText='No videos found'){
+  if(!list.length){
+    grid.innerHTML=statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:`<div class="empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
   const badgeClass={
     'Archive Video':'badge-archive-v',
     'PeerTube':'badge-peertube',
@@ -964,18 +1113,20 @@ function renderVideoGrid(list){
     'Dailymotion':'badge-dailymotion',
     'Wikimedia':'badge-wikimedia',
     'NASA':'badge-nasa',
-    'Mixcloud':'badge-mixcloud'
+    'Mixcloud':'badge-mixcloud',
+    'YouTube':'badge-youtube'
   };
-  grid.innerHTML=list.map((v,i)=>{
+  const cards=list.map((v,i)=>{
     const bc=badgeClass[v.provider]||'';
-    const thumb=v.thumb?`<img src="${v.thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
+    const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
     return`<div class="card video-card" data-vidx="${i}" style="cursor:pointer">
       <div class="card-icon" style="width:100%;height:90px;border-radius:6px;margin-bottom:10px">${thumb}</div>
-      <div class="card-title">${v.name}</div>
-      <div class="card-sub">${v.artist||''}</div>
-      <span class="card-badge ${bc}">${v.provider}</span>
+      <div class="card-title">${escapeHtml(v.name)}</div>
+      <div class="card-sub">${escapeHtml(v.artist||'')}</div>
+      <span class="card-badge ${bc}">${escapeHtml(v.provider)}</span>
     </div>`;
   }).join('');
+  grid.innerHTML=cards+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:'');
   $$('.video-card').forEach(c=>c.onclick=()=>openVideoModal(list[+c.dataset.vidx]));
 }
 
@@ -997,6 +1148,11 @@ async function loadOrSearch(){
     grid.innerHTML='<div class="empty">Search for a video, topic, or talk...</div>';
     return;
   }
+  if(currentApi==='podcast'&&!q){
+    tracks=[];
+    grid.innerHTML='<div class="empty">Search for a podcast, DJ mix, or show...</div>';
+    return;
+  }
   grid.innerHTML='<div class="loading">Loading...</div>';
   try{
     let result;
@@ -1013,9 +1169,18 @@ async function loadOrSearch(){
       if(token!==searchToken)return;
       tracks=result;
     } else if(currentApi==='video'){
-      result=await fetchVideoAll(q);
+      result=await fetchVideoAll(q,(partial,status)=>{
+        if(token===searchToken)renderVideoGrid(partial,status);
+      },()=>token===searchToken);
       if(token!==searchToken)return;
       renderVideoGrid(result);
+      return;
+    } else if(currentApi==='podcast'){
+      result=await fetchPodcastAll(q,(partial,status)=>{
+        if(token===searchToken)renderVideoGrid(partial,status,'No podcasts found');
+      },()=>token===searchToken);
+      if(token!==searchToken)return;
+      renderVideoGrid(result,'','No podcasts found');
       return;
     } else {
       result=await fetchOnline(q);
@@ -1283,7 +1448,7 @@ document.onclick=e=>{
   if(!e.target.closest('.sb-add-btn')&&!e.target.closest('.sb-dropdown'))sbDropdown.classList.remove('show');
 };
 
-$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();if(currentApi!=='video')closeVideoModal();$('#ngBtn').style.display=currentApi==='online'?'block':'none';loadOrSearch()};
+$('#apiSelect').onchange=e=>{currentApi=e.target.value;playTracks=null;const isLocal=currentApi==='local';plBtn.classList.toggle('visible',isLocal);uploadBtn.classList.toggle('visible',isLocal);if(!isLocal)closeSb();closeVideoModal();$('#ngBtn').style.display=currentApi==='online'?'block':'none';loadOrSearch()};
 $('#plBtn').onclick=()=>{plModal.classList.add('open');renderPlModal();$('#newPlInput').value=''};
 $('#closePl').onclick=()=>plModal.classList.remove('open');
 $('#createPl').onclick=()=>{const n=$('#newPlInput').value.trim();if(n){playlists.push({id:Date.now(),name:n,tracks:[]});renderPlModal();$('#newPlInput').value=''}};
@@ -1294,7 +1459,7 @@ document.querySelector('.logo').onclick=()=>{closeSb();closeVideoModal()};
 let searchT;
 search.oninput=()=>{clearTimeout(searchT);searchT=setTimeout(()=>currentApi==='local'?renderGrid():loadOrSearch(),300)};
 $('#apiSelect').addEventListener('change',()=>{
-  const placeholders={online:'Search tracks...',radio:'Search stations...',video:'Search videos...',local:'Filter local tracks...'};
+  const placeholders={online:'Search tracks...',radio:'Search stations...',video:'Search videos...',podcast:'Search podcasts...',local:'Filter local tracks...'};
   search.placeholder=placeholders[currentApi]||'Search...';
 });
 
