@@ -119,17 +119,6 @@
   .video-modal-sub{font-size:11px;color:var(--sub);white-space:nowrap}
   .video-modal-close{background:none;border:none;color:var(--sub);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px}
   .video-modal-close:hover{color:var(--text)}
-  /* Player picker dropdown */
-  .vm-player-pick{position:relative;flex-shrink:0;margin-left:auto}
-  .vm-pick-btn{display:flex;align-items:center;gap:5px;background:#2a2a2a;border:1px solid var(--border);border-radius:10px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer;white-space:nowrap;user-select:none;transition:border-color .15s,color .15s}
-  .vm-pick-btn:hover{border-color:#ff6b6b;color:var(--text)}
-  .vm-pick-btn svg{opacity:.6;flex-shrink:0}
-  .vm-pick-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);background:#1e1e1e;border:1px solid var(--border);border-radius:10px;min-width:165px;z-index:999;overflow:hidden;box-shadow:0 4px 20px #0008}
-  .vm-pick-menu.open{display:block}
-  .vm-pick-opt{padding:9px 14px;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s}
-  .vm-pick-opt:hover{background:#2a2020;color:var(--text)}
-  .vm-pick-opt.active{color:#ffb3b3;background:#2c1a1a}
-  .vm-pick-tag{font-size:9px;font-weight:700;background:#2a2a2a;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--sub);margin-left:auto}
   .video-iframe-wrap{position:relative;width:100%;flex-shrink:0;background:#000}
   .video-iframe-wrap iframe{display:block;width:100%;height:100%;background:#000;border:none}
   .video-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;margin-top:4px;letter-spacing:.5px;background:#1a3a5c;color:#6ab4ff}
@@ -289,16 +278,6 @@
     <div class="video-modal-header">
       <div class="video-modal-title" id="videoModalTitle"></div>
       <div class="video-modal-sub" id="videoModalSub"></div>
-      <div class="vm-player-pick" id="vmPlayerPick" style="display:none">
-        <div class="vm-pick-btn" id="vmPickBtn">
-          <span id="vmPickLabel">YouTube</span>
-          <svg viewBox="0 0 10 6" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="currentColor"/></svg>
-        </div>
-        <div class="vm-pick-menu" id="vmPickMenu">
-          <div class="vm-pick-opt active" data-player="native">YouTube <span class="vm-pick-tag">Privacy Mode</span></div>
-          <div class="vm-pick-opt" data-player="invidious">Invidious <span class="vm-pick-tag">Alt</span></div>
-        </div>
-      </div>
       <button class="video-modal-close" id="videoModalClose">✕</button>
     </div>
     <div class="video-iframe-wrap">
@@ -814,7 +793,6 @@ async function fetchInvidiousChannels(q){
 
 // YouTube search through public Invidious instances; playback uses YouTube Embed.
 let _lastInvidiousInstance='';
-let _lastInvidiousEmbedInstance='';
 async function fetchInvidiousYouTube(q,page=1){
   const instances=await getInvidiousInstances();
   for(const instance of instances){
@@ -826,8 +804,6 @@ async function fetchInvidiousYouTube(q,page=1){
       const videos=(Array.isArray(data)?data:[]).filter(v=>v.type==='video'&&v.videoId&&!v.paid&&!v.premium);
       if(!videos.length)continue;
       _lastInvidiousInstance=instance;
-      // Only store as embed instance if it's not Go-away protected
-      if(!INVIDIOUS_NO_EMBED.some(h=>instance.includes(h))) _lastInvidiousEmbedInstance=instance;
       return videos.slice(0,20).map(v=>mapInvidiousVideo(v,instance));
     }catch(e){}
   }
@@ -1263,47 +1239,10 @@ function fitVideoPlayer(){
 window.addEventListener('resize',fitVideoPlayer);
 window.addEventListener('orientationchange',()=>setTimeout(fitVideoPlayer,120));
 
-const vmPickBtn=$('#vmPickBtn'),vmPickMenu=$('#vmPickMenu'),vmPickLabel=$('#vmPickLabel'),vmPlayerPick=$('#vmPlayerPick');
-let _currentVideoObj=null,_currentPlayer='native';
-
-// Toggle dropdown
-vmPickBtn.onclick=(e)=>{e.stopPropagation();vmPickMenu.classList.toggle('open')};
-document.addEventListener('click',()=>vmPickMenu.classList.remove('open'));
-vmPickMenu.querySelectorAll('.vm-pick-opt').forEach(opt=>{
-  opt.onclick=(e)=>{
-    e.stopPropagation();
-    const p=opt.dataset.player;
-    if(p===_currentPlayer){vmPickMenu.classList.remove('open');return;}
-    _currentPlayer=p;
-    vmPickMenu.querySelectorAll('.vm-pick-opt').forEach(o=>o.classList.toggle('active',o.dataset.player===p));
-    vmPickLabel.textContent=p==='invidious'?'Invidious':'YouTube';
-    vmPickMenu.classList.remove('open');
-    if(_currentVideoObj)loadVideoSrc(_currentVideoObj);
-  };
-});
-
-// inv.nadeko.net and yt.chocolatemoo53.com and invidious.nerdvpn.de use Go-away bot protection
-// inv.thepixora.com works via /watch?v= for embedding without go-away
-const INVIDIOUS_NO_EMBED=['inv.nadeko.net','yt.chocolatemoo53.com','invidious.nerdvpn.de'];
-
-function getInvidiousWatchInstance(){
-  if(_lastInvidiousEmbedInstance) return _lastInvidiousEmbedInstance;
-  if(_lastInvidiousInstance&&!INVIDIOUS_NO_EMBED.some(h=>_lastInvidiousInstance.includes(h)))
-    return _lastInvidiousInstance;
-  return INVIDIOUS_FALLBACK_INSTANCES.find(u=>!INVIDIOUS_NO_EMBED.some(h=>u.includes(h)))
-    || 'https://yt.chocolatemoo53.com';
-}
+let _currentVideoObj=null;
 
 function buildNativeYouTubeUrl(id){
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&modestbranding=1`;
-}
-
-function openInvidious(v){
-  videoEl.style.display='none';
-  videoEl.src='';
-  videoFrame.style.display='block';
-  // thepixora works via /watch?v= — no /embed/ path, no go-away protection
-  videoFrame.src=`https://inv.thepixora.com/watch?v=${encodeURIComponent(v.id)}`;
 }
 
 function loadVideoSrc(v){
@@ -1325,8 +1264,6 @@ function loadVideoSrc(v){
       };
     }
     videoEl.play().catch(()=>{});
-  } else if(v.isYouTube&&_currentPlayer==='invidious'){
-    openInvidious(v);
   } else {
     videoEl.style.display='none';
     videoEl.src='';
@@ -1339,16 +1276,6 @@ function openVideoModal(v){
   _currentVideoObj=v;
   $('#videoModalTitle').textContent=v.name;
   $('#videoModalSub').textContent=v.artist?(v.artist+' · '+(v.provider||'Local')):v.provider||'Local';
-  // Show/hide player picker — only for YouTube videos
-  if(v.isYouTube){
-    vmPlayerPick.style.display='';
-    // Reset to native on each new video open
-    _currentPlayer='native';
-    vmPickLabel.textContent='YouTube';
-    vmPickMenu.querySelectorAll('.vm-pick-opt').forEach(o=>o.classList.toggle('active',o.dataset.player==='native'));
-  } else {
-    vmPlayerPick.style.display='none';
-  }
   loadVideoSrc(v);
   videoModal.classList.add('open');
   requestAnimationFrame(fitVideoPlayer);
@@ -1358,7 +1285,6 @@ function closeVideoModal(){
   videoFrame.src='';
   videoEl.pause();
   videoEl.src='';
-  vmPickMenu.classList.remove('open');
   _currentVideoObj=null;
   if(videoEl._blobURL){URL.revokeObjectURL(videoEl._blobURL);videoEl._blobURL=null}
 }
