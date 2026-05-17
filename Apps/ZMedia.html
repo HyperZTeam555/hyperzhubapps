@@ -113,7 +113,7 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .prog-wrap.hidden{visibility:hidden}
   @media(max-width:600px){header{padding:12px;gap:8px;flex-wrap:wrap}.search-wrap{order:3;min-width:100%}main{padding:12px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.player{flex-wrap:wrap;gap:6px;padding:8px 12px}.prog-wrap{order:10;width:100%;max-width:100%}.vol-wrap{display:none}.player.shifted{right:0}main.shifted{margin-right:0}.sidebar{width:100%;right:-100%}.sidebar.open{right:0}}
-  .video-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+  .video-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
   .video-modal-header{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
   .video-modal-title{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .video-modal-sub{font-size:11px;color:var(--sub);white-space:nowrap}
@@ -1207,18 +1207,32 @@ const videoModal=$('#videoModal'),videoFrame=$('#videoFrame'),videoEl=$('#videoE
 $('#videoModalClose').onclick=closeVideoModal;
 videoModal.onclick=e=>{if(e.target===videoModal)closeVideoModal()};
 
-// ── Smart video sizing: fills available space without cropping ────────────
+// ── Smart video sizing: shrinks the whole modal box to fit 16:9 ──────────
 const videoModalBox=$('.video-modal-box'),videoIframeWrap=$('.video-iframe-wrap');
 function fitVideoPlayer(){
   if(!videoModal.classList.contains('open'))return;
+  const vw=window.innerWidth,vh=window.innerHeight;
+  const maxBoxW=Math.min(860,vw*0.96);
   const headerH=videoModal.querySelector('.video-modal-header').offsetHeight||50;
-  const maxH=window.innerHeight*0.92;
-  const availH=maxH-headerH;
-  const availW=videoModalBox.offsetWidth||window.innerWidth*0.96;
-  // 16:9 ideal height from width
-  const idealH=availW*9/16;
-  const h=Math.min(idealH,availH);
-  videoIframeWrap.style.height=Math.round(h)+'px';
+  // Total space the entire modal can use
+  const maxTotalH=vh*0.92;
+  const availVideoH=maxTotalH-headerH;
+  const availVideoW=maxBoxW;
+  // Solve for best 16:9 fit inside availVideoW × availVideoH
+  const hFromW=availVideoW*9/16;
+  let videoW,videoH;
+  if(hFromW<=availVideoH){
+    videoW=availVideoW; videoH=hFromW;
+  } else {
+    videoH=availVideoH; videoW=Math.min(availVideoH*16/9,availVideoW);
+  }
+  // Set the wrap
+  videoIframeWrap.style.width=Math.round(videoW)+'px';
+  videoIframeWrap.style.height=Math.round(videoH)+'px';
+  videoIframeWrap.style.margin='0 auto';
+  // Shrink the box itself so it hugs the content
+  videoModalBox.style.width=Math.round(videoW)+'px';
+  videoModalBox.style.height=Math.round(videoH+headerH)+'px';
 }
 window.addEventListener('resize',fitVideoPlayer);
 window.addEventListener('orientationchange',()=>setTimeout(fitVideoPlayer,120));
