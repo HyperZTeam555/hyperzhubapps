@@ -301,7 +301,7 @@
         </div>
         <div class="vm-pick-menu" id="vmPickMenu">
           <div class="vm-pick-opt active" data-player="native">YouTube <span class="vm-pick-tag">Privacy Mode</span></div>
-          <div class="vm-pick-opt" data-player="invidious">Invidious <span class="vm-pick-tag">Alt</span></div>
+          <div class="vm-pick-opt" data-player="invidious">Invidious <span class="vm-pick-tag">New Tab</span></div>
         </div>
       </div>
       <button class="video-modal-close" id="videoModalClose">✕</button>
@@ -699,7 +699,6 @@ let searchToken=0;
 // ── Video sources ──────────────────────────────────────────────────────────
 
 const INVIDIOUS_FALLBACK_INSTANCES=[
-  'https://inv.thepixora.com',
   'https://yt.chocolatemoo53.com',
   'https://invidious.nerdvpn.de'
 ];
@@ -1288,17 +1287,15 @@ vmPickMenu.querySelectorAll('.vm-pick-opt').forEach(opt=>{
   };
 });
 
-// inv.nadeko.net uses Go-away bot protection which fires inside iframes — exclude from embed use
-const INVIDIOUS_NO_EMBED=['inv.nadeko.net'];
+// inv.nadeko.net uses Go-away bot protection; inv.thepixora.com is API-only (no video playback)
+const INVIDIOUS_NO_EMBED=['inv.nadeko.net','inv.thepixora.com'];
 
 function getInvidiousWatchInstance(){
-  // Prefer an instance we know works for embeds (not Go-away protected)
   if(_lastInvidiousEmbedInstance) return _lastInvidiousEmbedInstance;
   if(_lastInvidiousInstance&&!INVIDIOUS_NO_EMBED.some(h=>_lastInvidiousInstance.includes(h)))
     return _lastInvidiousInstance;
-  // Fall back to first non-blocked fallback
   return INVIDIOUS_FALLBACK_INSTANCES.find(u=>!INVIDIOUS_NO_EMBED.some(h=>u.includes(h)))
-    || 'https://inv.thepixora.com';
+    || 'https://yt.chocolatemoo53.com';
 }
 
 function buildNativeYouTubeUrl(id){
@@ -1307,13 +1304,20 @@ function buildNativeYouTubeUrl(id){
 
 function openInvidious(v){
   const instance=getInvidiousWatchInstance();
-  const embedUrl=`${instance}/embed/${encodeURIComponent(v.id)}`;
-  // Clear any previous placeholder
-  videoIframeWrap.querySelectorAll('.vm-invidious-placeholder').forEach(el=>el.remove());
+  const watchUrl=`${instance}/watch?v=${encodeURIComponent(v.id)}`;
+  window.open(watchUrl,'_blank','noopener,noreferrer');
+  // Show placeholder — embedding is broken on all public instances due to YouTube's
+  // PO Token requirement which requires invidious-companion, not feasible client-side
+  videoFrame.style.display='none';
+  videoFrame.src='';
   videoEl.style.display='none';
   videoEl.src='';
-  videoFrame.style.display='block';
-  videoFrame.src=embedUrl;
+  let ph=videoIframeWrap.querySelector('.vm-invidious-placeholder');
+  if(!ph){ph=document.createElement('div');ph.className='vm-invidious-placeholder';videoIframeWrap.appendChild(ph);}
+  ph.innerHTML=`<svg viewBox="0 0 24 24" width="42" height="42" fill="currentColor" style="opacity:.4"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59L7.76 14.83l1.41 1.41L19 5.41V9h2V3h-7z"/></svg>
+    <strong>Opened in Invidious</strong>
+    <span style="max-width:280px;line-height:1.5">Public instances can't embed videos directly — YouTube's PO Token requirement blocks it. The video opened in a new tab instead.</span>
+    <a href="${escapeHtml(watchUrl)}" target="_blank" rel="noopener noreferrer">Open again ↗</a>`;
 }
 
 function loadVideoSrc(v){
