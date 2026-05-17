@@ -130,6 +130,11 @@
   .vm-pick-opt:hover{background:#2a2020;color:var(--text)}
   .vm-pick-opt.active{color:#ffb3b3;background:#2c1a1a}
   .vm-pick-tag{font-size:9px;font-weight:700;background:#2a2a2a;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--sub);margin-left:auto}
+  .vm-invidious-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;width:100%;height:100%;background:#0f0f0f;color:var(--sub);font-size:13px;text-align:center;padding:24px}
+  .vm-invidious-placeholder svg{opacity:.5}
+  .vm-invidious-placeholder strong{color:var(--text);font-size:15px}
+  .vm-invidious-placeholder a{color:#ff6b6b;text-decoration:none;font-weight:700;padding:8px 18px;border:1px solid #ff6b6b;border-radius:20px;font-size:13px;transition:background .15s,color .15s}
+  .vm-invidious-placeholder a:hover{background:#ff6b6b;color:#fff}
   .video-iframe-wrap{position:relative;width:100%;flex-shrink:0;background:#000}
   .video-iframe-wrap iframe{display:block;width:100%;height:100%;background:#000;border:none}
   .video-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;margin-top:4px;letter-spacing:.5px;background:#1a3a5c;color:#6ab4ff}
@@ -814,6 +819,8 @@ async function fetchInvidiousChannels(q){
 }
 
 // YouTube search through public Invidious instances; playback uses YouTube Embed.
+let _lastInvidiousInstance='';
+let _lastInvidiousEmbedInstance='';
 async function fetchInvidiousYouTube(q,page=1){
   const instances=await getInvidiousInstances();
   for(const instance of instances){
@@ -824,6 +831,9 @@ async function fetchInvidiousYouTube(q,page=1){
       const data=await res.json();
       const videos=(Array.isArray(data)?data:[]).filter(v=>v.type==='video'&&v.videoId&&!v.paid&&!v.premium);
       if(!videos.length)continue;
+      _lastInvidiousInstance=instance;
+      // Only store as embed instance if it's not Go-away protected
+      if(!INVIDIOUS_NO_EMBED.some(h=>instance.includes(h))) _lastInvidiousEmbedInstance=instance;
       return videos.slice(0,20).map(v=>mapInvidiousVideo(v,instance));
     }catch(e){}
   }
@@ -1278,13 +1288,38 @@ vmPickMenu.querySelectorAll('.vm-pick-opt').forEach(opt=>{
   };
 });
 
-function buildYouTubeUrl(id,player){
-  if(player==='invidious') return `https://inv.nadeko.net/embed/${encodeURIComponent(id)}`;
-  // Native: privacy-enhanced nocookie — no tracking until play, significantly fewer ads
+// inv.nadeko.net uses Go-away bot protection which fires inside iframes — exclude from embed use
+const INVIDIOUS_NO_EMBED=['inv.nadeko.net'];
+
+function getInvidiousWatchInstance(){
+  // Prefer an instance we know works for embeds (not Go-away protected)
+  if(_lastInvidiousEmbedInstance) return _lastInvidiousEmbedInstance;
+  if(_lastInvidiousInstance&&!INVIDIOUS_NO_EMBED.some(h=>_lastInvidiousInstance.includes(h)))
+    return _lastInvidiousInstance;
+  // Fall back to first non-blocked fallback
+  return INVIDIOUS_FALLBACK_INSTANCES.find(u=>!INVIDIOUS_NO_EMBED.some(h=>u.includes(h)))
+    || 'https://inv.thepixora.com';
+}
+
+function buildNativeYouTubeUrl(id){
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&modestbranding=1`;
 }
 
+function openInvidious(v){
+  const instance=getInvidiousWatchInstance();
+  const embedUrl=`${instance}/embed/${encodeURIComponent(v.id)}`;
+  // Clear any previous placeholder
+  videoIframeWrap.querySelectorAll('.vm-invidious-placeholder').forEach(el=>el.remove());
+  videoEl.style.display='none';
+  videoEl.src='';
+  videoFrame.style.display='block';
+  videoFrame.src=embedUrl;
+}
+
 function loadVideoSrc(v){
+  // Clear any Invidious placeholder when switching back to native
+  videoIframeWrap.querySelectorAll('.vm-invidious-placeholder').forEach(el=>el.remove());
+
   if(v.blobUrl||v.isNasaVideo){
     videoFrame.style.display='none';
     videoFrame.src='';
@@ -1303,15 +1338,13 @@ function loadVideoSrc(v){
       };
     }
     videoEl.play().catch(()=>{});
+  } else if(v.isYouTube&&_currentPlayer==='invidious'){
+    openInvidious(v);
   } else {
     videoEl.style.display='none';
     videoEl.src='';
     videoFrame.style.display='block';
-    if(v.isYouTube){
-      videoFrame.src=buildYouTubeUrl(v.id,_currentPlayer);
-    } else {
-      videoFrame.src=v.embedUrl;
-    }
+    videoFrame.src=v.isYouTube ? buildNativeYouTubeUrl(v.id) : v.embedUrl;
   }
 }
 
@@ -1340,6 +1373,7 @@ function closeVideoModal(){
   videoEl.src='';
   vmPickMenu.classList.remove('open');
   _currentVideoObj=null;
+  videoIframeWrap.querySelectorAll('.vm-invidious-placeholder').forEach(el=>el.remove());
   if(videoEl._blobURL){URL.revokeObjectURL(videoEl._blobURL);videoEl._blobURL=null}
 }
 
