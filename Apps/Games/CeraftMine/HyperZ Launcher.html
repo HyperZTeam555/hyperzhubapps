@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HyperZ EaglerCraft Launcher</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #5aff5a;
+    --green-dim: #2a8c2a;
+    --green-dark: #0d2e0d;
+    --panel: rgba(0,0,0,0.72);
+    --border: rgba(90,255,90,0.35);
+    --text: #c8ffc8;
+    --muted: #5aff5a88;
+    --danger: #ff5a5a;
+  }
+
+  html, body {
+    height: 100%;
+    background: #060f06;
+    color: var(--text);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    overflow: hidden;
+  }
+
+  /* ── Stars background ── */
+  #stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ── */
+  #app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: rgba(0,0,0,0.85);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
+  }
+
+  .logo-text {
+    font-size: 13px;
+    color: var(--green);
+    text-shadow: 0 0 12px var(--green);
+    letter-spacing: 2px;
+  }
+
+  .logo-sub {
+    font-size: 7px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 3px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 8px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* ── Main body ── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px 10px;
+    font-size: 7px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  #version-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--green-dim) transparent;
+  }
+
+  #version-list::-webkit-scrollbar { width: 4px; }
+  #version-list::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 2px; }
+
+  .version-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    font-size: 8px;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .version-item:hover {
+    background: rgba(90,255,90,0.08);
+    border-left-color: var(--green-dim);
+  }
+
+  .version-item.active {
+    background: rgba(90,255,90,0.14);
+    border-left-color: var(--green);
+    color: var(--green);
+    text-shadow: 0 0 6px var(--green);
+  }
+
+  .version-item .vi-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .version-item .vi-name {
+    line-height: 1.5;
+  }
+
+  /* Skeleton loaders */
+  .skeleton {
+    height: 36px;
+    margin: 6px 14px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(90,255,90,0.05) 25%, rgba(90,255,90,0.12) 50%, rgba(90,255,90,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Content ── */
+  #content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Welcome screen ── */
+  #welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    text-align: center;
+    padding: 32px;
+  }
+
+  .welcome-pixel {
+    width: 72px;
+    height: 72px;
+    image-rendering: pixelated;
+  }
+
+  .welcome-title {
+    font-size: 15px;
+    color: var(--green);
+    text-shadow: 0 0 18px var(--green);
+    line-height: 1.8;
+  }
+
+  .welcome-sub {
+    font-size: 8px;
+    color: var(--muted);
+    line-height: 2.2;
+    max-width: 380px;
+  }
+
+  .welcome-arrow {
+    font-size: 8px;
+    color: var(--muted);
+    animation: blink 1.2s step-start infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ── Game bar ── */
+  #game-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.7);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 12px;
+  }
+
+  #game-bar.visible { display: flex; }
+
+  #game-title {
+    font-size: 9px;
+    color: var(--green);
+    text-shadow: 0 0 8px var(--green);
+  }
+
+  .bar-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .bar-btn:hover { background: rgba(90,255,90,0.15); color: var(--green); }
+
+  .bar-btn.danger { border-color: rgba(255,90,90,0.4); color: var(--danger); }
+  .bar-btn.danger:hover { background: rgba(255,90,90,0.12); }
+
+  /* ── Game iframe ── */
+  #game-frame {
+    display: none;
+    flex: 1;
+    border: none;
+    background: #000;
+  }
+
+  #game-frame.visible { display: block; }
+
+  /* ── Error ── */
+  #error-msg {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--danger);
+    font-size: 9px;
+    text-align: center;
+    padding: 32px;
+    line-height: 2;
+  }
+
+  #error-msg.visible { display: flex; }
+
+  /* ── Footer ── */
+  footer {
+    padding: 8px 20px;
+    background: rgba(0,0,0,0.85);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 7px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div id="app">
+  <header>
+    <div class="logo">
+      <!-- pixelated creeper face via canvas -->
+      <canvas class="logo-icon" id="creeper-icon" width="32" height="32"></canvas>
+      <div>
+        <div class="logo-text">HyperZ</div>
+        <div class="logo-sub">EaglerCraft Launcher</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="status-dot"></span>
+      <span id="conn-status">Connected to repo</span>
+    </div>
+  </header>
+
+  <div id="main">
+    <div id="sidebar">
+      <div class="sidebar-header">⬡ Select Version</div>
+      <div id="version-list">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton" style="width:70%"></div>
+      </div>
+    </div>
+
+    <div id="content">
+      <div id="game-bar">
+        <span id="game-title">—</span>
+        <div style="display:flex;gap:8px">
+          <button class="bar-btn" onclick="openNewWindow()">⤢ New Window</button>
+          <button class="bar-btn danger" onclick="closeGame()">✕ Close</button>
+        </div>
+      </div>
+
+      <div id="welcome">
+        <canvas class="welcome-pixel" id="grass-icon" width="72" height="72"></canvas>
+        <div class="welcome-title">HyperZ Launcher</div>
+        <div class="welcome-sub">
+          Select an EaglerCraft version from the sidebar<br>
+          to launch it right here in your browser.
+        </div>
+        <div class="welcome-arrow">← Choose a version</div>
+      </div>
+
+      <div id="error-msg">
+        <span>⚠</span>
+        <span id="error-text">Could not load game.</span>
+        <button class="bar-btn" onclick="retryLoad()">↺ Retry</button>
+      </div>
+
+      <iframe id="game-frame" allowfullscreen allow="fullscreen"></iframe>
+    </div>
+  </div>
+
+  <footer>
+    <span>HyperZ Launcher — EaglerCraft Edition</span>
+    <span id="repo-label">irv77/AmplerLauncher · /mc</span>
+  </footer>
+</div>
+
+<script>
+const REPO = 'irv77/AmplerLauncher';
+const BASE_RAW = `https://cdn.jsdelivr.net/gh/${REPO}@main/mc`;
+const API_URL = `https://api.github.com/repos/${REPO}/contents/mc`;
+
+const versionList = document.getElementById('version-list');
+const welcome = document.getElementById('welcome');
+const gameBar = document.getElementById('game-bar');
+const gameFrame = document.getElementById('game-frame');
+const gameTitle = document.getElementById('game-title');
+const errorMsg = document.getElementById('error-msg');
+const errorText = document.getElementById('error-text');
+
+let activeItem = null;
+let currentUrl = '';
+let currentFolder = '';
+
+/* ── Stars ── */
+(function initStars() {
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    stars = Array.from({ length: 140 }, () => ({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      r: Math.random() * 1.2 + 0.3,
+      o: Math.random()
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.o += (Math.random() - 0.5) * 0.02;
+      s.o = Math.max(0.1, Math.min(0.9, s.o));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(90,255,90,${s.o})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+/* ── Pixel icons ── */
+function drawCreeper(canvas) {
+  const ctx = canvas.getContext('2d');
+  const p = [
+    [0,1,1,0, 0,1,1,0],
+    [0,1,1,0, 0,1,1,0],
+    [0,1,1,1, 1,1,1,0],
+    [1,1,0,1, 1,0,1,1],
+    [1,1,1,1, 1,1,1,1],
+    [0,0,1,1, 1,1,0,0],
+    [0,1,1,0, 0,1,1,0],
+    [0,1,0,0, 0,0,1,0],
+  ];
+  const s = 4;
+  p.forEach((row, y) => row.forEach((v, x) => {
+    ctx.fillStyle = v ? '#3a8c3a' : (y < 2 ? '#1a4a1a' : '#0a2a0a');
+    ctx.fillRect(x * s, y * s, s, s);
+  }));
+}
+
+function drawGrassBlock(canvas) {
+  const ctx = canvas.getContext('2d');
+  const s = 9;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      if (y < 2) {
+        ctx.fillStyle = `hsl(${110 + (x+y)*3},60%,${30 + (x%3)*5}%)`;
+      } else {
+        ctx.fillStyle = `hsl(30,${40 - (x%3)*5}%,${35 + (y%4)*4}%)`;
+      }
+      ctx.fillRect(x * s, y * s, s, s);
+    }
+  }
+}
+
+drawCreeper(document.getElementById('creeper-icon'));
+drawGrassBlock(document.getElementById('grass-icon'));
+
+/* ── Fetch folders via GitHub API ── */
+async function fetchFolders() {
+  try {
+    const res = await fetch(API_URL, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+    const data = await res.json();
+    const dirs = data.filter(f => f.type === 'dir');
+    renderList(dirs);
+  } catch (e) {
+    versionList.innerHTML = `<div style="padding:16px;font-size:7px;color:var(--danger);line-height:2.2;">
+      ⚠ Could not fetch versions.<br>Check network or CORS.<br><br>
+      <button class="bar-btn" onclick="fetchFolders()" style="font-size:6px">↺ Retry</button>
+    </div>`;
+    document.getElementById('conn-status').textContent = 'Failed to connect';
+  }
+}
+
+function labelFor(name) {
+  const map = {
+    'eaglerforge': 'EaglerForge',
+    'shadowclient': 'Shadow Client',
+    'astraclient': 'Astra Client',
+    '1.12.2': 'Eaglercraft 1.12.2',
+    '1.12.2-wasm': 'Eaglercraft 1.12 WASM-GC',
+    'eaglerx': 'EaglerX',
+    'betacraft': 'BetaCraft',
+    'classiccraft': 'ClassicCraft',
+  };
+  return map[name.toLowerCase()] || name;
+}
+
+function iconFor(name) {
+  const n = name.toLowerCase();
+  if (n.includes('shadow')) return '🌑';
+  if (n.includes('forge')) return '⚒';
+  if (n.includes('astra')) return '✨';
+  if (n.includes('wasm')) return '⚡';
+  if (n.includes('1.12')) return '📦';
+  if (n.includes('beta')) return '🧪';
+  return '🎮';
+}
+
+function renderList(dirs) {
+  if (!dirs.length) {
+    versionList.innerHTML = `<div style="padding:16px;font-size:7px;color:var(--muted)">No versions found.</div>`;
+    return;
+  }
+  versionList.innerHTML = '';
+  dirs.forEach(dir => {
+    const item = document.createElement('div');
+    item.className = 'version-item';
+    item.innerHTML = `<span class="vi-icon">${iconFor(dir.name)}</span><span class="vi-name">${labelFor(dir.name)}</span>`;
+    item.addEventListener('click', () => launchGame(dir.name, item));
+    versionList.appendChild(item);
+  });
+}
+
+/* ── Launch game ── */
+async function launchGame(folder, item) {
+  if (activeItem) activeItem.classList.remove('active');
+  activeItem = item;
+  item.classList.add('active');
+
+  welcome.style.display = 'none';
+  errorMsg.classList.remove('visible');
+  gameBar.classList.add('visible');
+  gameFrame.classList.remove('visible');
+  gameFrame.src = '';
+
+  const url = `${BASE_RAW}/${folder}/index.html`;
+  currentUrl = url;
+  currentFolder = folder;
+  gameTitle.textContent = labelFor(folder);
+
+  // Revoke any previous blob URL to free memory
+  if (window._lastBlobUrl) {
+    URL.revokeObjectURL(window._lastBlobUrl);
+    window._lastBlobUrl = null;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    let html = await res.text();
+
+    const baseUrl = `${BASE_RAW}/${folder}/`;
+
+    // Inject <base href> for any paths we miss
+    if (/<head[\s>]/i.test(html)) {
+      html = html.replace(/(<head[^>]*>)/i, `$1<base href="${baseUrl}">`);
+    } else {
+      html = `<base href="${baseUrl}">` + html;
+    }
+
+    // Rewrite all relative src/href/url() to absolute jsDelivr URLs
+    // so the iframe's blob: origin never makes a relative fetch that gets blocked
+    html = html.replace(
+      /(src|href)=["'](?!https?:\/\/|\/\/|data:|blob:|#)([^"']*?)["']/gi,
+      (m, attr, path) => `${attr}="${baseUrl}${path.replace(/^\.?\//, '')}"`
+    );
+    // Also rewrite url(...) in inline styles / <style> blocks
+    html = html.replace(
+      /url\(["']?(?!https?:\/\/|\/\/|data:|blob:)([^"')]+?)["']?\)/gi,
+      (m, path) => `url("${baseUrl}${path.replace(/^\.?\//, '')}")`
+    );
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    window._lastBlobUrl = blobUrl;
+
+    gameFrame.src = blobUrl;
+    gameFrame.classList.add('visible');
+    gameFrame.onerror = () => showError(`Failed to render ${labelFor(folder)}.`);
+  } catch (e) {
+    showError(`Failed to load ${labelFor(folder)}.`, `Could not fetch index.html: ${e.message}`);
+  }
+}
+
+function showError(msg, detail) {
+  gameFrame.classList.remove('visible');
+  errorMsg.classList.add('visible');
+  errorText.textContent = msg;
+  let detailEl = document.getElementById('error-detail');
+  if (!detailEl) {
+    detailEl = document.createElement('div');
+    detailEl.id = 'error-detail';
+    detailEl.style.cssText = 'font-size:6px;color:var(--muted);max-width:340px;line-height:2.2;margin-top:-8px;';
+    errorText.insertAdjacentElement('afterend', detailEl);
+  }
+  detailEl.textContent = detail || '';
+}
+
+function retryLoad() {
+  if (!currentUrl || !activeItem || !currentFolder) return;
+  errorMsg.classList.remove('visible');
+  launchGame(currentFolder, activeItem);
+}
+
+function openNewWindow() {
+  if (currentUrl) window.open(currentUrl, '_blank');
+}
+
+function closeGame() {
+  gameFrame.classList.remove('visible');
+  gameBar.classList.remove('visible');
+  errorMsg.classList.remove('visible');
+  welcome.style.display = 'flex';
+  gameFrame.src = '';
+  if (activeItem) activeItem.classList.remove('active');
+  activeItem = null;
+  currentUrl = '';
+  currentFolder = '';
+  if (window._lastBlobUrl) {
+    URL.revokeObjectURL(window._lastBlobUrl);
+    window._lastBlobUrl = null;
+  }
+}
+
+fetchFolders();
+</script>
+</body>
+</html>
