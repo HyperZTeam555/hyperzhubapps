@@ -112,15 +112,15 @@
   .live-dot{width:8px;height:8px;border-radius:50%;background:#e22;display:inline-block;margin-right:5px;animation:pulse 1.2s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .prog-wrap.hidden{visibility:hidden}
-  @media(max-width:600px){header{padding:12px;gap:8px;flex-wrap:wrap}.search-wrap{order:3;min-width:100%}main{padding:12px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.player{flex-wrap:wrap;gap:6px;padding:8px 12px}.prog-wrap{order:10;width:100%;max-width:100%}.vol-wrap{display:none}.player.shifted{right:0}main.shifted{margin-right:0}.sidebar{width:100%}}
+  @media(max-width:600px){header{padding:12px;gap:8px;flex-wrap:wrap}.search-wrap{order:3;min-width:100%}main{padding:12px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.player{flex-wrap:wrap;gap:6px;padding:8px 12px}.prog-wrap{order:10;width:100%;max-width:100%}.vol-wrap{display:none}.player.shifted{right:0}main.shifted{margin-right:0}.sidebar{width:100%;right:-100%}.sidebar.open{right:0}}
   .video-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
   .video-modal-header{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
   .video-modal-title{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .video-modal-sub{font-size:11px;color:var(--sub);white-space:nowrap}
   .video-modal-close{background:none;border:none;color:var(--sub);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px}
   .video-modal-close:hover{color:var(--text)}
-  .video-iframe-wrap{position:relative;width:100%;padding-top:56.25%;flex-shrink:0}
-  .video-iframe-wrap iframe{position:absolute;inset:0;width:100%;height:100%;background:#000}
+  .video-iframe-wrap{position:relative;width:100%;flex-shrink:0;background:#000}
+  .video-iframe-wrap iframe{display:block;width:100%;height:100%;background:#000;border:none}
   .video-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;margin-top:4px;letter-spacing:.5px;background:#1a3a5c;color:#6ab4ff}
   .badge-archive-v{background:#2a1a3a;color:#c084fc}
   .badge-peertube{background:#1a3a1a;color:#4ade80}
@@ -147,15 +147,21 @@
   .channel-desc{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .channel-body>.channel-desc{font-size:13px;display:block;-webkit-line-clamp:unset;white-space:pre-wrap;overflow:visible}
   .channel-modal-box{background:#1a1a1a;border:1px solid var(--border);border-radius:12px;width:min(940px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
-  .channel-body{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+  .channel-body{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px;min-height:0}
   .channel-hero{display:flex;gap:14px;align-items:flex-start}
   .channel-hero .channel-avatar{width:72px;height:72px}
   .channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
   .channel-actions a{text-decoration:none}
-  .channel-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;overflow-x:auto}
+  .channel-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;align-items:center;flex-shrink:0;flex-wrap:nowrap;min-height:0}
+  .channel-tabs-btns{display:flex;gap:8px;overflow-x:auto;flex-shrink:0}
   .channel-tab{background:#242424;border:1px solid var(--border);border-radius:18px;color:var(--sub);padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s}
   .channel-tab:hover{border-color:#ff6b6b;color:var(--text)}
   .channel-tab.active{background:#3a1a1a;border-color:#ff6b6b;color:#ffb3b3}
+  .channel-search-wrap{flex:1;min-width:0;max-width:220px;margin-left:auto;position:relative}
+  .channel-search-wrap input{width:100%;padding:7px 12px 7px 30px;border-radius:18px;border:1px solid var(--border);background:#242424;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+  .channel-search-wrap input:focus{border-color:#ff6b6b;background:#2c2020}
+  .channel-search-wrap input::placeholder{color:var(--sub)}
+  .channel-search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;fill:var(--sub);pointer-events:none}
   .channel-section{border-top:1px solid var(--border);padding-top:14px}
   .channel-panel{display:none}
   .channel-panel.active{display:block}
@@ -276,7 +282,7 @@
     </div>
     <div class="video-iframe-wrap">
       <iframe id="videoFrame" allowfullscreen allow="autoplay; fullscreen; encrypted-media" frameborder="0"></iframe>
-      <video id="videoEl" controls style="display:none;position:absolute;inset:0;width:100%;height:100%;background:#000"></video>
+      <video id="videoEl" controls style="display:none;width:100%;height:100%;background:#000;display:block"></video>
     </div>
   </div>
 </div>
@@ -302,9 +308,15 @@
       </div>
       <div class="channel-desc" id="channelDescription"></div>
       <div class="channel-tabs" id="channelTabs">
-        <button class="channel-tab active" data-channel-tab="videos">Videos</button>
-        <button class="channel-tab" data-channel-tab="streams">Livestreams</button>
-        <button class="channel-tab" data-channel-tab="posts">Posts</button>
+        <div class="channel-tabs-btns">
+          <button class="channel-tab active" data-channel-tab="videos">Videos</button>
+          <button class="channel-tab" data-channel-tab="streams">Livestreams</button>
+          <button class="channel-tab" data-channel-tab="posts">Posts</button>
+        </div>
+        <div class="channel-search-wrap">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" id="channelSearchInput" placeholder="Search videos...">
+        </div>
       </div>
       <div class="channel-panel active" data-channel-panel="videos">
         <div class="channel-mini-grid" id="channelLatest"></div>
@@ -1195,6 +1207,22 @@ const videoModal=$('#videoModal'),videoFrame=$('#videoFrame'),videoEl=$('#videoE
 $('#videoModalClose').onclick=closeVideoModal;
 videoModal.onclick=e=>{if(e.target===videoModal)closeVideoModal()};
 
+// ── Smart video sizing: fills available space without cropping ────────────
+const videoModalBox=$('.video-modal-box'),videoIframeWrap=$('.video-iframe-wrap');
+function fitVideoPlayer(){
+  if(!videoModal.classList.contains('open'))return;
+  const headerH=videoModal.querySelector('.video-modal-header').offsetHeight||50;
+  const maxH=window.innerHeight*0.92;
+  const availH=maxH-headerH;
+  const availW=videoModalBox.offsetWidth||window.innerWidth*0.96;
+  // 16:9 ideal height from width
+  const idealH=availW*9/16;
+  const h=Math.min(idealH,availH);
+  videoIframeWrap.style.height=Math.round(h)+'px';
+}
+window.addEventListener('resize',fitVideoPlayer);
+window.addEventListener('orientationchange',()=>setTimeout(fitVideoPlayer,120));
+
 function openVideoModal(v){
   $('#videoModalTitle').textContent=v.name;
   $('#videoModalSub').textContent=v.artist?(v.artist+' · '+(v.provider||'Local')):v.provider||'Local';
@@ -1227,6 +1255,7 @@ function openVideoModal(v){
     videoFrame.src=v.embedUrl;
   }
   videoModal.classList.add('open');
+  requestAnimationFrame(fitVideoPlayer);
 }
 function closeVideoModal(){
   videoModal.classList.remove('open');
@@ -1240,7 +1269,11 @@ function closeVideoModal(){
 const channelModal=$('#channelModal'),channelAvatar=$('#channelAvatar'),channelLatest=$('#channelLatest'),channelStreams=$('#channelStreams'),channelPosts=$('#channelPosts');
 const channelLatestStatus=$('#channelLatestStatus'),channelStreamsStatus=$('#channelStreamsStatus'),channelPostsStatus=$('#channelPostsStatus');
 const channelTabBtns=$$('.channel-tab'),channelPanels=$$('.channel-panel');
-let channelModalToken=0,channelPostVideos=[],channelState=null;
+let channelModalToken=0,channelPostVideos=[],channelState=null,channelSearchQuery='';
+$('#channelSearchInput').oninput=e=>{
+  channelSearchQuery=e.target.value.toLowerCase().trim();
+  if(channelState){renderChannelSection(channelState.active)}
+};
 const CHANNEL_PAGE_TIMEOUTS=[8000,5000,5000,3000,3000,1500,1500,1000,1000,500,500];
 $('#channelModalClose').onclick=closeChannelModal;
 channelModal.onclick=e=>{if(e.target===channelModal)closeChannelModal()};
@@ -1250,6 +1283,8 @@ function closeChannelModal(){
   channelModal.classList.remove('open');
   channelModalToken++;
   channelState=null;
+  channelSearchQuery='';
+  $('#channelSearchInput').value='';
 }
 
 function renderChannelStrip(channels){
@@ -1274,19 +1309,48 @@ function bindChannelCards(channels){
 }
 
 function renderChannelVideoCards(el,videos,emptyText){
-  if(!videos?.length){el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(emptyText)}</div>`;return}
-  el.innerHTML=videos.map((v,i)=>{
+  const filtered=channelSearchQuery
+    ?videos.filter(v=>(v.name||'').toLowerCase().includes(channelSearchQuery)||(v.artist||'').toLowerCase().includes(channelSearchQuery))
+    :videos;
+
+  if(!filtered.length){
+    const msg=channelSearchQuery&&videos.length?`No results for "${channelSearchQuery}"`:emptyText;
+    // Only rewrite if there's something to replace (avoids touching the loading spinner)
+    if(!el.querySelector('.channel-mini-card')){
+      el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
+    }
+    return;
+  }
+
+  // Count how many cards are already rendered
+  const existing=el.querySelectorAll('.channel-mini-card').length;
+
+  // If search is active, we need a full redraw (filter changes the set)
+  if(channelSearchQuery){
+    el.innerHTML='';
+  }
+
+  const startIdx=channelSearchQuery?0:existing;
+  const newItems=filtered.slice(startIdx);
+  if(!newItems.length)return;
+
+  const fragment=document.createDocumentFragment();
+  newItems.forEach((v,offset)=>{
+    const i=startIdx+offset;
     const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" alt="">`:'';
-    return`<div class="channel-mini-card" data-vidx="${i}">
-      <div class="channel-mini-thumb">${thumb}</div>
+    const div=document.createElement('div');
+    div.className='channel-mini-card';
+    div.dataset.vidx=i;
+    div.innerHTML=`<div class="channel-mini-thumb">${thumb}</div>
       <div class="card-title">${escapeHtml(v.name)}</div>
-      <div class="card-sub">${escapeHtml(v.artist||'')}</div>
-    </div>`;
-  }).join('');
-  el.querySelectorAll('.channel-mini-card').forEach(c=>c.onclick=()=>{
-    closeChannelModal();
-    openVideoModal(videos[+c.dataset.vidx]);
+      <div class="card-sub">${escapeHtml(v.artist||'')}</div>`;
+    div.onclick=()=>{closeChannelModal();openVideoModal(filtered[+div.dataset.vidx]);};
+    fragment.appendChild(div);
   });
+  el.appendChild(fragment);
+
+  // Remove empty placeholder if cards are now present
+  el.querySelectorAll('.empty').forEach(e=>e.remove());
 }
 
 function renderChannelPosts(posts,instance){
@@ -1349,7 +1413,9 @@ function renderChannelSection(kind){
   const sec=channelState.tabs[kind];
   if(!sec)return;
   if(!sec.items.length&&sec.loading){
-    sec.el.innerHTML=`<div class="loading">Loading ${escapeHtml(sec.label.toLowerCase())}...</div>`;
+    // Only show spinner if grid is completely empty (no cards yet)
+    if(!sec.el.querySelector('.channel-mini-card,.channel-post'))
+      sec.el.innerHTML=`<div class="loading">Loading ${escapeHtml(sec.label.toLowerCase())}...</div>`;
   }else if(sec.kind==='posts'){
     renderChannelPosts(sec.items,channelState.instance);
   }else{
@@ -1461,63 +1527,110 @@ async function openChannelModal(ch){
   }
 }
 
+// Tracks what's currently rendered in the main video grid to avoid scroll-resetting full redraws
+let _gridRenderedIds=[];
+
 function renderVideoGrid(list,statusText='',emptyText='No videos found',channels=[]){
-  const channelHtml=renderChannelStrip(channels);
-  if(!list.length){
-    grid.innerHTML=channelHtml+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:`<div class="empty">${escapeHtml(emptyText)}</div>`);
+  const badgeClass={
+    'Archive Video':'badge-archive-v','PeerTube':'badge-peertube','TED':'badge-ted',
+    'Vimeo':'badge-vimeo','Dailymotion':'badge-dailymotion','Wikimedia':'badge-wikimedia',
+    'NASA':'badge-nasa','Mixcloud':'badge-mixcloud','YouTube':'badge-youtube'
+  };
+
+  // Build/update channel strip without touching video cards
+  let channelStrip=grid.querySelector('.channel-strip');
+  if(channels?.length){
+    const channelHtml=renderChannelStrip(channels);
+    if(!channelStrip){
+      grid.insertAdjacentHTML('afterbegin',channelHtml);
+    }
     bindChannelCards(channels);
+    channelStrip=grid.querySelector('.channel-strip');
+  } else if(channelStrip){
+    channelStrip.remove();
+    channelStrip=null;
+  }
+
+  // Status/loading element — always at the end, update in place
+  let statusEl=grid.querySelector('.grid-status');
+  if(!statusEl){
+    statusEl=document.createElement('div');
+    statusEl.className='grid-status';
+    grid.appendChild(statusEl);
+  }
+
+  if(!list.length){
+    // Clear any existing video cards and reset tracker
+    grid.querySelectorAll('.video-card').forEach(c=>c.remove());
+    _gridRenderedIds=[];
+    statusEl.className='grid-status '+(statusText?'loading':'empty');
+    statusEl.innerHTML=statusText?escapeHtml(statusText):escapeHtml(emptyText);
+    // Move status after channel strip if present
+    if(channelStrip)channelStrip.after(statusEl);
     return;
   }
-  const badgeClass={
-    'Archive Video':'badge-archive-v',
-    'PeerTube':'badge-peertube',
-    'TED':'badge-ted',
-    'Vimeo':'badge-vimeo',
-    'Dailymotion':'badge-dailymotion',
-    'Wikimedia':'badge-wikimedia',
-    'NASA':'badge-nasa',
-    'Mixcloud':'badge-mixcloud',
-    'YouTube':'badge-youtube'
-  };
-  const cards=list.map((v,i)=>{
-    const bc=badgeClass[v.provider]||'';
-    const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
-    return`<div class="card video-card" data-vidx="${i}" style="cursor:pointer">
-      <div class="card-icon" style="width:100%;height:90px;border-radius:6px;margin-bottom:10px">${thumb}</div>
-      <div class="card-title">${escapeHtml(v.name)}</div>
-      <div class="card-sub">${escapeHtml(v.artist||'')}</div>
-      <span class="card-badge ${bc}">${escapeHtml(v.provider)}</span>
-    </div>`;
-  }).join('');
-  grid.innerHTML=channelHtml+cards+(statusText?`<div class="loading">${escapeHtml(statusText)}</div>`:'');
-  bindChannelCards(channels);
-  $$('.video-card').forEach(c=>c.onclick=()=>openVideoModal(list[+c.dataset.vidx]));
+
+  // Figure out which items are new (append-only, preserving scroll)
+  const newItems=list.slice(_gridRenderedIds.length);
+  if(newItems.length){
+    const fragment=document.createDocumentFragment();
+    newItems.forEach((v,offset)=>{
+      const i=_gridRenderedIds.length+offset;
+      const bc=badgeClass[v.provider]||'';
+      const thumb=v.thumb
+        ?`<img src="${escapeHtml(v.thumb)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`
+        :`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
+      const div=document.createElement('div');
+      div.className='card video-card';
+      div.dataset.vidx=i;
+      div.style.cursor='pointer';
+      div.innerHTML=`<div class="card-icon" style="width:100%;height:90px;border-radius:6px;margin-bottom:10px">${thumb}</div>
+        <div class="card-title">${escapeHtml(v.name)}</div>
+        <div class="card-sub">${escapeHtml(v.artist||'')}</div>
+        <span class="card-badge ${bc}">${escapeHtml(v.provider)}</span>`;
+      div.onclick=()=>openVideoModal(list[+div.dataset.vidx]);
+      fragment.appendChild(div);
+      _gridRenderedIds.push(v.id||v.name||i);
+    });
+    // Insert before status element
+    statusEl.before(fragment);
+  }
+
+  // Update status
+  if(statusText){
+    statusEl.className='grid-status loading';
+    statusEl.textContent=statusText;
+    statusEl.style.display='';
+  } else {
+    statusEl.style.display='none';
+  }
 }
 
 async function loadOrSearch(){
   const token=++searchToken;
   const q=search.value.trim();
   if(currentApi==='online'&&!q){
-    tracks=[];
+    tracks=[];_gridRenderedIds=[];
     grid.innerHTML='<div class="empty">Type something to search...</div>';
     return;
   }
   if(currentApi==='radio'&&!q){
-    tracks=[];
+    tracks=[];_gridRenderedIds=[];
     grid.innerHTML='<div class="empty">Search for a station, genre, or country...</div>';
     return;
   }
   if(currentApi==='video'&&!q){
-    tracks=[];
+    tracks=[];_gridRenderedIds=[];
     grid.innerHTML='<div class="empty">Search for a video, topic, or talk...</div>';
     return;
   }
   if(currentApi==='podcast'&&!q){
-    tracks=[];
+    tracks=[];_gridRenderedIds=[];
     grid.innerHTML='<div class="empty">Search for a podcast, DJ mix, or show...</div>';
     return;
   }
   grid.innerHTML='<div class="loading">Loading...</div>';
+  _gridRenderedIds=[];
   try{
     let result;
     if(currentApi==='local'){
