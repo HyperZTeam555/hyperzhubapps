@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CineOS+</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: sans-serif;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">Loading repo...</div>
+<iframe id="frame"></iframe>
+
+<script>
+const REPO = "https://cdn.jsdelivr.net/gh/nathanpikelny6-oss/CineOS@main";
+
+// Try root index first, fallback paths
+const CANDIDATES = [
+  `${REPO}/index.html`,
+  `${REPO}/Public/index.html`,
+  `${REPO}/public/index.html`
+];
+
+async function load() {
+  let html = null;
+
+  for (const url of CANDIDATES) {
+    try {
+      const res = await fetch(url);
+
+      if (res.ok) {
+        html = await res.text();
+        break;
+      }
+    } catch {}
+  }
+
+  if (!html) {
+    document.getElementById("loading").innerText = "Failed to load repo";
+    return;
+  }
+
+  // Force base URL so assets resolve from CDN
+  html = html.replace(
+    /<head>/i,
+    `<head><base href="${REPO}/">`
+  );
+
+  // Rewrite relative asset paths
+  html = html.replace(
+    /(src|href)=["'](?!https?:\/\/|\/\/|data:|#)(.*?)["']/g,
+    (m, attr, path) => {
+      return `${attr}="${REPO}/${path.replace(/^\.?\//, "")}"`;
+    }
+  );
+
+  const iframe = document.getElementById("frame");
+  iframe.srcdoc = html;
+
+  iframe.onload = () => {
+    document.getElementById("loading").style.display = "none";
+  };
+}
+
+load();
+</script>
+
+</body>
+</html>
