@@ -756,12 +756,17 @@ function mapInvidiousVideo(v,instance,provider='YouTube'){
   };
 }
 
-async function fetchInvidiousJson(path,preferredInstance='',timeout=8000,maxTries=0){
+function mapChannelInvidiousVideo(item,instance){
+  const mapped=mapInvidiousVideo(item,instance);
+  if(!mapped.id)return null;
+  if(!mapped.name||mapped.name==='Untitled YouTube video')return null;
+  return mapped;
+}
+
+async function fetchInvidiousJson(path,preferredInstance='',timeout=8000){
   const instances=await getInvidiousInstances();
   const ordered=[...new Set([preferredInstance,...instances].filter(Boolean))];
-  const limit=maxTries>0?Math.min(maxTries,ordered.length):ordered.length;
-  for(let i=0;i<limit;i++){
-    const instance=ordered[i];
+  for(const instance of ordered){
     try{
       const res=await withTimeout(fetch(`${instance}${path}`,{cache:'no-store'}),timeout);
       if(!res.ok)continue;
@@ -1303,8 +1308,7 @@ channelSearchInput.oninput=e=>{
   channelSearchByTab[channelState.active]=e.target.value.toLowerCase().trim();
   renderChannelSection(channelState.active);
 };
-const CHANNEL_PAGE_TIMEOUTS=[10000,7000];
-const CHANNEL_INSTANCE_TRIES=4;
+const CHANNEL_PAGE_TIMEOUTS=[8000,5000,5000,3000,3000,1500,1500,1000,1000,500,500];
 $('#channelModalClose').onclick=closeChannelModal;
 channelModal.onclick=e=>{if(e.target===channelModal)closeChannelModal()};
 channelTabBtns.forEach(btn=>btn.onclick=()=>showChannelTab(btn.dataset.channelTab));
@@ -1352,18 +1356,29 @@ function renderChannelVideoCards(el,videos,emptyText,query=''){
   const filtered=query
     ?videos.filter(v=>(v.name||'').toLowerCase().includes(query)||(v.artist||'').toLowerCase().includes(query)||(v.description||'').toLowerCase().includes(query))
     :videos;
+  const needsFullRedraw=el._filterKey!==query;
+  if(needsFullRedraw){
+    el.innerHTML='';
+    el._filterKey=query;
+  }
 
   if(!filtered.length){
     const msg=query&&videos.length?`No results for "${query}"`:emptyText;
-    el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
-    el._filterKey=query;
+    if(needsFullRedraw||!el.querySelector('.channel-mini-card')){
+      el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
+    }
     return;
   }
 
-  el.innerHTML='';
-  el._filterKey=query;
+  // Count how many cards are already rendered
+  const existing=el.querySelectorAll('.channel-mini-card').length;
+  const startIdx=needsFullRedraw?0:existing;
+  const newItems=filtered.slice(startIdx);
+  if(!newItems.length)return;
+
   const fragment=document.createDocumentFragment();
-  filtered.forEach(v=>{
+  newItems.forEach((v,offset)=>{
+    const i=startIdx+offset;
     const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" alt="">`:'';
     const div=document.createElement('div');
     div.className='channel-mini-card';
@@ -1375,6 +1390,9 @@ function renderChannelVideoCards(el,videos,emptyText,query=''){
     fragment.appendChild(div);
   });
   el.appendChild(fragment);
+
+  // Remove empty placeholder if cards are now present
+  el.querySelectorAll('.empty').forEach(e=>e.remove());
 }
 
 function renderChannelPosts(posts,instance,query=''){
@@ -1427,8 +1445,8 @@ function makeChannelState(ch,instance){
   return{
     id,instance:instance||ch.instance,active:'videos',
     tabs:{
-      videos:{kind:'videos',label:'Videos',basePath:`/api/v1/channels/${id}/videos?sort_by=newest`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelLatest,statusEl:channelLatestStatus,emptyText:'No latest videos found'},
-      streams:{kind:'streams',label:'Livestreams',basePath:`/api/v1/channels/${id}/streams?sort_by=newest`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelStreams,statusEl:channelStreamsStatus,emptyText:'No livestreams found'},
+      videos:{kind:'videos',label:'Videos',basePath:`/api/v1/channels/${id}/videos`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelLatest,statusEl:channelLatestStatus,emptyText:'No latest videos found'},
+      streams:{kind:'streams',label:'Livestreams',basePath:`/api/v1/channels/${id}/streams`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelStreams,statusEl:channelStreamsStatus,emptyText:'No livestreams found'},
       posts:{kind:'posts',label:'Posts',basePath:`/api/v1/channels/${id}/community`,items:[],keys:new Set(),continuation:null,pagesLoaded:0,done:false,loading:false,started:false,el:channelPosts,statusEl:channelPostsStatus,emptyText:'No community posts found'}
     }
   };
@@ -1477,7 +1495,6 @@ function channelRowsForSection(sec,data){
   if(sec.kind==='posts')return Array.isArray(data?.comments)?data.comments:[];
   if(Array.isArray(data))return data;
   if(Array.isArray(data?.videos))return data.videos;
-  if(sec.kind==='streams'&&Array.isArray(data?.streams))return data.streams;
   if(Array.isArray(data?.latestVideos))return data.latestVideos;
   if(Array.isArray(data?.items))return data.items;
   return [];
@@ -1485,36 +1502,18 @@ function channelRowsForSection(sec,data){
 
 function addChannelItems(sec,data,instance){
   const rows=channelRowsForSection(sec,data);
-  const before=sec.items.length;
   for(const item of rows){
-    if(sec.kind==='posts'){
-      const key=item.commentId||`${item.published||''}:${item.content||''}`;
-      if(sec.keys.has(key))continue;
-      sec.keys.add(key);
-      sec.items.push(item);
-      continue;
-    }
-    const mapped=mapInvidiousVideo(item,instance);
-    if(!mapped.id)continue;
-    if(sec.keys.has(mapped.id))continue;
-    sec.keys.add(mapped.id);
+    const mapped=sec.kind==='posts'?item:mapChannelInvidiousVideo(item,instance);
+    if(!mapped)continue;
+    const key=sec.kind==='posts'
+      ?(item.commentId||`${item.published||''}:${item.content||''}`)
+      :mapped.id;
+    if(sec.keys.has(key))continue;
+    sec.keys.add(key);
     sec.items.push(mapped);
   }
-  const added=sec.items.length-before;
-  sec.continuation=data?.continuation||'';
-  if(!rows.length)sec.done=true;
-  else if(!added&&sec.pagesLoaded>=1)sec.done=true;
-  else sec.done=!sec.continuation;
-}
-
-function seedChannelVideosFromAbout(info,instance){
-  if(!channelState||!info)return;
-  const sec=channelState.tabs.videos;
-  if(!sec||sec.items.length)return;
-  const rows=Array.isArray(info.latestVideos)?info.latestVideos:[];
-  if(!rows.length)return;
-  addChannelItems(sec,{videos:rows},instance);
-  renderChannelSection('videos');
+  sec.continuation=data.continuation||'';
+  sec.done=!sec.continuation||!rows.length;
 }
 
 async function loadChannelTabPages(kind,token){
@@ -1528,7 +1527,7 @@ async function loadChannelTabPages(kind,token){
     const page=sec.pagesLoaded+1;
     setChannelStatus(sec,`Loading ${sec.label} page ${page}...`);
     try{
-      const res=await fetchInvidiousJson(channelPagePath(sec),channelState.instance,CHANNEL_PAGE_TIMEOUTS[sec.pagesLoaded],CHANNEL_INSTANCE_TRIES);
+      const res=await fetchInvidiousJson(channelPagePath(sec),channelState.instance,CHANNEL_PAGE_TIMEOUTS[sec.pagesLoaded]);
       if(token!==channelModalToken)return;
       channelState.instance=res.instance||channelState.instance;
       sec.pagesLoaded++;
@@ -1564,8 +1563,6 @@ async function openChannelModal(ch){
   channelLatest.innerHTML='';
   channelStreams.innerHTML='';
   channelPosts.innerHTML='';
-  delete channelLatest._filterKey;
-  delete channelStreams._filterKey;
   channelLatestStatus.textContent='';
   channelStreamsStatus.textContent='';
   channelPostsStatus.textContent='';
@@ -1573,12 +1570,11 @@ async function openChannelModal(ch){
   showChannelTab('videos');
   try{
     const id=encodeURIComponent(ch.id);
-    const about=await fetchInvidiousJson(`/api/v1/channels/${id}`,ch.instance,8000,CHANNEL_INSTANCE_TRIES).catch(()=>({data:null,instance:ch.instance}));
+    const about=await fetchInvidiousJson(`/api/v1/channels/${id}`,ch.instance,8000).catch(()=>({data:null,instance:ch.instance}));
     if(token!==channelModalToken)return;
     const info=about.data||{};
     const instance=about.instance||ch.instance;
     if(channelState)channelState.instance=instance;
-    seedChannelVideosFromAbout(info,instance);
     const name=info.author||ch.name;
     $('#channelModalTitle').textContent=name;
     $('#channelName').textContent=name;
