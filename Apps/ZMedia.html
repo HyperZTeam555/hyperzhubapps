@@ -1291,11 +1291,12 @@ function closeVideoModal(){
 
 const channelModal=$('#channelModal'),channelAvatar=$('#channelAvatar'),channelLatest=$('#channelLatest'),channelStreams=$('#channelStreams'),channelPosts=$('#channelPosts');
 const channelLatestStatus=$('#channelLatestStatus'),channelStreamsStatus=$('#channelStreamsStatus'),channelPostsStatus=$('#channelPostsStatus');
-const channelTabBtns=$$('.channel-tab'),channelPanels=$$('.channel-panel');
-let channelModalToken=0,channelPostVideos=[],channelState=null,channelSearchQuery='';
-$('#channelSearchInput').oninput=e=>{
-  channelSearchQuery=e.target.value.toLowerCase().trim();
-  if(channelState){renderChannelSection(channelState.active)}
+const channelTabBtns=$$('.channel-tab'),channelPanels=$$('.channel-panel'),channelSearchInput=$('#channelSearchInput');
+let channelModalToken=0,channelPostVideos=[],channelState=null,channelSearchByTab={videos:'',streams:'',posts:''};
+channelSearchInput.oninput=e=>{
+  if(!channelState)return;
+  channelSearchByTab[channelState.active]=e.target.value.toLowerCase().trim();
+  renderChannelSection(channelState.active);
 };
 const CHANNEL_PAGE_TIMEOUTS=[8000,5000,5000,3000,3000,1500,1500,1000,1000,500,500];
 $('#channelModalClose').onclick=closeChannelModal;
@@ -1306,8 +1307,8 @@ function closeChannelModal(){
   channelModal.classList.remove('open');
   channelModalToken++;
   channelState=null;
-  channelSearchQuery='';
-  $('#channelSearchInput').value='';
+  channelSearchByTab={videos:'',streams:'',posts:''};
+  channelSearchInput.value='';
 }
 
 function renderChannelStrip(channels){
@@ -1331,15 +1332,30 @@ function bindChannelCards(channels){
   $$('.channel-card').forEach(c=>c.onclick=()=>openChannelModal(channels[+c.dataset.cidx]));
 }
 
+function activeChannelQuery(){
+  return channelState?channelSearchByTab[channelState.active]||'':'';
+}
+
+function updateChannelSearchBox(kind){
+  const labels={videos:'Search videos...',streams:'Search livestreams...',posts:'Search posts...'};
+  channelSearchInput.placeholder=labels[kind]||'Search...';
+  channelSearchInput.value=channelSearchByTab[kind]||'';
+}
+
 function renderChannelVideoCards(el,videos,emptyText){
-  const filtered=channelSearchQuery
-    ?videos.filter(v=>(v.name||'').toLowerCase().includes(channelSearchQuery)||(v.artist||'').toLowerCase().includes(channelSearchQuery))
+  const query=activeChannelQuery();
+  const filtered=query
+    ?videos.filter(v=>(v.name||'').toLowerCase().includes(query)||(v.artist||'').toLowerCase().includes(query)||(v.description||'').toLowerCase().includes(query))
     :videos;
+  const needsFullRedraw=el._filterKey!==query;
+  if(needsFullRedraw){
+    el.innerHTML='';
+    el._filterKey=query;
+  }
 
   if(!filtered.length){
-    const msg=channelSearchQuery&&videos.length?`No results for "${channelSearchQuery}"`:emptyText;
-    // Only rewrite if there's something to replace (avoids touching the loading spinner)
-    if(!el.querySelector('.channel-mini-card')){
+    const msg=query&&videos.length?`No results for "${query}"`:emptyText;
+    if(needsFullRedraw||!el.querySelector('.channel-mini-card')){
       el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
     }
     return;
@@ -1347,13 +1363,7 @@ function renderChannelVideoCards(el,videos,emptyText){
 
   // Count how many cards are already rendered
   const existing=el.querySelectorAll('.channel-mini-card').length;
-
-  // If search is active, we need a full redraw (filter changes the set)
-  if(channelSearchQuery){
-    el.innerHTML='';
-  }
-
-  const startIdx=channelSearchQuery?0:existing;
+  const startIdx=needsFullRedraw?0:existing;
   const newItems=filtered.slice(startIdx);
   if(!newItems.length)return;
 
@@ -1363,11 +1373,11 @@ function renderChannelVideoCards(el,videos,emptyText){
     const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" alt="">`:'';
     const div=document.createElement('div');
     div.className='channel-mini-card';
-    div.dataset.vidx=i;
     div.innerHTML=`<div class="channel-mini-thumb">${thumb}</div>
       <div class="card-title">${escapeHtml(v.name)}</div>
       <div class="card-sub">${escapeHtml(v.artist||'')}</div>`;
-    div.onclick=()=>{closeChannelModal();openVideoModal(filtered[+div.dataset.vidx]);};
+    div._videoObj=v;
+    div.onclick=()=>{closeChannelModal();openVideoModal(div._videoObj);};
     fragment.appendChild(div);
   });
   el.appendChild(fragment);
@@ -1379,8 +1389,20 @@ function renderChannelVideoCards(el,videos,emptyText){
 function renderChannelPosts(posts,instance){
   channelPostVideos=[];
   const rows=Array.isArray(posts)?posts:[];
-  if(!rows.length){channelPosts.innerHTML='<div class="empty" style="padding:18px">No community posts found</div>';return}
-  channelPosts.innerHTML=rows.map(post=>{
+  const query=activeChannelQuery();
+  const filtered=query?rows.filter(post=>{
+    const attach=post.attachment||{};
+    return (post.content||'').toLowerCase().includes(query)||
+      (post.contentHtml||'').replace(/<[^>]+>/g,'').toLowerCase().includes(query)||
+      (post.publishedText||'').toLowerCase().includes(query)||
+      (attach.title||attach.author||'').toLowerCase().includes(query);
+  }):rows;
+  if(!filtered.length){
+    const msg=query&&rows.length?`No results for "${query}"`:'No community posts found';
+    channelPosts.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
+    return;
+  }
+  channelPosts.innerHTML=filtered.map(post=>{
     const attachments=[];
     const attach=post.attachment;
     if(attach?.type==='video'&&attach.videoId){
@@ -1425,6 +1447,7 @@ function makeChannelState(ch,instance){
 function setChannelTab(kind){
   channelTabBtns.forEach(btn=>btn.classList.toggle('active',btn.dataset.channelTab===kind));
   channelPanels.forEach(panel=>panel.classList.toggle('active',panel.dataset.channelPanel===kind));
+  updateChannelSearchBox(kind);
 }
 
 function setChannelStatus(sec,msg){
@@ -1605,13 +1628,13 @@ function renderVideoGrid(list,statusText='',emptyText='No videos found',channels
         :`<svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:var(--primary)"><path d="M10 8l6 4-6 4V8z"/><path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H3V5h18v14z"/></svg>`;
       const div=document.createElement('div');
       div.className='card video-card';
-      div.dataset.vidx=i;
       div.style.cursor='pointer';
       div.innerHTML=`<div class="card-icon" style="width:100%;height:90px;border-radius:6px;margin-bottom:10px">${thumb}</div>
         <div class="card-title">${escapeHtml(v.name)}</div>
         <div class="card-sub">${escapeHtml(v.artist||'')}</div>
         <span class="card-badge ${bc}">${escapeHtml(v.provider)}</span>`;
-      div.onclick=()=>openVideoModal(list[+div.dataset.vidx]);
+      div._videoObj=v;
+      div.onclick=()=>openVideoModal(div._videoObj);
       fragment.appendChild(div);
       _gridRenderedIds.push(v.id||v.name||i);
     });
