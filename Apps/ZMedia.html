@@ -738,25 +738,30 @@ function pickInvidiousThumb(thumbnails,instance){
 }
 
 function mapInvidiousVideo(v,instance,provider='YouTube'){
-  const duration=compactDuration(v.lengthSeconds);
+  const src=v?.video||v?.item||v?.data||v||{};
+  const id=src.videoId||src.id||src.video_id||'';
+  const title=src.title||src.name||src.videoTitle||src.titleText||'Untitled YouTube video';
+  const duration=compactDuration(src.lengthSeconds||src.length_seconds||src.duration);
   return{
-    id:v.videoId,
-    name:v.title||'Untitled YouTube video',
-    artist:[v.author||provider,duration||v.publishedText].filter(Boolean).join(' · '),
-    description:v.description||'',
-    thumb:pickInvidiousThumb(v.videoThumbnails,instance),
+    id,
+    name:title,
+    artist:[src.author||src.channelName||provider,duration||src.publishedText].filter(Boolean).join(' · '),
+    description:src.description||src.descriptionHtml?.replace(/<[^>]+>/g,'')||'',
+    thumb:pickInvidiousThumb(src.videoThumbnails||src.thumbnails||src.thumbnail,instance),
     // Use privacy-enhanced nocookie domain — no tracking cookies until play, fewer ads
-    embedUrl:`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&rel=0`,
-    pageUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`,
+    embedUrl:`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`,
+    pageUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`,
     provider,isVideo:true,isYouTube:true,
-    liveNow:!!v.liveNow
+    liveNow:!!src.liveNow
   };
 }
 
-async function fetchInvidiousJson(path,preferredInstance='',timeout=8000){
+async function fetchInvidiousJson(path,preferredInstance='',timeout=8000,maxTries=0){
   const instances=await getInvidiousInstances();
   const ordered=[...new Set([preferredInstance,...instances].filter(Boolean))];
-  for(const instance of ordered){
+  const limit=maxTries>0?Math.min(maxTries,ordered.length):ordered.length;
+  for(let i=0;i<limit;i++){
+    const instance=ordered[i];
     try{
       const res=await withTimeout(fetch(`${instance}${path}`,{cache:'no-store'}),timeout);
       if(!res.ok)continue;
@@ -1298,7 +1303,8 @@ channelSearchInput.oninput=e=>{
   channelSearchByTab[channelState.active]=e.target.value.toLowerCase().trim();
   renderChannelSection(channelState.active);
 };
-const CHANNEL_PAGE_TIMEOUTS=[8000,5000,5000,3000,3000,1500,1500,1000,1000,500,500];
+const CHANNEL_PAGE_TIMEOUTS=[10000,7000];
+const CHANNEL_INSTANCE_TRIES=4;
 $('#channelModalClose').onclick=closeChannelModal;
 channelModal.onclick=e=>{if(e.target===channelModal)closeChannelModal()};
 channelTabBtns.forEach(btn=>btn.onclick=()=>showChannelTab(btn.dataset.channelTab));
@@ -1332,8 +1338,8 @@ function bindChannelCards(channels){
   $$('.channel-card').forEach(c=>c.onclick=()=>openChannelModal(channels[+c.dataset.cidx]));
 }
 
-function activeChannelQuery(){
-  return channelState?channelSearchByTab[channelState.active]||'':'';
+function channelQueryFor(kind){
+  return channelSearchByTab[kind]||'';
 }
 
 function updateChannelSearchBox(kind){
@@ -1342,34 +1348,22 @@ function updateChannelSearchBox(kind){
   channelSearchInput.value=channelSearchByTab[kind]||'';
 }
 
-function renderChannelVideoCards(el,videos,emptyText){
-  const query=activeChannelQuery();
+function renderChannelVideoCards(el,videos,emptyText,query=''){
   const filtered=query
     ?videos.filter(v=>(v.name||'').toLowerCase().includes(query)||(v.artist||'').toLowerCase().includes(query)||(v.description||'').toLowerCase().includes(query))
     :videos;
-  const needsFullRedraw=el._filterKey!==query;
-  if(needsFullRedraw){
-    el.innerHTML='';
-    el._filterKey=query;
-  }
 
   if(!filtered.length){
     const msg=query&&videos.length?`No results for "${query}"`:emptyText;
-    if(needsFullRedraw||!el.querySelector('.channel-mini-card')){
-      el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
-    }
+    el.innerHTML=`<div class="empty" style="padding:18px">${escapeHtml(msg)}</div>`;
+    el._filterKey=query;
     return;
   }
 
-  // Count how many cards are already rendered
-  const existing=el.querySelectorAll('.channel-mini-card').length;
-  const startIdx=needsFullRedraw?0:existing;
-  const newItems=filtered.slice(startIdx);
-  if(!newItems.length)return;
-
+  el.innerHTML='';
+  el._filterKey=query;
   const fragment=document.createDocumentFragment();
-  newItems.forEach((v,offset)=>{
-    const i=startIdx+offset;
+  filtered.forEach(v=>{
     const thumb=v.thumb?`<img src="${escapeHtml(v.thumb)}" alt="">`:'';
     const div=document.createElement('div');
     div.className='channel-mini-card';
@@ -1381,15 +1375,11 @@ function renderChannelVideoCards(el,videos,emptyText){
     fragment.appendChild(div);
   });
   el.appendChild(fragment);
-
-  // Remove empty placeholder if cards are now present
-  el.querySelectorAll('.empty').forEach(e=>e.remove());
 }
 
-function renderChannelPosts(posts,instance){
+function renderChannelPosts(posts,instance,query=''){
   channelPostVideos=[];
   const rows=Array.isArray(posts)?posts:[];
-  const query=activeChannelQuery();
   const filtered=query?rows.filter(post=>{
     const attach=post.attachment||{};
     return (post.content||'').toLowerCase().includes(query)||
@@ -1458,14 +1448,15 @@ function renderChannelSection(kind){
   if(!channelState)return;
   const sec=channelState.tabs[kind];
   if(!sec)return;
+  const query=channelQueryFor(kind);
   if(!sec.items.length&&sec.loading){
     // Only show spinner if grid is completely empty (no cards yet)
     if(!sec.el.querySelector('.channel-mini-card,.channel-post'))
       sec.el.innerHTML=`<div class="loading">Loading ${escapeHtml(sec.label.toLowerCase())}...</div>`;
   }else if(sec.kind==='posts'){
-    renderChannelPosts(sec.items,channelState.instance);
+    renderChannelPosts(sec.items,channelState.instance,query);
   }else{
-    renderChannelVideoCards(sec.el,sec.items,sec.emptyText);
+    renderChannelVideoCards(sec.el,sec.items,sec.emptyText,query);
   }
 }
 
@@ -1482,18 +1473,48 @@ function channelPagePath(sec){
   return `${sec.basePath}${sec.basePath.includes('?')?'&':'?'}continuation=${encodeURIComponent(sec.continuation)}`;
 }
 
+function channelRowsForSection(sec,data){
+  if(sec.kind==='posts')return Array.isArray(data?.comments)?data.comments:[];
+  if(Array.isArray(data))return data;
+  if(Array.isArray(data?.videos))return data.videos;
+  if(sec.kind==='streams'&&Array.isArray(data?.streams))return data.streams;
+  if(Array.isArray(data?.latestVideos))return data.latestVideos;
+  if(Array.isArray(data?.items))return data.items;
+  return [];
+}
+
 function addChannelItems(sec,data,instance){
-  const rows=sec.kind==='posts'?(data.comments||[]):(data.videos||[]);
+  const rows=channelRowsForSection(sec,data);
+  const before=sec.items.length;
   for(const item of rows){
-    const key=sec.kind==='posts'
-      ?(item.commentId||`${item.published||''}:${item.content||''}`)
-      :`${item.videoId||''}:${item.title||''}`;
-    if(sec.keys.has(key))continue;
-    sec.keys.add(key);
-    sec.items.push(sec.kind==='posts'?item:mapInvidiousVideo(item,instance));
+    if(sec.kind==='posts'){
+      const key=item.commentId||`${item.published||''}:${item.content||''}`;
+      if(sec.keys.has(key))continue;
+      sec.keys.add(key);
+      sec.items.push(item);
+      continue;
+    }
+    const mapped=mapInvidiousVideo(item,instance);
+    if(!mapped.id)continue;
+    if(sec.keys.has(mapped.id))continue;
+    sec.keys.add(mapped.id);
+    sec.items.push(mapped);
   }
-  sec.continuation=data.continuation||'';
-  sec.done=!sec.continuation||!rows.length;
+  const added=sec.items.length-before;
+  sec.continuation=data?.continuation||'';
+  if(!rows.length)sec.done=true;
+  else if(!added&&sec.pagesLoaded>=1)sec.done=true;
+  else sec.done=!sec.continuation;
+}
+
+function seedChannelVideosFromAbout(info,instance){
+  if(!channelState||!info)return;
+  const sec=channelState.tabs.videos;
+  if(!sec||sec.items.length)return;
+  const rows=Array.isArray(info.latestVideos)?info.latestVideos:[];
+  if(!rows.length)return;
+  addChannelItems(sec,{videos:rows},instance);
+  renderChannelSection('videos');
 }
 
 async function loadChannelTabPages(kind,token){
@@ -1507,7 +1528,7 @@ async function loadChannelTabPages(kind,token){
     const page=sec.pagesLoaded+1;
     setChannelStatus(sec,`Loading ${sec.label} page ${page}...`);
     try{
-      const res=await fetchInvidiousJson(channelPagePath(sec),channelState.instance,CHANNEL_PAGE_TIMEOUTS[sec.pagesLoaded]);
+      const res=await fetchInvidiousJson(channelPagePath(sec),channelState.instance,CHANNEL_PAGE_TIMEOUTS[sec.pagesLoaded],CHANNEL_INSTANCE_TRIES);
       if(token!==channelModalToken)return;
       channelState.instance=res.instance||channelState.instance;
       sec.pagesLoaded++;
@@ -1543,6 +1564,8 @@ async function openChannelModal(ch){
   channelLatest.innerHTML='';
   channelStreams.innerHTML='';
   channelPosts.innerHTML='';
+  delete channelLatest._filterKey;
+  delete channelStreams._filterKey;
   channelLatestStatus.textContent='';
   channelStreamsStatus.textContent='';
   channelPostsStatus.textContent='';
@@ -1550,11 +1573,12 @@ async function openChannelModal(ch){
   showChannelTab('videos');
   try{
     const id=encodeURIComponent(ch.id);
-    const about=await fetchInvidiousJson(`/api/v1/channels/${id}`,ch.instance,8000).catch(()=>({data:null,instance:ch.instance}));
+    const about=await fetchInvidiousJson(`/api/v1/channels/${id}`,ch.instance,8000,CHANNEL_INSTANCE_TRIES).catch(()=>({data:null,instance:ch.instance}));
     if(token!==channelModalToken)return;
     const info=about.data||{};
     const instance=about.instance||ch.instance;
     if(channelState)channelState.instance=instance;
+    seedChannelVideosFromAbout(info,instance);
     const name=info.author||ch.name;
     $('#channelModalTitle').textContent=name;
     $('#channelName').textContent=name;
