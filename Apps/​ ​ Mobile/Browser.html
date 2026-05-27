@@ -16,29 +16,30 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background: linear-gradient(135deg, #1e293b, #0f172a);
+      background: linear-gradient(135deg, #111827, #1f2937);
       font-family: Arial, sans-serif;
-      color: white;
+      overflow: hidden;
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(10px);
-      padding: 30px;
-      border-radius: 20px;
       width: 90%;
-      max-width: 500px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      max-width: 520px;
+      padding: 32px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.45);
+      color: white;
       text-align: center;
     }
 
     h1 {
       margin-top: 0;
+      margin-bottom: 22px;
       font-size: 2rem;
-      margin-bottom: 20px;
     }
 
-    .input-row {
+    .row {
       display: flex;
       gap: 10px;
     }
@@ -47,18 +48,24 @@
       flex: 1;
       padding: 14px;
       border: none;
-      border-radius: 12px;
-      font-size: 1rem;
       outline: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      background: rgba(255,255,255,0.12);
+      color: white;
+    }
+
+    input::placeholder {
+      color: rgba(255,255,255,0.65);
     }
 
     button {
-      padding: 14px 22px;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
+      padding: 14px 22px;
+      font-size: 1rem;
       background: #3b82f6;
       color: white;
-      font-size: 1rem;
       cursor: pointer;
       transition: 0.2s;
     }
@@ -69,12 +76,17 @@
     }
 
     .hint {
-      margin-top: 15px;
+      margin-top: 16px;
       opacity: 0.7;
-      font-size: 0.9rem;
+      font-size: 0.92rem;
     }
 
-    a {
+    .fallback {
+      margin-top: 12px;
+      font-size: 0.85rem;
+    }
+
+    .fallback a {
       color: #93c5fd;
     }
   </style>
@@ -84,22 +96,24 @@
   <div class="card">
     <h1>Quick Redirect</h1>
 
-    <div class="input-row">
+    <div class="row">
       <input
-        type="text"
         id="urlInput"
-        placeholder="Enter a website URL..."
+        type="text"
+        placeholder="Enter URL..."
       />
       <button onclick="goToSite()">GO</button>
     </div>
 
     <div class="hint">
-      Example: google.com or https://example.com
+      Example: google.com
     </div>
 
-    <!-- Tiny fallback link -->
-    <div style="margin-top: 10px; font-size: 0.85rem;">
-      <a href="#" id="fallbackLink" target="_blank">Open manually</a>
+    <!-- tiny fallback link -->
+    <div class="fallback">
+      <a id="fallbackLink" href="#" target="_top">
+        Open manually
+      </a>
     </div>
   </div>
 
@@ -107,11 +121,13 @@
     const input = document.getElementById("urlInput");
     const fallback = document.getElementById("fallbackLink");
 
-    function formatURL(url) {
+    function normalizeURL(url) {
       url = url.trim();
 
-      if (!url.startsWith("http://") &&
-          !url.startsWith("https://")) {
+      if (
+        !url.startsWith("http://") &&
+        !url.startsWith("https://")
+      ) {
         url = "https://" + url;
       }
 
@@ -123,11 +139,16 @@
 
       if (!url.trim()) return;
 
-      url = formatURL(url);
+      url = normalizeURL(url);
 
       fallback.href = url;
 
-      window.location.href = url;
+      // Break out of iframe
+      try {
+        window.top.location.href = url;
+      } catch {
+        window.open(url, "_top");
+      }
     }
 
     input.addEventListener("keydown", (e) => {
@@ -137,8 +158,7 @@
     });
 
     input.addEventListener("input", () => {
-      const url = formatURL(input.value || "#");
-      fallback.href = url;
+      fallback.href = normalizeURL(input.value || "#");
     });
   </script>
 
