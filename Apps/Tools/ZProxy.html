@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZProxy</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#161a22; --text:#e7eaf0; --muted:#aeb4c3; --border:#2a3040; --accent:#62a0ff; --danger:#ff6b6b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .topbar { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px); background: color-mix(in srgb, var(--panel) 88%, transparent); border-bottom: 1px solid var(--border); padding: 12px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .url { flex: 1; min-width: 220px; background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); outline: none; }
+    .url::placeholder { color: var(--muted); }
+    .url:focus { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+    button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+    button:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+    .status { font-size: 12px; color: var(--muted); flex: 1 1 100%; padding: 0 4px; }
+    .status.error { color: var(--danger); }
+    .wrap { height: calc(100vh - 72px); display: flex; flex-direction: column; }
+    iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <input id="urlInput" class="url" type="text" placeholder="Enter URL (e.g. https://example.com)" autocomplete="off" spellcheck="false" />
+    <button id="goBtn" type="button">Go</button>
+    <button id="backBtn" type="button" title="Back">←</button>
+    <button id="fwdBtn" type="button" title="Forward">→</button>
+    <div id="status" class="status">Uses AllOrigins API — same as api.allorigins.win/get and /raw</div>
+  </div>
+  <div class="wrap">
+    <iframe id="view" sandbox="allow-scripts allow-forms allow-popups allow-downloads"></iframe>
+  </div>
+
+  <script>
+    const API = 'https://api.allorigins.win';
+    const urlInput = document.getElementById('urlInput');
+    const goBtn = document.getElementById('goBtn');
+    const backBtn = document.getElementById('backBtn');
+    const fwdBtn = document.getElementById('fwdBtn');
+    const statusEl = document.getElementById('status');
+    const iframe = document.getElementById('view');
+
+    const history = [];
+    let historyIndex = -1;
+
+    function normalizeUrl(raw) {
+      const s = (raw || '').trim();
+      if (!s) return '';
+      if (/^https?:\/\//i.test(s)) return s;
+      return 'https://' + s;
+    }
+
+    /** AllOrigins /raw — returns proxied body with CORS headers */
+    function rawUrl(target) {
+      return API + '/raw?url=' + encodeURIComponent(target);
+    }
+
+    /** AllOrigins /get — returns JSON { contents, status } */
+    function getUrl(target, charset) {
+      let u = API + '/get?url=' + encodeURIComponent(target);
+      if (charset) u += '&charset=' + encodeURIComponent(charset);
+      return u;
+    }
+
+    function resolveUrl(href, base) {
+      if (!href || /^(data:|blob:|javascript:|#|mailto:|tel:)/i.test(href)) return null;
+      try {
+        return new URL(href, base).href;
+      } catch {
+        return null;
+      }
+    }
+
+    function proxyifyUrl(absUrl) {
+      return rawUrl(absUrl);
+    }
+
+    /** Rewrite href/src/action/etc. so assets load through AllOrigins /raw */
+    function rewriteHtml(html, pageUrl) {
+      const attrRe = /\b(href|src|action|poster|data|cite|formaction)\s*=\s*(["'])(.*?)\2/gi;
+      html = html.replace(attrRe, (m, attr, q, val) => {
+        const abs = resolveUrl(val.trim(), pageUrl);
+        if (!abs) return m;
+        return attr + '=' + q + proxyifyUrl(abs) + q;
+      });
+
+      const srcsetRe = /\bsrcset\s*=\s*(["'])(.*?)\1/gi;
+      html = html.replace(srcsetRe, (m, q, val) => {
+        const parts = val.split(',').map((part) => {
+          const bits = part.trim().split(/\s+/);
+          const abs = resolveUrl(bits[0], pageUrl);
+          if (!abs) return part.trim();
+          bits[0] = proxyifyUrl(abs);
+          return bits.join(' ');
+        });
+        return 'srcset=' + q + parts.join(', ') + q;
+      });
+
+      html = html.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (m, q, val) => {
+        const abs = resolveUrl(val.trim(), pageUrl);
+        if (!abs) return m;
+        return 'url(' + (q || '') + proxyifyUrl(abs) + (q || '') + ')';
+      });
+
+      html = html.replace(/<meta[^>]+http-equiv\s*=\s*["']?Content-Security-Policy["']?[^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+http-equiv\s*=\s*["']?X-Frame-Options["']?[^>]*>/gi, '');
+      html = html.replace(/<base[^>]*>/gi, '');
+
+      // Turn meta refresh redirects into "proxy navigation" messages.
+      html = html.replace(/<meta[^>]*http-equiv\s*=\s*["']refresh["'][^>]*>/gi, (tag) => {
+        const c = /content\s*=\s*["']([^"']*)["']/i.exec(tag);
+        if (!c) return tag;
+        const content = c[1] || '';
+        const u = /url\s*=\s*([^;]+)/i.exec(content);
+        if (!u) return tag;
+        const abs = resolveUrl(u[1].trim(), pageUrl);
+        if (!abs) return tag;
+        const safe = JSON.stringify(abs);
+        return '<script>setTimeout(function(){try{parent.postMessage({type:"zproxy-nav",url:' + safe + '},\"*\" );}catch(e){}},0);<\/script>';
+      });
+
+      const navScript = '<script>(function(){' +
+        'var _zproxyBase=' + JSON.stringify(pageUrl) + ';' +
+        'function _zproxyUnwrap(raw){' +
+        'try{' +
+        'var u=new URL(raw);' +
+        'if(u.hostname && u.hostname.indexOf("allorigins.win")!==-1){' +
+        'var p=new URLSearchParams(u.search);' +
+        'var t=p.get("url");' +
+        'if(t) return t;' +
+        '}' +
+        'return raw;' +
+        '}catch(e){return raw;}' +
+        '}' +
+        'function _zproxySend(raw){' +
+        'try{' +
+        'var abs=new URL(raw,_zproxyBase).href;' +
+        'abs=_zproxyUnwrap(abs);' +
+        'parent.postMessage({type:"zproxy-nav",url:abs},"*");' +
+        '}catch(e){}' +
+        '}' +
+        'document.addEventListener("click",function(e){' +
+        'var a=e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
+        'if(!a)return;' +
+        'var h=a.getAttribute("href");' +
+        'if(!h||h.charAt(0)==="#"||/^(javascript:|mailto:|tel:)/i.test(h))return;' +
+        'if(a.target==="_blank")return;' +
+        'e.preventDefault();' +
+        '_zproxySend(h);' +
+        '},true);' +
+        'document.addEventListener("submit",function(e){' +
+        'var f=e.target;' +
+        'if(!f||!f.action)return;' +
+        'e.preventDefault();' +
+        '_zproxySend(f.action);' +
+        '});' +
+        'try{' +
+        'window.location.assign=function(u){_zproxySend(u);};' +
+        'window.location.replace=function(u){_zproxySend(u);};' +
+        'window.open=function(u){_zproxySend(u); return null;};' +
+        '}catch(e){}' +
+        '})();<\/script>';
+
+      if (/<\/body>/i.test(html)) {
+        html = html.replace(/<\/body>/i, navScript + '</body>');
+      } else {
+        html += navScript;
+      }
+
+      return html;
+    }
+
+    async function fetchPage(targetUrl) {
+      const res = await fetch(getUrl(targetUrl), { cache: 'no-store' });
+      if (!res.ok) throw new Error('AllOrigins /get failed (HTTP ' + res.status + ')');
+      const data = await res.json();
+      if (data.status && data.status.error) {
+        const err = data.status.error;
+        throw new Error(err.message || err.code || 'Request failed');
+      }
+      const contents = data.contents;
+      if (contents == null || contents === '') {
+        throw new Error('Empty response from target URL');
+      }
+      return { html: contents, status: data.status || {} };
+    }
+
+    function pushHistory(url) {
+      if (historyIndex < history.length - 1) history.length = historyIndex + 1;
+      if (history[historyIndex] !== url) {
+        history.push(url);
+        historyIndex = history.length - 1;
+      }
+      backBtn.disabled = historyIndex <= 0;
+      fwdBtn.disabled = historyIndex >= history.length - 1;
+    }
+
+    async function loadUrl(targetUrl, { addHistory = true } = {}) {
+      targetUrl = normalizeUrl(targetUrl);
+      if (!targetUrl) return;
+
+      statusEl.textContent = 'Loading…';
+      statusEl.classList.remove('error');
+      urlInput.value = targetUrl;
+
+      try {
+        const { html, status } = await fetchPage(targetUrl);
+        const rewritten = rewriteHtml(html, targetUrl);
+        iframe.removeAttribute('src');
+        iframe.srcdoc = rewritten;
+
+        const code = status.http_code;
+        const ct = status.content_type || '';
+        statusEl.textContent = code
+          ? 'Loaded (HTTP ' + code + (ct ? ', ' + ct.split(';')[0] : '') + ') via AllOrigins'
+          : 'Loaded via AllOrigins /get';
+
+        if (addHistory) pushHistory(targetUrl);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + (err.message || String(err));
+        statusEl.classList.add('error');
+        iframe.srcdoc = '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem;color:#c00">' +
+          '<h2>Could not load page</h2><p>' + (err.message || String(err)).replace(/</g, '&lt;') + '</p></body></html>';
+      }
+    }
+
+    function navigateFromIframe(url) {
+      loadUrl(url, { addHistory: true });
+    }
+
+    window.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'zproxy-nav') return;
+      navigateFromIframe(e.data.url);
+    });
+
+    goBtn.addEventListener('click', () => loadUrl(urlInput.value));
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadUrl(urlInput.value);
+    });
+    backBtn.addEventListener('click', () => {
+      if (historyIndex > 0) {
+        historyIndex--;
+        loadUrl(history[historyIndex], { addHistory: false });
+      }
+    });
+    fwdBtn.addEventListener('click', () => {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        loadUrl(history[historyIndex], { addHistory: false });
+      }
+    });
+
+    backBtn.disabled = true;
+    fwdBtn.disabled = true;
+
+    const start = new URLSearchParams(location.search).get('url');
+    if (start) loadUrl(start);
+  </script>
+</body>
+</html>
