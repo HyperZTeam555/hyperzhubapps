@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Quick Redirect</title>
+  <title>Browser</title>
 
   <style>
     * {
@@ -23,7 +23,7 @@
 
     .card {
       width: 90%;
-      max-width: 520px;
+      max-width: 500px;
       padding: 32px;
       border-radius: 22px;
       background: rgba(255,255,255,0.08);
@@ -39,13 +39,8 @@
       font-size: 2rem;
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-    }
-
     input {
-      flex: 1;
+      width: 100%;
       padding: 14px;
       border: none;
       outline: none;
@@ -59,18 +54,21 @@
       color: rgba(255,255,255,0.65);
     }
 
-    button {
-      border: none;
+    .go-btn {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 14px;
       border-radius: 14px;
-      padding: 14px 22px;
+      text-decoration: none;
       font-size: 1rem;
       background: #3b82f6;
       color: white;
-      cursor: pointer;
       transition: 0.2s;
+      user-select: none;
     }
 
-    button:hover {
+    .go-btn:hover {
       background: #2563eb;
       transform: translateY(-1px);
     }
@@ -80,46 +78,36 @@
       opacity: 0.7;
       font-size: 0.92rem;
     }
-
-    .fallback {
-      margin-top: 12px;
-      font-size: 0.85rem;
-    }
-
-    .fallback a {
-      color: #93c5fd;
-    }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h1>Quick Redirect</h1>
+    <h1>Browser</h1>
 
-    <div class="row">
-      <input
-        id="urlInput"
-        type="text"
-        placeholder="Enter URL..."
-      />
-      <button onclick="goToSite()">GO</button>
-    </div>
+    <input
+      id="urlInput"
+      type="text"
+      placeholder="Enter URL..."
+    />
+
+    <a
+      id="goButton"
+      class="go-btn"
+      href="#"
+      target="_top"
+    >
+      GO
+    </a>
 
     <div class="hint">
       Example: google.com
-    </div>
-
-    <!-- tiny fallback link -->
-    <div class="fallback">
-      <a id="fallbackLink" href="#" target="_top">
-        Open manually
-      </a>
     </div>
   </div>
 
   <script>
     const input = document.getElementById("urlInput");
-    const fallback = document.getElementById("fallbackLink");
+    const button = document.getElementById("goButton");
 
     function normalizeURL(url) {
       url = url.trim();
@@ -134,31 +122,24 @@
       return url;
     }
 
-    function goToSite() {
-      let url = input.value;
+    function updateButton() {
+      const value = input.value.trim();
 
-      if (!url.trim()) return;
-
-      url = normalizeURL(url);
-
-      fallback.href = url;
-
-      // Break out of iframe
-      try {
-        window.top.location.href = url;
-      } catch {
-        window.open(url, "_top");
+      if (!value) {
+        button.href = "#";
+        return;
       }
+
+      button.href = normalizeURL(value);
     }
+
+    input.addEventListener("input", updateButton);
 
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
-        goToSite();
+        updateButton();
+        button.click();
       }
-    });
-
-    input.addEventListener("input", () => {
-      fallback.href = normalizeURL(input.value || "#");
     });
   </script>
 
