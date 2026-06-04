@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini 2.5 Flash - Premium</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { background-color: #131314; color: #e3e3e3; font-family: 'Google Sans', sans-serif; overflow: hidden; }
+        
+        /* Layout */
+        .sidebar { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); background-color: #1e1f20; }
+        .sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+        .messages-area { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #444 #131314; }
+        
+        /* Messages */
+        .user-msg { background-color: #2b2a2a; padding: 0.85rem 1.25rem; border-radius: 1.5rem; max-width: 80%; align-self: flex-end; margin-left: auto; word-break: break-word;}
+        .ai-msg { display: flex; gap: 1rem; margin-bottom: 2rem; animation: fadeIn 0.4s ease; max-width: 90%; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Level Selector Dropdown */
+        .level-pill { padding: 10px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: 0.2s; color: #e3e3e3; user-select: none; display: flex; align-items: center; gap: 8px; }
+        .level-pill:hover { background: #333; }
+        .level-pill.active { background: #3a3b3c; font-weight: 500; color: #a8c7fa; }
+        .level-pill svg { width: 16px; height: 16px; fill: currentColor; }
+
+        /* Buttons & Inputs */
+        .icon-btn { padding: 8px; border-radius: 50%; transition: 0.2s; cursor: pointer; color: #c4c7c5; display: flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: #333537; color: white; }
+        input, textarea { background: transparent; border: none; outline: none; color: white; font-size: 15px; }
+
+        /* Sleek Loading Animation */
+        .loader { display: flex; gap: 4px; align-items: center; height: 24px; padding-left: 4px; }
+        .loader div { width: 6px; height: 6px; background-color: #a8c7fa; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .loader div:nth-child(1) { animation-delay: -0.32s; }
+        .loader div:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+
+        /* Code Block Styling */
+        .code-container { background: #0d0d0d; border-radius: 12px; margin: 1rem 0; border: 1px solid #333; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .code-header { background: #1e1f20; padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #a8c7fa; border-bottom: 1px solid #2b2a2a; }
+        .code-btn { background: transparent; color: #c4c7c5; border: 1px solid #444; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; transition: 0.2s;}
+        .code-btn:hover { background: #333; color: white; }
+
+        /* Modals */
+        .modal-overlay { background: rgba(19, 19, 20, 0.95); backdrop-filter: blur(8px); z-index: 100; }
+        .chat-history-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+        .chat-history-item:hover, .chat-history-item.active { background: #333537; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex h-screen w-full relative">
+
+<div id="auth-modal" class="modal-overlay fixed inset-0 flex items-center justify-center hidden">
+    <div class="bg-[#1e1f20] border border-[#333] p-8 rounded-2xl shadow-2xl w-[90%] max-w-md flex flex-col items-center text-center">
+        <h2 class="text-2xl font-semibold text-white mb-2" id="auth-title">Welcome to Gemini</h2>
+        <p class="text-gray-400 text-sm mb-6">Create your local profile to save chats and preferences.</p>
+        
+        <div class="w-full relative mb-4">
+            <div class="w-24 h-24 mx-auto rounded-full bg-[#2b2a2a] border-2 border-[#444] overflow-hidden cursor-pointer flex items-center justify-center mb-2 hover:border-[#a8c7fa] transition" onclick="document.getElementById('profile-upload').click()">
+                <img id="auth-avatar-preview" src="" class="w-full h-full object-cover hidden">
+                <svg id="auth-avatar-placeholder" width="40" height="40" viewBox="0 0 24 24" fill="#a8c7fa"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <input type="file" id="profile-upload" accept="image/*" hidden>
+            <p class="text-xs text-gray-400">Click to upload avatar</p>
+        </div>
+
+        <input type="text" id="auth-name" placeholder="Enter your name" class="w-full bg-[#131314] border border-[#333] rounded-xl px-4 py-3 mb-6 focus:border-[#a8c7fa] transition text-center">
+        <button id="auth-save-btn" class="w-full bg-[#a8c7fa] text-[#131314] font-semibold py-3 rounded-xl hover:bg-[#8ab4f8] transition">Save & Continue</button>
+    </div>
+</div>
+
+<div id="sidebar" class="sidebar w-[280px] h-full flex flex-col px-3 py-4 flex-shrink-0 z-20 shadow-xl">
+    <div class="flex items-center justify-between mb-6 px-1">
+        <button id="close-sidebar-btn" class="icon-btn"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+    </div>
+    <button id="new-chat-btn" class="flex items-center gap-3 bg-[#131314] hover:bg-[#2b2a2a] text-[#c4c7c5] px-4 py-3 rounded-full w-fit transition mb-6 border border-[#333]">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span class="font-medium text-sm">New chat</span>
+    </button>
+    <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Recent</div>
+    <div id="chat-list" class="flex-1 overflow-y-auto pr-1 flex flex-col gap-1"></div>
+</div>
+
+<div class="flex-1 flex flex-col h-full relative">
+    
+    <div class="p-4 flex items-center justify-between z-10 bg-gradient-to-b from-[#131314] to-transparent">
+        <div class="flex items-center gap-3">
+            <button id="show-sidebar-btn" class="icon-btn hidden"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+            <span class="font-medium text-xl flex items-center gap-2">Gemini <span class="text-[#a8c7fa] text-xs bg-[#1e1f20] px-2 py-1 rounded-md border border-[#333]">2.5 Flash</span></span>
+        </div>
+
+        <div id="profile-trigger" class="w-10 h-10 rounded-full cursor-pointer border border-[#444] hover:border-[#a8c7fa] transition overflow-hidden bg-[#1e1f20] flex items-center justify-center">
+            <img id="header-user-avatar" src="" class="w-full h-full object-cover hidden">
+            <svg id="header-user-placeholder" width="22" height="22" viewBox="0 0 24 24" fill="#a8c7fa"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+    </div>
+
+    <div class="messages-area flex-1 flex flex-col gap-6 px-4 md:px-24 pb-48 pt-4" id="chat-box">
+        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full opacity-60">
+            <h1 class="text-4xl font-medium mb-2 text-white">Hello, <span id="welcome-name" class="text-transparent bg-clip-text bg-gradient-to-r from-[#4285f4] to-[#d96570]">Guest</span></h1>
+            <p class="text-xl">How can I help with your tasks today?</p>
+        </div>
+    </div>
+
+    <div class="absolute bottom-0 w-full px-4 md:px-24 pb-6 bg-gradient-to-t from-[#131314] via-[#131314] to-transparent pt-16">
+        <div class="max-w-4xl mx-auto flex flex-col shadow-2xl bg-[#1e1f20] rounded-[24px] border border-[#333]">
+            
+            <div id="image-preview-container" class="hidden px-4 pt-3 pb-1 relative">
+                <div class="relative inline-block border border-[#444] rounded-lg overflow-hidden group">
+                    <img id="img-preview" src="" class="h-16 w-16 object-cover">
+                    <button id="remove-img-btn" class="absolute top-1 right-1 bg-black/70 rounded-full p-1 opacity-0 group-hover:opacity-100 transition text-white">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-end w-full px-2 py-2">
+                <button class="icon-btn text-gray-400 p-3 mb-1 hover:text-[#a8c7fa]" onclick="document.getElementById('chat-img-upload').click()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <input type="file" id="chat-img-upload" accept="image/*" hidden>
+                
+                <textarea id="user-input" rows="1" placeholder="Ask Gemini..." class="flex-grow bg-transparent outline-none text-white px-3 py-3 resize-none max-h-32" style="scrollbar-width:none;"></textarea>
+
+                <div class="flex items-center gap-1 mb-1 mr-1">
+                    
+                    <div class="relative">
+                        <div id="level-toggle-btn" class="flex items-center gap-2 cursor-pointer hover:bg-[#333] px-3 py-1.5 rounded-full transition border border-transparent hover:border-[#444]">
+                            <img src="https://qfoemstkquoozbbpwkmm.supabase.co/storage/v1/object/public/images/c6160349d9c9bb7363effe9808d8ed7d.png" class="w-5 h-5 object-contain">
+                            <span id="current-mode-display" class="text-sm font-medium text-gray-300">Fast</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400"><path d="M7 10l5 5 5-5z"/></svg>
+                        </div>
+                        
+                        <div id="level-popover" class="hidden absolute bottom-[115%] right-0 bg-[#2b2a2a] border border-[#444] rounded-xl p-1 shadow-2xl flex flex-col z-50 min-w-[150px] mb-2">
+                            <div class="level-pill active" data-level="fast">
+                                <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66C7.67 12.24 9.02 9.68 11.22 6h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"/></svg>
+                                Fast
+                            </div>
+                            <div class="level-pill" data-level="thinking">
+                                <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zm1-11h-2v3H8v2h3v3h2v-3h3v-2h-3V8z"/></svg>
+                                Thinking
+                            </div>
+                            <div class="level-pill" data-level="pro">
+                                <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                Pro
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="send-btn" class="bg-[#333] text-gray-300 hover:bg-[#a8c7fa] hover:text-black rounded-full p-2.5 flex items-center justify-center transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+        <p class="text-center text-[11px] text-gray-500 mt-3 font-medium tracking-wide">Gemini may display inaccurate info, including about people, so double-check its responses.</p>
+    </div>
+</div>
+
+<script type="module">
+    import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+    // --- API Configuration ---
+    const API_KEY = "AIzaSyATbcS-DrulCPozEex3bhFzZF3GKXN2ZDg";
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    
+    // --- State Management ---
+    const STORAGE_KEY_CHATS = 'gemini_chats_v6';
+    const STORAGE_KEY_USER = 'gemini_user_v2';
+    
+    let chats = [];
+    let currentChatId = null;
+    let config = { temperature: 0.1, topP: 0.8 }; // Default Fast
+    let currentUploadedImageBase64 = null;
+    let currentUploadedImageMimeType = null;
+    let userProfile = { name: 'Guest', avatar: '' };
+
+    // --- DOM Elements ---
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const welcomeName = document.getElementById('welcome-name');
+    const chatList = document.getElementById('chat-list');
+    
+    // Auth DOM
+    const authModal = document.getElementById('auth-modal');
+    const authName = document.getElementById('auth-name');
+    const authSaveBtn = document.getElementById('auth-save-btn');
+    const authAvatarPreview = document.getElementById('auth-avatar-preview');
+    const authAvatarPlaceholder = document.getElementById('auth-avatar-placeholder');
+    const profileUpload = document.getElementById('profile-upload');
+    const profileTrigger = document.getElementById('profile-trigger');
+    const headerUserAvatar = document.getElementById('header-user-avatar');
+    const headerUserPlaceholder = document.getElementById('header-user-placeholder');
+
+    // UI & Image Input DOM
+    const levelToggleBtn = document.getElementById('level-toggle-btn');
+    const levelPopover = document.getElementById('level-popover');
+    const levelPills = document.querySelectorAll('.level-pill');
+    const currentModeDisplay = document.getElementById('current-mode-display');
+    const chatImgUpload = document.getElementById('chat-img-upload');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imgPreview = document.getElementById('img-preview');
+    const removeImgBtn = document.getElementById('remove-img-btn');
+
+    // --- Markdown Configuration ---
+    const renderer = new marked.Renderer();
+    renderer.code = (code, lang) => {
+        const id = 'code-' + Math.random().toString(36).substr(2, 9);
+        return `<div class="code-container">
+            <div class="code-header"><span>${(lang || 'CODE').toUpperCase()}</span>
+                <div class="flex gap-2">
+                    <button class="code-btn copy-btn" data-target="${id}">Copy</button>
+                    <button class="code-btn dl-btn" data-target="${id}">Download</button>
+                </div>
+            </div>
+            <pre style="padding:16px; margin:0; overflow-x:auto;"><code id="${id}" class="hljs language-${lang}">${hljs.highlightAuto(code).value}</code></pre>
+        </div>`;
+    };
+    marked.setOptions({ renderer });
+
+    // --- Core Logic: Authentication ---
+    function initAuth() {
+        const savedUser = localStorage.getItem(STORAGE_KEY_USER);
+        if (savedUser) {
+            userProfile = JSON.parse(savedUser);
+            updateProfileUI();
+        } else {
+            authModal.classList.remove('hidden');
+        }
+    }
+
+    function updateProfileUI() {
+        welcomeName.innerText = userProfile.name;
+        if (userProfile.avatar) {
+            headerUserAvatar.src = userProfile.avatar;
+            headerUserAvatar.classList.remove('hidden');
+            headerUserPlaceholder.classList.add('hidden');
+        } else {
+            headerUserAvatar.classList.add('hidden');
+            headerUserPlaceholder.classList.remove('hidden');
+        }
+    }
+
+    authSaveBtn.addEventListener('click', () => {
+        const name = authName.value.trim();
+        if (name) userProfile.name = name;
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userProfile));
+        authModal.classList.add('hidden');
+        updateProfileUI();
+    });
+
+    profileTrigger.addEventListener('click', () => {
+        document.getElementById('auth-title').innerText = "Edit Profile";
+        authName.value = userProfile.name;
+        if(userProfile.avatar) {
+            authAvatarPreview.src = userProfile.avatar;
+            authAvatarPreview.classList.remove('hidden');
+            authAvatarPlaceholder.classList.add('hidden');
+        }
+        authModal.classList.remove('hidden');
+    });
+
+    // Profile Avatar Upload Process
+    profileUpload.addEventListener('change', (e) => {
+        if (!e.target.files[0]) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            userProfile.avatar = event.target.result;
+            authAvatarPreview.src = userProfile.avatar;
+            authAvatarPreview.classList.remove('hidden');
+            authAvatarPlaceholder.classList.add('hidden');
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    // Chat Image Upload Process
+    chatImgUpload.addEventListener('change', (e) => {
+        if (!e.target.files[0]) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            currentUploadedImageBase64 = event.target.result;
+            currentUploadedImageMimeType = e.target.files[0].type;
+            imgPreview.src = currentUploadedImageBase64;
+            imagePreviewContainer.classList.remove('hidden');
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    removeImgBtn.addEventListener('click', () => {
+        currentUploadedImageBase64 = null;
+        currentUploadedImageMimeType = null;
+        imagePreviewContainer.classList.add('hidden');
+        chatImgUpload.value = '';
+    });
+
+    // --- Core Logic: Chat System ---
+    function loadChats() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY_CHATS);
+            if (saved) chats = JSON.parse(saved);
+        } catch (e) { console.error(e); }
+    }
+
+    function saveChats() {
+        localStorage.setItem(STORAGE_KEY_CHATS, JSON.stringify(chats));
+    }
+
+    function createNewChat() {
+        currentChatId = 'chat_' + Date.now();
+        chats.unshift({ id: currentChatId, title: 'New chat', messages: [] });
+        saveChats(); renderSidebar(); renderChat();
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text && !currentUploadedImageBase64) return;
+
+        let chat = chats.find(c => c.id === currentChatId);
+        if (!chat) { createNewChat(); chat = chats[0]; }
+        if (chat.messages.length === 0) chat.title = text ? text.substring(0, 30) : 'Image Context';
+
+        // Add user message to state
+        const userMsgObj = { role: 'user', text: text, image: currentUploadedImageBase64 };
+        chat.messages.push(userMsgObj);
+        
+        // Cache and clear image preview
+        const cachedImgData = currentUploadedImageBase64;
+        const cachedMime = currentUploadedImageMimeType;
+        removeImgBtn.click(); // resets UI and variables
+        userInput.value = '';
+        userInput.style.height = 'auto'; // reset textarea
+        
+        saveChats();
+        renderSidebar();
+        appendDOMMessage('user', userMsgObj);
+
+        // Prep AI Loader
+        const aiMsgDiv = appendLoader();
+        const contentDiv = aiMsgDiv.querySelector('.prose');
+
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: config });
+            
+            // Build history strictly for SDK parameters
+            const history = chat.messages.slice(0, -1).map(m => ({ 
+                role: m.role, 
+                parts: [{ text: m.text || "Attached an image." }] 
+            }));
+            
+            const chatSession = model.startChat({ history });
+            
+            // Build Prompt Parts
+            let promptParts = [text];
+            if (cachedImgData) {
+                promptParts.push({
+                    inlineData: { data: cachedImgData.split(',')[1], mimeType: cachedMime }
+                });
+            }
+
+            const result = await chatSession.sendMessageStream(promptParts);
+            
+            removeLoader(aiMsgDiv); 
+            let fullText = "";
+            
+            for await (const chunk of result.stream) {
+                fullText += chunk.text();
+                contentDiv.innerHTML = marked.parse(fullText);
+                attachCodeListeners();
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            chat.messages.push({ role: 'model', text: fullText });
+            saveChats();
+
+        } catch (e) {
+            removeLoader(aiMsgDiv);
+            contentDiv.innerHTML = `<span style="color:#ff6b6b">API Error: ${e.message}</span>`;
+            console.error(e);
+        }
+    }
+
+    // --- UI Rendering ---
+    function appendDOMMessage(role, msgData) {
+        welcomeScreen.style.display = 'none';
+        const div = document.createElement('div');
+        div.className = role === 'user' ? 'user-msg flex flex-col gap-2' : 'ai-msg w-full';
+        
+        if (role === 'user') {
+            let html = '';
+            if(msgData.image) html += `<img src="${msgData.image}" class="max-w-[200px] rounded-lg border border-[#444] self-end">`;
+            if(msgData.text) html += `<span>${msgData.text}</span>`;
+            div.innerHTML = html;
+        } else {
+            div.innerHTML = `
+                <div class="w-8 h-8 flex-shrink-0 mt-1"><img src="https://qfoemstkquoozbbpwkmm.supabase.co/storage/v1/object/public/images/c6160349d9c9bb7363effe9808d8ed7d.png" class="w-full h-full object-contain"></div>
+                <div class="prose prose-invert w-full max-w-none text-[#e3e3e3] leading-relaxed">${marked.parse(msgData.text || '')}</div>`;
+        }
+        
+        chatBox.appendChild(div);
+        attachCodeListeners();
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return div;
+    }
+
+    // Loading Animation
+    function appendLoader() {
+        const div = document.createElement('div');
+        div.className = 'ai-msg w-full';
+        div.innerHTML = `
+            <div class="w-8 h-8 flex-shrink-0 mt-1"><img src="https://qfoemstkquoozbbpwkmm.supabase.co/storage/v1/object/public/images/c6160349d9c9bb7363effe9808d8ed7d.png" class="w-full h-full object-contain opacity-50"></div>
+            <div class="prose prose-invert w-full flex items-center h-8"><div class="loader" id="ai-loading-dots"><div></div><div></div><div></div></div></div>`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return div;
+    }
+
+    function removeLoader(aiMsgDiv) {
+        const loader = aiMsgDiv.querySelector('#ai-loading-dots');
+        if(loader) loader.remove();
+    }
+
+    function renderChat() {
+        chatBox.innerHTML = '';
+        const chat = chats.find(c => c.id === currentChatId);
+        
+        if (!chat || chat.messages.length === 0) {
+            chatBox.appendChild(welcomeScreen);
+            welcomeScreen.style.display = 'flex';
+        } else {
+            welcomeScreen.style.display = 'none';
+            chat.messages.forEach(m => appendDOMMessage(m.role, m));
+        }
+    }
+
+    function renderSidebar() {
+        chatList.innerHTML = '';
+        chats.forEach(c => {
+            const item = document.createElement('div');
+            item.className = `chat-history-item ${c.id === currentChatId ? 'active' : ''}`;
+            item.innerText = c.title;
+            item.addEventListener('click', () => { currentChatId = c.id; renderChat(); renderSidebar(); });
+            chatList.appendChild(item);
+        });
+    }
+
+    // Utilities & Listeners
+    function attachCodeListeners() {
+        document.querySelectorAll('.copy-btn, .dl-btn').forEach(btn => {
+            if (btn.hasAttribute('data-bound')) return; 
+            btn.setAttribute('data-bound', 'true');
+            
+            btn.addEventListener('click', (e) => {
+                const targetId = e.target.getAttribute('data-target');
+                const codeContent = document.getElementById(targetId).innerText;
+
+                if (e.target.classList.contains('copy-btn')) {
+                    navigator.clipboard.writeText(codeContent);
+                    e.target.innerText = "Copied!";
+                    setTimeout(() => e.target.innerText = "Copy", 2000);
+                } else {
+                    const blob = new Blob([codeContent], {type: 'text/plain'});
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = "snippet.txt";
+                    a.click();
+                }
+            });
+        });
+    }
+
+    userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight < 128 ? this.scrollHeight : 128) + 'px';
+    });
+
+    userInput.addEventListener('keydown', (e) => { 
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } 
+    });
+    
+    sendBtn.addEventListener('click', sendMessage);
+    document.getElementById('new-chat-btn').addEventListener('click', createNewChat);
+    
+    document.getElementById('close-sidebar-btn').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('collapsed');
+        document.getElementById('show-sidebar-btn').classList.remove('hidden');
+    });
+    document.getElementById('show-sidebar-btn').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.remove('collapsed');
+        document.getElementById('show-sidebar-btn').classList.add('hidden');
+    });
+
+    // Level Dropdown Logic
+    levelToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        levelPopover.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!levelPopover.contains(e.target) && e.target !== levelToggleBtn) {
+            levelPopover.classList.add('hidden');
+        }
+    });
+
+    levelPills.forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            const targetPill = e.currentTarget;
+            levelPills.forEach(p => p.classList.remove('active'));
+            targetPill.classList.add('active');
+            
+            const lvl = targetPill.getAttribute('data-level');
+            
+            // Update UI text display next to logo
+            if (lvl === 'fast') { config = { temperature: 0.1, topP: 0.8 }; currentModeDisplay.innerText = "Fast"; }
+            else if (lvl === 'thinking') { config = { temperature: 0.7, topP: 0.9 }; currentModeDisplay.innerText = "Thinking"; }
+            else if (lvl === 'pro') { config = { temperature: 1.0, topP: 1.0 }; currentModeDisplay.innerText = "Pro"; }
+            
+            levelPopover.classList.add('hidden');
+        });
+    });
+
+    // --- Initialization ---
+    initAuth();
+    loadChats();
+    if (chats.length > 0) currentChatId = chats[0].id; else createNewChat();
+    renderSidebar();
+    renderChat();
+
+</script>
+</body>
+</html>
