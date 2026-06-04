@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+    margin: 0;
+    background: #0b1220;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.frame {
+    width: 900px;
+    height: 1000px;
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* zoom container inside iframe */
+.zoom-wrapper {
+    transform: scale(2);
+    transform-origin: top left;
+
+    /* compensate for scale so content still fits */
+    width: 50%;
+    height: 50%;
+}
+</style>
+</head>
+
+<body>
+
+<iframe class="frame"
+    srcdoc='
+    <html>
+    <head>
+    <style>
+        body {
+            margin: 0;
+            background: #111827;
+            overflow: hidden;
+        }
+    </style>
+    </head>
+
+    <body>
+        <div class="zoom-wrapper">
+            <script src="https://embedai.dev/embed/v1/chat.js"></script>
+        </div>
+    </body>
+    </html>
+    '>
+</iframe>
+
+</body>
+</html>
