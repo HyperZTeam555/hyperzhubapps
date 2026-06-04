@@ -6,54 +6,26 @@ body {
     margin: 0;
     background: #0b1220;
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: center; /* Centers the chat horizontally */
+    align-items: center;     /* Centers the chat vertically */
     height: 100vh;
 }
 
 .frame {
-    width: 900px;
-    height: 1000px;
+    width: 450px;           /* Slightly wider for a better desktop chat feel */
+    height: 800px;          /* Increased height so the widget isn't cut off */
     border: none;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-
-/* zoom container inside iframe */
-.zoom-wrapper {
-    transform: scale(2);
-    transform-origin: top left;
-
-    /* compensate for scale so content still fits */
-    width: 50%;
-    height: 50%;
+    background: #172237;    /* Match your dark theme while it loads */
 }
 </style>
 </head>
-
 <body>
 
 <iframe class="frame"
-    srcdoc='
-    <html>
-    <head>
-    <style>
-        body {
-            margin: 0;
-            background: #111827;
-            overflow: hidden;
-        }
-    </style>
-    </head>
-
-    <body>
-        <div class="zoom-wrapper">
-            <script src="https://embedai.dev/embed/v1/chat.js"></script>
-        </div>
-    </body>
-    </html>
-    '>
+    src="data:text/html;base64,PHNjcmlwdCBzcmM9Imh0dHBzOi8vZW1iZWRhaS5kZXYvZW1iZWQvdjEvY2hhdC5qcyI+PC9zY3JpcHQ+">
 </iframe>
 
 </body>
