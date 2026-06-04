@@ -1,91 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Prismarine</title>
-
+  <title>Embed mcraft.fun</title>
   <style>
     html, body {
       margin: 0;
       height: 100%;
-      background: #000;
-      overflow: hidden;
+      background: black;
     }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
-    #loading {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      font-family: sans-serif;
-      background: #000;
-    }
   </style>
 </head>
 <body>
 
-<div id="loading">Loading Minecraft Web Client...</div>
-<iframe id="frame"></iframe>
-
-<script>
-const REPO = "https://cdn.jsdelivr.net/gh/zardoy/minecraft-web-client@main";
-
-// Common entry points (depends on build output)
-const CANDIDATES = [
-  `${REPO}/index.html`,
-  `${REPO}/dist/index.html`,
-  `${REPO}/build/index.html`,
-  `${REPO}/public/index.html`
-];
-
-async function load() {
-  let html = null;
-
-  for (const url of CANDIDATES) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        html = await res.text();
-        break;
-      }
-    } catch {}
-  }
-
-  if (!html) {
-    document.getElementById("loading").innerText = "Failed to load Minecraft Web Client";
-    return;
-  }
-
-  // Fix base path so assets load correctly from CDN
-  html = html.replace(
-    /<head>/i,
-    `<head><base href="${REPO}/">`
-  );
-
-  // Rewrite relative asset paths
-  html = html.replace(
-    /(src|href)=["'](?!https?:\/\/|\/\/|data:|#)(.*?)["']/g,
-    (m, attr, path) => {
-      return `${attr}="${REPO}/${path.replace(/^\.?\//, "")}"`;
-    }
-  );
-
-  const iframe = document.getElementById("frame");
-  iframe.srcdoc = html;
-
-  iframe.onload = () => {
-    document.getElementById("loading").style.display = "none";
-  };
-}
-
-load();
-</script>
+<iframe 
+  src="https://mcraft.fun"
+  allow="fullscreen; gamepad; microphone; clipboard-read; clipboard-write"
+  allowfullscreen>
+</iframe>
 
 </body>
 </html>
