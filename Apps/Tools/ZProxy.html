@@ -1,261 +1,634 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZProxy</title>
-  <style>
-    :root { --bg:#0f1115; --panel:#161a22; --text:#e7eaf0; --muted:#aeb4c3; --border:#2a3040; --accent:#62a0ff; --danger:#ff6b6b; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-    .topbar { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px); background: color-mix(in srgb, var(--panel) 88%, transparent); border-bottom: 1px solid var(--border); padding: 12px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .url { flex: 1; min-width: 220px; background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); outline: none; }
-    .url::placeholder { color: var(--muted); }
-    .url:focus { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-    button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
-    button:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
-    .status { font-size: 12px; color: var(--muted); flex: 1 1 100%; padding: 0 4px; }
-    .status.error { color: var(--danger); }
-    .wrap { height: calc(100vh - 72px); display: flex; flex-direction: column; }
-    iframe { flex: 1; width: 100%; border: 0; background: #fff; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZProxy | Secure Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #141414;
+            --bg-tertiary: #1f1f1f;
+            --bg-card: #252525;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #606060;
+            --accent: #00d4ff;
+            --accent-hover: #00a8cc;
+            --border: #2a2a2a;
+            --shadow: rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .top-bar {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 20px var(--shadow);
+            position: relative;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo::before {
+            content: "◈";
+            font-size: 28px;
+            -webkit-text-fill-color: var(--accent);
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+        }
+
+        .address-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .proxy-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .proxy-select:hover, .proxy-select:focus {
+            border-color: var(--accent);
+        }
+
+        .proxy-select option {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .address-bar {
+            flex: 1;
+            display: flex;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .address-bar:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
+        .address-bar input {
+            flex: 1;
+            border: none;
+            padding: 12px 18px;
+            font-size: 14px;
+            outline: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'Segoe UI', monospace;
+        }
+
+        .address-bar input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .go-btn {
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            color: var(--bg-primary);
+            border: none;
+            padding: 0 28px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        .go-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .content {
+            width: 100%;
+            height: calc(100vh - 73px);
+            position: relative;
+        }
+
+        .proxy-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--bg-primary);
+        }
+
+        .home-screen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at top, var(--bg-secondary) 0%, var(--bg-primary) 50%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .home-screen::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 212, 255, 0.03) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .home-content {
+            text-align: center;
+            z-index: 1;
+            max-width: 800px;
+            padding: 40px;
+        }
+
+        .home-content h1 {
+            font-size: 72px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+        }
+
+        .home-content p {
+            color: var(--text-secondary);
+            font-size: 18px;
+            margin-bottom: 50px;
+            line-height: 1.6;
+        }
+
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 20px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .quick-link {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 20px;
+            border-radius: 16px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quick-link::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .quick-link:hover::before {
+            opacity: 1;
+        }
+
+        .quick-link:hover {
+            border-color: var(--accent);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.15);
+        }
+
+        .quick-link-icon {
+            font-size: 32px;
+            filter: grayscale(100%);
+            transition: filter 0.3s;
+        }
+
+        .quick-link:hover .quick-link-icon {
+            filter: grayscale(0%);
+        }
+
+        .quick-link span {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .quick-link:hover span {
+            color: var(--text-primary);
+        }
+
+        .loader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 100;
+        }
+
+        .loader.active {
+            display: block;
+        }
+
+        .loader-ring {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 40px var(--shadow);
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast-code {
+            font-family: 'Fira Code', monospace;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .proxy-badge {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 100;
+            display: none;
+        }
+
+        .proxy-badge.frog {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            border: 1px solid #2ecc71;
+        }
+
+        .proxy-badge.space {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+            border: 1px solid #9b59b6;
+        }
+
+        .proxy-badge.scramjet {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+
+        .proxy-badge.allorigins {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            border: 1px solid #3498db;
+        }
+
+        .proxy-badge.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .home-content h1 { font-size: 48px; }
+            .quick-links { grid-template-columns: repeat(2, 1fr); }
+            .nav-controls { display: none; }
+            .proxy-select { font-size: 12px; padding: 8px; max-width: 120px; }
+        }
+    </style>
 </head>
 <body>
-  <div class="topbar">
-    <input id="urlInput" class="url" type="text" placeholder="Enter URL (e.g. https://example.com)" autocomplete="off" spellcheck="false" />
-    <button id="goBtn" type="button">Go</button>
-    <button id="backBtn" type="button" title="Back">←</button>
-    <button id="fwdBtn" type="button" title="Forward">→</button>
-    <div id="status" class="status">Uses AllOrigins API — same as api.allorigins.win/get and /raw</div>
-  </div>
-  <div class="wrap">
-    <iframe id="view" sandbox="allow-scripts allow-forms allow-popups allow-downloads"></iframe>
-  </div>
+    <div class="top-bar">
+        <div class="logo" onclick="goHome()">ZProxy</div>
+        <div class="nav-controls">
+            <button class="nav-btn" onclick="goBack()" title="Back">←</button>
+            <button class="nav-btn" onclick="goForward()" title="Forward">→</button>
+            <button class="nav-btn" onclick="reload()" title="Reload">↻</button>
+            <button class="nav-btn" onclick="goHome()" title="Home">⌂</button>
+        </div>
+        <div class="address-container">
+            <select class="proxy-select" id="proxySelect" onchange="updateProxy()">
+                <option value="frog">🐸 Frog (XOR)</option>
+                <option value="space">🚀 Space (XOR)</option>
+                <option value="scramjet">⚡ Scramjet (URL)</option>
+                <option value="allorigins">🌐 AllOrigins</option>
+            </select>
+            <div class="address-bar">
+                <input type="text" id="urlInput" placeholder="Search or enter URL..." 
+                       onkeypress="if(event.key==='Enter')navigate()" autocomplete="off">
+                <button class="go-btn" onclick="navigate()">GO</button>
+            </div>
+        </div>
+    </div>
 
-  <script>
-    const API = 'https://api.allorigins.win';
-    const urlInput = document.getElementById('urlInput');
-    const goBtn = document.getElementById('goBtn');
-    const backBtn = document.getElementById('backBtn');
-    const fwdBtn = document.getElementById('fwdBtn');
-    const statusEl = document.getElementById('status');
-    const iframe = document.getElementById('view');
+    <div class="content">
+        <div id="homeScreen" class="home-screen">
+            <div class="home-content">
+                <h1>ZProxy</h1>
+                <p>Select your proxy method above and enter a URL to begin browsing.<br>Text searches automatically use DuckDuckGo.</p>
+                <div class="quick-links">
+                    <div class="quick-link" onclick="loadSite('https://www.google.com')">
+                        <div class="quick-link-icon">🔍</div>
+                        <span>Google</span>
+                    </div>
+                    <div class="quick-link" onclick="loadSite('https://www.wikipedia.org')">
+                        <div class="quick-link-icon">📚</div>
+                        <span>Wikipedia</span>
+                    </div>
+                    <div class="quick-link" onclick="loadSite('https://www.reddit.com')">
+                        <div class="quick-link-icon">🔴</div>
+                        <span>Reddit</span>
+                    </div>
+                    <div class="quick-link" onclick="loadSite('https://www.youtube.com')">
+                        <div class="quick-link-icon">▶️</div>
+                        <span>YouTube</span>
+                    </div>
+                    <div class="quick-link" onclick="loadSite('https://duckduckgo.com')">
+                        <div class="quick-link-icon">🦆</div>
+                        <span>DuckDuckGo</span>
+                    </div>
+                    <div class="quick-link" onclick="loadSite('https://www.github.com')">
+                        <div class="quick-link-icon">💻</div>
+                        <span>GitHub</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    const history = [];
-    let historyIndex = -1;
+        <iframe id="proxyFrame" class="proxy-frame" style="display: none;" 
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+    </div>
 
-    function normalizeUrl(raw) {
-      const s = (raw || '').trim();
-      if (!s) return '';
-      if (/^https?:\/\//i.test(s)) return s;
-      return 'https://' + s;
-    }
+    <div class="loader" id="loader">
+        <div class="loader-ring"></div>
+    </div>
 
-    /** AllOrigins /raw — returns proxied body with CORS headers */
-    function rawUrl(target) {
-      return API + '/raw?url=' + encodeURIComponent(target);
-    }
+    <div class="toast" id="toast">
+        <span id="toastText">Loading...</span>
+        <span class="toast-code" id="toastCode"></span>
+    </div>
 
-    /** AllOrigins /get — returns JSON { contents, status } */
-    function getUrl(target, charset) {
-      let u = API + '/get?url=' + encodeURIComponent(target);
-      if (charset) u += '&charset=' + encodeURIComponent(charset);
-      return u;
-    }
+    <div class="proxy-badge frog" id="badgeFrog">Frog Proxy</div>
+    <div class="proxy-badge space" id="badgeSpace">Space Proxy</div>
+    <div class="proxy-badge scramjet" id="badgeScramjet">Scramjet</div>
+    <div class="proxy-badge allorigins" id="badgeAllorigins">AllOrigins</div>
 
-    function resolveUrl(href, base) {
-      if (!href || /^(data:|blob:|javascript:|#|mailto:|tel:)/i.test(href)) return null;
-      try {
-        return new URL(href, base).href;
-      } catch {
-        return null;
-      }
-    }
+    <script>
+        let currentProxy = 'frog';
 
-    function proxyifyUrl(absUrl) {
-      return rawUrl(absUrl);
-    }
+        // XOR Cipher encode (alternating XOR 0x02 on odd indices)
+        function xorEncode(str) {
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                if (i % 2 === 1) {
+                    result += String.fromCharCode(str.charCodeAt(i) ^ 0x02);
+                } else {
+                    result += str[i];
+                }
+            }
+            return result;
+        }
 
-    /** Rewrite href/src/action/etc. so assets load through AllOrigins /raw */
-    function rewriteHtml(html, pageUrl) {
-      const attrRe = /\b(href|src|action|poster|data|cite|formaction)\s*=\s*(["'])(.*?)\2/gi;
-      html = html.replace(attrRe, (m, attr, q, val) => {
-        const abs = resolveUrl(val.trim(), pageUrl);
-        if (!abs) return m;
-        return attr + '=' + q + proxyifyUrl(abs) + q;
-      });
+        function looksLikeUrl(string) {
+            return string.includes('.') && !string.includes(' ') && 
+                   (string.startsWith('http') || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(string));
+        }
 
-      const srcsetRe = /\bsrcset\s*=\s*(["'])(.*?)\1/gi;
-      html = html.replace(srcsetRe, (m, q, val) => {
-        const parts = val.split(',').map((part) => {
-          const bits = part.trim().split(/\s+/);
-          const abs = resolveUrl(bits[0], pageUrl);
-          if (!abs) return part.trim();
-          bits[0] = proxyifyUrl(abs);
-          return bits.join(' ');
+        function updateProxy() {
+            currentProxy = document.getElementById('proxySelect').value;
+            document.querySelectorAll('.proxy-badge').forEach(b => b.classList.remove('show'));
+        }
+
+        function navigate() {
+            const input = document.getElementById('urlInput').value.trim();
+            if (!input) return;
+
+            if (looksLikeUrl(input)) {
+                let url = input;
+                if (!url.startsWith('http')) {
+                    url = 'https://' + url;
+                }
+                // Remove trailing slash to prevent encoding issues
+                url = url.replace(/\/$/, '');
+                loadSite(url);
+            } else {
+                const searchUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(input);
+                loadSite(searchUrl);
+            }
+        }
+
+        function loadSite(url) {
+            document.getElementById('homeScreen').style.display = 'none';
+            document.getElementById('proxyFrame').style.display = 'block';
+            document.getElementById('loader').classList.add('active');
+            
+            let proxyUrl;
+            const encoded = xorEncode(url);
+            
+            switch(currentProxy) {
+                case 'frog':
+                    // Frog: https://frogiesarcade.net/frog/default/ixl/{encoded}
+                    proxyUrl = 'https://frogiesarcade.net/frog/default/ixl/' + encodeURIComponent(encoded);
+                    showToast('Frog XOR Encrypted', encoded.substring(0, 30) + '...');
+                    break;
+                    
+                case 'space':
+                    // Space: https://gointospace.app/scram/res/{encoded}
+                    // Properly URL-encode special characters for the path
+                    const spaceEncoded = encoded.split('').map(c => {
+                        if (/[a-zA-Z0-9]/.test(c)) return c;
+                        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+                    }).join('');
+                    proxyUrl = 'https://gointospace.app/scram/res/' + spaceEncoded;
+                    showToast('Space XOR Encrypted', encoded.substring(0, 30) + '...');
+                    break;
+                    
+                case 'scramjet':
+                    // Scramjet: https://55gms.com/scramjet/{url-encoded}
+                    proxyUrl = 'https://55gms.com/scramjet/' + encodeURIComponent(url);
+                    showToast('Scramjet URL Encoded', 'Standard URL encoding');
+                    break;
+                    
+                case 'allorigins':
+                    // AllOrigins: https://api.allorigins.win/raw?url={url}
+                    proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                    showToast('AllOrigins Direct', 'No encryption');
+                    break;
+            }
+            
+            document.getElementById('proxyFrame').src = proxyUrl;
+            document.getElementById('urlInput').value = url;
+            
+            // Show proxy badge
+            document.querySelectorAll('.proxy-badge').forEach(b => b.classList.remove('show'));
+            const badgeName = currentProxy.charAt(0).toUpperCase() + currentProxy.slice(1);
+            const badge = document.getElementById('badge' + badgeName);
+            if (badge) badge.classList.add('show');
+            
+            setTimeout(() => {
+                document.getElementById('loader').classList.remove('active');
+            }, 1500);
+        }
+
+        function showToast(text, code) {
+            document.getElementById('toastText').textContent = text;
+            document.getElementById('toastCode').textContent = code;
+            document.getElementById('toast').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('toast').classList.remove('show');
+            }, 4000);
+        }
+
+        function goHome() {
+            document.getElementById('homeScreen').style.display = 'flex';
+            document.getElementById('proxyFrame').style.display = 'none';
+            document.getElementById('proxyFrame').src = '';
+            document.getElementById('urlInput').value = '';
+            document.querySelectorAll('.proxy-badge').forEach(b => b.classList.remove('show'));
+        }
+
+        function goBack() {
+            try {
+                document.getElementById('proxyFrame').contentWindow.history.back();
+            } catch(e) {
+                window.history.back();
+            }
+        }
+
+        function goForward() {
+            try {
+                document.getElementById('proxyFrame').contentWindow.history.forward();
+            } catch(e) {
+                window.history.forward();
+            }
+        }
+
+        function reload() {
+            const frame = document.getElementById('proxyFrame');
+            if (frame.style.display !== 'none') {
+                frame.src = frame.src;
+            }
+        }
+
+        document.getElementById('proxyFrame').addEventListener('load', function() {
+            document.getElementById('loader').classList.remove('active');
         });
-        return 'srcset=' + q + parts.join(', ') + q;
-      });
-
-      html = html.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (m, q, val) => {
-        const abs = resolveUrl(val.trim(), pageUrl);
-        if (!abs) return m;
-        return 'url(' + (q || '') + proxyifyUrl(abs) + (q || '') + ')';
-      });
-
-      html = html.replace(/<meta[^>]+http-equiv\s*=\s*["']?Content-Security-Policy["']?[^>]*>/gi, '');
-      html = html.replace(/<meta[^>]+http-equiv\s*=\s*["']?X-Frame-Options["']?[^>]*>/gi, '');
-      html = html.replace(/<base[^>]*>/gi, '');
-
-      // Turn meta refresh redirects into "proxy navigation" messages.
-      html = html.replace(/<meta[^>]*http-equiv\s*=\s*["']refresh["'][^>]*>/gi, (tag) => {
-        const c = /content\s*=\s*["']([^"']*)["']/i.exec(tag);
-        if (!c) return tag;
-        const content = c[1] || '';
-        const u = /url\s*=\s*([^;]+)/i.exec(content);
-        if (!u) return tag;
-        const abs = resolveUrl(u[1].trim(), pageUrl);
-        if (!abs) return tag;
-        const safe = JSON.stringify(abs);
-        return '<script>setTimeout(function(){try{parent.postMessage({type:"zproxy-nav",url:' + safe + '},\"*\" );}catch(e){}},0);<\/script>';
-      });
-
-      const navScript = '<script>(function(){' +
-        'var _zproxyBase=' + JSON.stringify(pageUrl) + ';' +
-        'function _zproxyUnwrap(raw){' +
-        'try{' +
-        'var u=new URL(raw);' +
-        'if(u.hostname && u.hostname.indexOf("allorigins.win")!==-1){' +
-        'var p=new URLSearchParams(u.search);' +
-        'var t=p.get("url");' +
-        'if(t) return t;' +
-        '}' +
-        'return raw;' +
-        '}catch(e){return raw;}' +
-        '}' +
-        'function _zproxySend(raw){' +
-        'try{' +
-        'var abs=new URL(raw,_zproxyBase).href;' +
-        'abs=_zproxyUnwrap(abs);' +
-        'parent.postMessage({type:"zproxy-nav",url:abs},"*");' +
-        '}catch(e){}' +
-        '}' +
-        'document.addEventListener("click",function(e){' +
-        'var a=e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
-        'if(!a)return;' +
-        'var h=a.getAttribute("href");' +
-        'if(!h||h.charAt(0)==="#"||/^(javascript:|mailto:|tel:)/i.test(h))return;' +
-        'if(a.target==="_blank")return;' +
-        'e.preventDefault();' +
-        '_zproxySend(h);' +
-        '},true);' +
-        'document.addEventListener("submit",function(e){' +
-        'var f=e.target;' +
-        'if(!f||!f.action)return;' +
-        'e.preventDefault();' +
-        '_zproxySend(f.action);' +
-        '});' +
-        'try{' +
-        'window.location.assign=function(u){_zproxySend(u);};' +
-        'window.location.replace=function(u){_zproxySend(u);};' +
-        'window.open=function(u){_zproxySend(u); return null;};' +
-        '}catch(e){}' +
-        '})();<\/script>';
-
-      if (/<\/body>/i.test(html)) {
-        html = html.replace(/<\/body>/i, navScript + '</body>');
-      } else {
-        html += navScript;
-      }
-
-      return html;
-    }
-
-    async function fetchPage(targetUrl) {
-      const res = await fetch(getUrl(targetUrl), { cache: 'no-store' });
-      if (!res.ok) throw new Error('AllOrigins /get failed (HTTP ' + res.status + ')');
-      const data = await res.json();
-      if (data.status && data.status.error) {
-        const err = data.status.error;
-        throw new Error(err.message || err.code || 'Request failed');
-      }
-      const contents = data.contents;
-      if (contents == null || contents === '') {
-        throw new Error('Empty response from target URL');
-      }
-      return { html: contents, status: data.status || {} };
-    }
-
-    function pushHistory(url) {
-      if (historyIndex < history.length - 1) history.length = historyIndex + 1;
-      if (history[historyIndex] !== url) {
-        history.push(url);
-        historyIndex = history.length - 1;
-      }
-      backBtn.disabled = historyIndex <= 0;
-      fwdBtn.disabled = historyIndex >= history.length - 1;
-    }
-
-    async function loadUrl(targetUrl, { addHistory = true } = {}) {
-      targetUrl = normalizeUrl(targetUrl);
-      if (!targetUrl) return;
-
-      statusEl.textContent = 'Loading…';
-      statusEl.classList.remove('error');
-      urlInput.value = targetUrl;
-
-      try {
-        const { html, status } = await fetchPage(targetUrl);
-        const rewritten = rewriteHtml(html, targetUrl);
-        iframe.removeAttribute('src');
-        iframe.srcdoc = rewritten;
-
-        const code = status.http_code;
-        const ct = status.content_type || '';
-        statusEl.textContent = code
-          ? 'Loaded (HTTP ' + code + (ct ? ', ' + ct.split(';')[0] : '') + ') via AllOrigins'
-          : 'Loaded via AllOrigins /get';
-
-        if (addHistory) pushHistory(targetUrl);
-      } catch (err) {
-        statusEl.textContent = 'Error: ' + (err.message || String(err));
-        statusEl.classList.add('error');
-        iframe.srcdoc = '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem;color:#c00">' +
-          '<h2>Could not load page</h2><p>' + (err.message || String(err)).replace(/</g, '&lt;') + '</p></body></html>';
-      }
-    }
-
-    function navigateFromIframe(url) {
-      loadUrl(url, { addHistory: true });
-    }
-
-    window.addEventListener('message', (e) => {
-      if (!e.data || e.data.type !== 'zproxy-nav') return;
-      navigateFromIframe(e.data.url);
-    });
-
-    goBtn.addEventListener('click', () => loadUrl(urlInput.value));
-    urlInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') loadUrl(urlInput.value);
-    });
-    backBtn.addEventListener('click', () => {
-      if (historyIndex > 0) {
-        historyIndex--;
-        loadUrl(history[historyIndex], { addHistory: false });
-      }
-    });
-    fwdBtn.addEventListener('click', () => {
-      if (historyIndex < history.length - 1) {
-        historyIndex++;
-        loadUrl(history[historyIndex], { addHistory: false });
-      }
-    });
-
-    backBtn.disabled = true;
-    fwdBtn.disabled = true;
-
-    const start = new URLSearchParams(location.search).get('url');
-    if (start) loadUrl(start);
-  </script>
+    </script>
 </body>
 </html>
