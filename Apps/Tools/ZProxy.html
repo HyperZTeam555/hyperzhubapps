@@ -383,22 +383,16 @@
             border: 1px solid #2ecc71;
         }
 
-        .proxy-badge.space {
-            background: rgba(155, 89, 182, 0.2);
-            color: #9b59b6;
-            border: 1px solid #9b59b6;
-        }
-
-        .proxy-badge.scramjet {
-            background: rgba(231, 76, 60, 0.2);
-            color: #e74c3c;
-            border: 1px solid #e74c3c;
-        }
-
         .proxy-badge.allorigins {
             background: rgba(52, 152, 219, 0.2);
             color: #3498db;
             border: 1px solid #3498db;
+        }
+
+        .proxy-badge.direct {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border: 1px solid #ffffff;
         }
 
         .proxy-badge.show {
@@ -425,9 +419,8 @@
         <div class="address-container">
             <select class="proxy-select" id="proxySelect" onchange="updateProxy()">
                 <option value="frog">🐸 Frog (XOR)</option>
-                <option value="space">🚀 Space (XOR)</option>
-                <option value="scramjet">⚡ Scramjet (URL)</option>
                 <option value="allorigins">🌐 AllOrigins</option>
+                <option value="direct">🔗 Direct (No Proxy)</option>
             </select>
             <div class="address-bar">
                 <input type="text" id="urlInput" placeholder="Search or enter URL..." 
@@ -485,9 +478,8 @@
     </div>
 
     <div class="proxy-badge frog" id="badgeFrog">Frog Proxy</div>
-    <div class="proxy-badge space" id="badgeSpace">Space Proxy</div>
-    <div class="proxy-badge scramjet" id="badgeScramjet">Scramjet</div>
     <div class="proxy-badge allorigins" id="badgeAllorigins">AllOrigins</div>
+    <div class="proxy-badge direct" id="badgeDirect">Direct Access</div>
 
     <script>
         let currentProxy = 'frog';
@@ -548,27 +540,16 @@
                     showToast('Frog XOR Encrypted', encoded.substring(0, 30) + '...');
                     break;
                     
-                case 'space':
-                    // Space: https://gointospace.app/scram/res/{encoded}
-                    // Properly URL-encode special characters for the path
-                    const spaceEncoded = encoded.split('').map(c => {
-                        if (/[a-zA-Z0-9]/.test(c)) return c;
-                        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
-                    }).join('');
-                    proxyUrl = 'https://gointospace.app/scram/res/' + spaceEncoded;
-                    showToast('Space XOR Encrypted', encoded.substring(0, 30) + '...');
-                    break;
-                    
-                case 'scramjet':
-                    // Scramjet: https://55gms.com/scramjet/{url-encoded}
-                    proxyUrl = 'https://55gms.com/scramjet/' + encodeURIComponent(url);
-                    showToast('Scramjet URL Encoded', 'Standard URL encoding');
-                    break;
-                    
                 case 'allorigins':
                     // AllOrigins: https://api.allorigins.win/raw?url={url}
                     proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
                     showToast('AllOrigins Direct', 'No encryption');
+                    break;
+
+                case 'direct':
+                    // Direct: No proxy, just the raw URL
+                    proxyUrl = url;
+                    showToast('Direct Connection', 'No Proxy Active');
                     break;
             }
             
@@ -632,3 +613,4 @@
     </script>
 </body>
 </html>
+
