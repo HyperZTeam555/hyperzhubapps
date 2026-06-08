@@ -110,6 +110,7 @@
             cursor: pointer;
             outline: none;
             transition: all 0.3s;
+            min-width: 140px;
         }
 
         .proxy-select:hover, .proxy-select:focus {
@@ -377,7 +378,9 @@
             display: none;
         }
 
-        .proxy-badge.frog {
+        /* Badge Colors */
+        .proxy-badge.frog, .proxy-badge.frog2, .proxy-badge.frog3, 
+        .proxy-badge.frog4, .proxy-badge.frog5, .proxy-badge.frog6 {
             background: rgba(46, 204, 113, 0.2);
             color: #2ecc71;
             border: 1px solid #2ecc71;
@@ -418,9 +421,14 @@
         </div>
         <div class="address-container">
             <select class="proxy-select" id="proxySelect" onchange="updateProxy()">
-                <option value="frog">🐸 Frog (XOR)</option>
-                <option value="allorigins">🌐 AllOrigins</option>
-                <option value="direct">🔗 Direct (No Proxy)</option>
+                <option value="frog">Frog (XOR)</option>
+                <option value="frog2">Frog2 (XOR)</option>
+                <option value="frog3">Frog3 (XOR)</option>
+                <option value="frog4">Frog4 (XOR)</option>
+                <option value="frog5">Frog5 (XOR)</option>
+                <option value="frog6">Frog6 (XOR)</option>
+                <option value="allorigins">AllOrigins</option>
+                <option value="direct">Direct (No Proxy)</option>
             </select>
             <div class="address-bar">
                 <input type="text" id="urlInput" placeholder="Search or enter URL..." 
@@ -477,7 +485,13 @@
         <span class="toast-code" id="toastCode"></span>
     </div>
 
+    <!-- Badges -->
     <div class="proxy-badge frog" id="badgeFrog">Frog Proxy</div>
+    <div class="proxy-badge frog2" id="badgeFrog2">Frog2 Proxy</div>
+    <div class="proxy-badge frog3" id="badgeFrog3">Frog3 Proxy</div>
+    <div class="proxy-badge frog4" id="badgeFrog4">Frog4 Proxy</div>
+    <div class="proxy-badge frog5" id="badgeFrog5">Frog5 Proxy</div>
+    <div class="proxy-badge frog6" id="badgeFrog6">Frog6 Proxy</div>
     <div class="proxy-badge allorigins" id="badgeAllorigins">AllOrigins</div>
     <div class="proxy-badge direct" id="badgeDirect">Direct Access</div>
 
@@ -532,22 +546,38 @@
             
             let proxyUrl;
             const encoded = xorEncode(url);
+            const safeEncoded = encodeURIComponent(encoded);
             
             switch(currentProxy) {
                 case 'frog':
-                    // Frog: https://frogiesarcade.net/frog/default/ixl/{encoded}
-                    proxyUrl = 'https://frogiesarcade.net/frog/default/ixl/' + encodeURIComponent(encoded);
-                    showToast('Frog XOR Encrypted', encoded.substring(0, 30) + '...');
+                    proxyUrl = 'https://frogiesarcade.net/frog/default/ixl/' + safeEncoded;
+                    showToast('Frog Encrypted', encoded.substring(0, 20) + '...');
                     break;
-                    
+                case 'frog2':
+                    proxyUrl = 'https://frogiesarcade.win/frog/default/ixl/' + safeEncoded;
+                    showToast('Frog2 Encrypted', encoded.substring(0, 20) + '...');
+                    break;
+                case 'frog3':
+                    proxyUrl = 'https://full.boxathome.net/frog/default/ixl/' + safeEncoded;
+                    showToast('Frog3 Encrypted', encoded.substring(0, 20) + '...');
+                    break;
+                case 'frog4':
+                    proxyUrl = 'https://vcsa-yt.keybusinessconnection.com/frog/default/ixl/' + safeEncoded;
+                    showToast('Frog4 Encrypted', encoded.substring(0, 20) + '...');
+                    break;
+                case 'frog5':
+                    proxyUrl = 'https://thetheoryof.twilightparadox.com/frog/' + safeEncoded;
+                    showToast('Frog5 Encrypted', encoded.substring(0, 20) + '...');
+                    break;
+                case 'frog6':
+                    proxyUrl = 'https://highschoolmathteachers.com/frog/default/' + safeEncoded;
+                    showToast('Frog6 Encrypted', encoded.substring(0, 20) + '...');
+                    break;
                 case 'allorigins':
-                    // AllOrigins: https://api.allorigins.win/raw?url={url}
                     proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
                     showToast('AllOrigins Direct', 'No encryption');
                     break;
-
                 case 'direct':
-                    // Direct: No proxy, just the raw URL
                     proxyUrl = url;
                     showToast('Direct Connection', 'No Proxy Active');
                     break;
