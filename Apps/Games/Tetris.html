@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wumbo AI Tetris</title>
+<title>Tetris</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://cdn.jsdelivr.net/npm/fontsource-rajdhani@5.0.0/index.css');
@@ -137,16 +137,13 @@
 <!-- Game UI -->
 <div id="game-ui" class="hidden flex-col lg:flex-row gap-6 items-center lg:items-start max-w-7xl w-full relative">
   
-  <!-- Exit Button (Top Right) -->
   <button class="absolute -top-12 right-0 lg:-right-20 lg:top-0 btn px-4 py-2 rounded bg-red-900/40 border border-red-500 text-red-300 text-sm z-10" onclick="openPauseMenu()">
     EXIT / PAUSE
   </button>
 
-  <!-- Left Panel: Player Stats & Hold -->
   <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-2 lg:order-1" id="player-panel">
     <h2 class="text-2xl font-bold text-cyan-400 text-center mb-2 tracking-widest">PLAYER</h2>
     
-    <!-- Hold Piece -->
     <div class="mb-4 border-b border-cyan-900/50 pb-4">
       <div class="stat-label mb-2 text-center">Hold (R)</div>
       <div id="p-hold-piece" class="flex justify-center items-center h-16">
@@ -171,18 +168,18 @@
         <span class="stat-label">Tetrises</span>
         <span id="p-tetrises" class="stat-value" style="color:#0f0; text-shadow:0 0 8px #0f0;">0</span>
       </div>
+      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2">
+        <span class="stat-label">Gravity</span>
+        <span id="p-gravity" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">1.25/s</span>
+      </div>
     </div>
     
-    <!-- Next Pieces for Player -->
     <div class="mt-4 border-t border-cyan-900/50 pt-4">
       <div class="stat-label mb-2 text-center">Next 5</div>
-      <div id="p-next-pieces" class="flex flex-col items-center gap-2">
-        <!-- Filled by JS -->
-      </div>
+      <div id="p-next-pieces" class="flex flex-col items-center gap-2"></div>
     </div>
   </div>
 
-  <!-- Center: Game Boards -->
   <div class="flex gap-6 order-1 lg:order-2 justify-center items-start flex-wrap">
     <div class="glass rounded-xl p-4 neon-border" id="player-board-container">
       <canvas id="p-canvas" width="300" height="600"></canvas>
@@ -192,11 +189,9 @@
     </div>
   </div>
 
-  <!-- Right Panel: AI Stats & Info -->
   <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-3" id="ai-panel">
     <h2 class="text-2xl font-bold text-fuchsia-400 text-center mb-2 tracking-widest">WUMBO AI</h2>
     
-    <!-- AI Hold (Visual only) -->
     <div class="mb-4 border-b border-fuchsia-900/50 pb-4">
       <div class="stat-label mb-2 text-center">Hold</div>
       <div id="a-hold-piece" class="flex justify-center items-center h-16">
@@ -221,14 +216,15 @@
         <span class="stat-label">Tetrises</span>
         <span id="a-tetrises" class="stat-value" style="color:#0f0; text-shadow:0 0 8px #0f0;">0</span>
       </div>
+      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2">
+        <span class="stat-label">Gravity</span>
+        <span id="a-gravity" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">1.25/s</span>
+      </div>
     </div>
 
-    <!-- Next Pieces for AI -->
     <div class="mt-4 border-t border-fuchsia-900/50 pt-4">
       <div class="stat-label mb-2 text-center">Next 5</div>
-      <div id="a-next-pieces" class="flex flex-col items-center gap-2">
-        <!-- Filled by JS -->
-      </div>
+      <div id="a-next-pieces" class="flex flex-col items-center gap-2"></div>
     </div>
 
     <div class="mt-4 border-t border-cyan-900/50 pt-4">
@@ -249,7 +245,6 @@
 </div>
 
 <script>
-// ==================== CONSTANTS ====================
 const COLS = 10;
 const ROWS = 20;
 const HIDDEN_ROWS = 2;
@@ -272,7 +267,6 @@ const SHAPES = {
   L: [[[0,0,1],[1,1,1],[0,0,0]], [[0,1,0],[0,1,0],[0,1,1]], [[0,0,0],[1,1,1],[1,0,0]], [[1,1,0],[0,1,0],[0,1,0]]]
 };
 
-// ==================== GAME CLASS ====================
 class TetrisInstance {
   constructor(isAI, canvasId, nextContainerId, holdContainerId) {
     this.isAI = isAI;
@@ -366,20 +360,15 @@ class TetrisInstance {
 
   holdCurrentPiece() {
     if (!this.canHold || this.gameOver || this.isAI) return;
-    
     const currentType = this.currentPiece.type;
-    
     if (this.holdPiece) {
-      // Swap
       const temp = this.holdPiece;
       this.holdPiece = currentType;
       this.spawnPiece(temp);
     } else {
-      // Store and get new
       this.holdPiece = currentType;
       this.spawnPiece();
     }
-    
     this.canHold = false;
     this.drawHoldPiece();
   }
@@ -436,7 +425,6 @@ class TetrisInstance {
       if (!this.isAI) flashTetris();
     }
 
-    // Garbage sending logic
     let garbageToSend = 0;
     if (linesCleared === 2) garbageToSend = 1;
     else if (linesCleared === 3) garbageToSend = 2;
@@ -532,57 +520,74 @@ class TetrisInstance {
     return bestMove;
   }
 
+  // AI lateral move speed: 14 steps/sec at level 1, grows with level
+  getAIMoveSpeed() {
+    const stepsPerSec = 14 + (this.level - 1) * 0.5;
+    const msPerStep = 1000 / stepsPerSec;
+    return Math.max(10, Math.floor(msPerStep));
+  }
+
   update(dt, opponent) {
     if (this.gameOver) return;
+    if (!this.isAI) return;
 
-    // No max speed: exponential decay, can reach 1ms
-    let levelFactor = Math.pow(0.85, this.level - 1);
-    let alignSpeed = Math.max(1, Math.floor(40 * levelFactor));
-    let dropSpeed = Math.max(1, Math.floor(40 * levelFactor));
+    const moveSpeed = this.getAIMoveSpeed();
 
-    if (this.isAI) {
-      if (this.aiState === 'ALIGNING') {
-        this.moveTimer += dt;
-        if (this.moveTimer >= alignSpeed) {
-          this.moveTimer = 0;
-          let needsAlign = false;
-          if (this.currentPiece.x !== this.targetX) {
-            needsAlign = true;
-            const dir = this.targetX > this.currentPiece.x ? 1 : -1;
-            if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x + dir, this.currentPiece.y)) {
-              this.currentPiece.x += dir;
-            } else if (this.isValid(this.board, this.currentPiece.type, this.targetRot, this.currentPiece.x, this.currentPiece.y)) {
-              this.currentPiece.rotation = this.targetRot;
-            } else {
+    if (this.aiState === 'ALIGNING') {
+      this.moveTimer += dt;
+      if (this.moveTimer >= moveSpeed) {
+        this.moveTimer -= moveSpeed;
+        let aligned = true;
+
+        if (this.currentPiece.rotation !== this.targetRot) {
+          aligned = false;
+          const nextRotCW = (this.currentPiece.rotation + 1) % 4;
+          const nextRotCCW = (this.currentPiece.rotation + 3) % 4;
+          const cwDist = (this.targetRot - this.currentPiece.rotation + 4) % 4;
+          const ccwDist = (this.currentPiece.rotation - this.targetRot + 4) % 4;
+          const nextRot = cwDist <= ccwDist ? nextRotCW : nextRotCCW;
+
+          if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x, this.currentPiece.y)) {
+            this.currentPiece.rotation = nextRot;
+          } else {
+            let kicked = false;
+            for (let dx of [-1, 1, -2, 2]) {
+              if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x + dx, this.currentPiece.y)) {
+                this.currentPiece.x += dx;
+                this.currentPiece.rotation = nextRot;
+                kicked = true;
+                break;
+              }
+            }
+            if (!kicked) {
+              if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
+                this.currentPiece.y += 1;
+              }
+            }
+          }
+        } else if (this.currentPiece.x !== this.targetX) {
+          aligned = false;
+          const dir = this.targetX > this.currentPiece.x ? 1 : -1;
+          if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x + dir, this.currentPiece.y)) {
+            this.currentPiece.x += dir;
+          } else {
+            if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
               this.currentPiece.y += 1;
             }
-          } else if (this.currentPiece.rotation !== this.targetRot) {
-            needsAlign = true;
-            if (this.isValid(this.board, this.currentPiece.type, this.targetRot, this.currentPiece.x, this.currentPiece.y)) {
-              this.currentPiece.rotation = this.targetRot;
-            } else {
-              let shifted = false;
-              for (let dx of [-1, 1, -2, 2, -3, 3]) {
-                if (this.isValid(this.board, this.currentPiece.type, this.targetRot, this.currentPiece.x + dx, this.currentPiece.y)) {
-                  this.currentPiece.x += dx; this.currentPiece.rotation = this.targetRot; shifted = true; break;
-                }
-              }
-              if (!shifted) this.currentPiece.y += 1;
-            }
           }
-          if (!needsAlign) { this.aiState = 'DROPPING'; this.dropTimer = 0; }
         }
-      } else if (this.aiState === 'DROPPING') {
-        this.dropTimer += dt;
-        if (this.dropTimer >= dropSpeed) {
+
+        if (aligned) {
+          this.aiState = 'DROPPING';
           this.dropTimer = 0;
-          if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-            this.currentPiece.y += 1;
-          } else {
-            this.lockPiece(opponent);
-          }
         }
       }
+    } else if (this.aiState === 'DROPPING') {
+      // Always hard drop - instant slam to bottom
+      while (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
+        this.currentPiece.y++;
+      }
+      this.lockPiece(opponent);
     }
   }
 
@@ -672,12 +677,10 @@ class TetrisInstance {
         this.currentPiece.x++; this.currentPiece.rotation = nextRot;
       }
     } else if (key === ' ') {
-      // Hard Drop
       while (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
         this.currentPiece.y++;
         this.score += 2;
       }
-      // Lock immediately after hard drop
       this.lockPiece(mode === 'vs_ai' ? ai : null);
     } else if (key === 'r' || key === 'R') {
       this.holdCurrentPiece();
@@ -688,18 +691,15 @@ class TetrisInstance {
     const container = document.getElementById(this.nextContainerId);
     if (!container) return;
     container.innerHTML = '';
-    
     for (let i = 0; i < Math.min(5, this.nextQueue.length); i++) {
       const type = this.nextQueue[i];
       const shape = SHAPES[type][0];
       const h = shape.length;
       const w = shape[0].length;
       const color = COLORS[type];
-      
       const div = document.createElement('div');
       div.className = 'piece-preview';
       div.style.gridTemplateColumns = `repeat(${w}, 18px)`;
-      
       for (let r = 0; r < h; r++) {
         for (let c = 0; c < w; c++) {
           const cell = document.createElement('div');
@@ -721,22 +721,18 @@ class TetrisInstance {
     const container = document.getElementById(this.holdContainerId);
     if (!container) return;
     container.innerHTML = '';
-    
     if (!this.holdPiece) {
       container.innerHTML = '<span class="text-gray-600 text-xs">' + (this.isAI ? 'N/A' : 'EMPTY') + '</span>';
       return;
     }
-
     const type = this.holdPiece;
     const shape = SHAPES[type][0];
     const h = shape.length;
     const w = shape[0].length;
     const color = COLORS[type];
-    
     const div = document.createElement('div');
     div.className = 'piece-preview';
     div.style.gridTemplateColumns = `repeat(${w}, 18px)`;
-    
     for (let r = 0; r < h; r++) {
       for (let c = 0; c < w; c++) {
         const cell = document.createElement('div');
@@ -754,7 +750,30 @@ class TetrisInstance {
   }
 }
 
-// ==================== GLOBAL STATE ====================
+// Gravity formula: 800ms * 0.85^(level-1), uncapped (floored at 1ms physical limit)
+function getGravityDropSpeed(level) {
+  const levelFactor = Math.pow(0.85, level - 1);
+  return Math.max(1, Math.floor(800 * levelFactor));
+}
+
+// Format the gravity speed for display
+function formatGravity(level) {
+  const ms = getGravityDropSpeed(level);
+  const rowsPerSec = 1000 / ms;
+  let label;
+  if (rowsPerSec >= 100) label = Math.round(rowsPerSec) + '/s';
+  else if (rowsPerSec >= 10) label = rowsPerSec.toFixed(1) + '/s';
+  else label = rowsPerSec.toFixed(2) + '/s';
+  return { label, ms };
+}
+
+function gravityColor(ms) {
+  if (ms <= 10) return { color: '#f00', shadow: '0 0 10px #f00' };
+  if (ms <= 50) return { color: '#f60', shadow: '0 0 8px #f60' };
+  if (ms <= 150) return { color: '#ff0', shadow: '0 0 8px #ff0' };
+  return { color: '#0ff', shadow: '0 0 8px #0ff' };
+}
+
 let mode = 'single';
 let player, ai;
 let lastTime = 0;
@@ -822,7 +841,7 @@ function restartGame() {
 }
 
 function openPauseMenu() {
-  if (!player && !ai) return; // Not in game
+  if (!player && !ai) return;
   paused = true;
   document.getElementById('pause-overlay').classList.remove('hidden');
 }
@@ -874,12 +893,32 @@ function updateUI() {
     document.getElementById('p-level').textContent = player.level;
     document.getElementById('p-lines').textContent = player.lines;
     document.getElementById('p-tetrises').textContent = player.tetrises;
+
+    const gravEl = document.getElementById('p-gravity');
+    if (gravEl) {
+      const { label, ms } = formatGravity(player.level);
+      const colors = gravityColor(ms);
+      gravEl.textContent = label;
+      gravEl.style.color = colors.color;
+      gravEl.style.textShadow = colors.shadow;
+    }
   }
   if (ai) {
     document.getElementById('a-score').textContent = ai.score.toLocaleString();
     document.getElementById('a-level').textContent = ai.level;
     document.getElementById('a-lines').textContent = ai.lines;
     document.getElementById('a-tetrises').textContent = ai.tetrises;
+
+    // AI gravity display (same formula as player)
+    const aGravEl = document.getElementById('a-gravity');
+    if (aGravEl) {
+      const { label, ms } = formatGravity(ai.level);
+      const colors = gravityColor(ms);
+      aGravEl.textContent = label;
+      aGravEl.style.color = colors.color;
+      aGravEl.style.textShadow = colors.shadow;
+    }
+
     if (ai.gameOver) {
       document.getElementById('ai-status').textContent = '● DEFEATED';
       document.getElementById('ai-status').className = 'text-xs text-red-400 text-center';
@@ -895,12 +934,10 @@ function gameLoop(timestamp) {
     let gameOverTriggered = false;
 
     if (player && !player.gameOver) {
-      // Player drops automatically based on level
-      let levelFactor = Math.pow(0.85, player.level - 1);
-      let dropSpeed = Math.max(50, Math.floor(800 * levelFactor));
+      const dropSpeed = getGravityDropSpeed(player.level);
       player.dropTimer = (player.dropTimer || 0) + dt;
-      if (player.dropTimer >= dropSpeed) {
-        player.dropTimer = 0;
+      while (player.dropTimer >= dropSpeed && !player.gameOver) {
+        player.dropTimer -= dropSpeed;
         if (player.isValid(player.board, player.currentPiece.type, player.currentPiece.rotation, player.currentPiece.x, player.currentPiece.y + 1)) {
           player.currentPiece.y += 1;
         } else {
@@ -948,7 +985,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Initial render to avoid blank canvas before start
 const tempCtx = document.getElementById('p-canvas').getContext('2d');
 tempCtx.fillStyle = 'rgba(5, 10, 20, 0.85)';
 tempCtx.fillRect(0, 0, 300, 600);
