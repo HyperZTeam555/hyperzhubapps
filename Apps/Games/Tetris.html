@@ -194,7 +194,6 @@
     EXIT / PAUSE
   </button>
 
-  <!-- Player Panel -->
   <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-2 lg:order-1" id="player-panel">
     <h2 class="text-2xl font-bold text-cyan-400 text-center mb-2 tracking-widest" id="player-title">PLAYER</h2>
     
@@ -242,7 +241,6 @@
     </div>
   </div>
 
-  <!-- Center: Boards -->
   <div class="flex flex-col gap-4 order-1 lg:order-2 items-center" id="center-column">
     <div class="flex gap-6 justify-center items-start flex-wrap">
       <div class="board-wrapper glass rounded-xl p-4 neon-border" id="player-board-container">
@@ -254,7 +252,6 @@
         <div id="a-combo-overlay" class="combo-overlay ai"></div>
       </div>
     </div>
-    <!-- Controls (shown under boards in VS / AI-vs-AI modes) -->
     <div id="controls-under" class="controls-box rounded-xl p-4 text-xs text-gray-400 leading-relaxed hidden w-full max-w-[640px]">
       <div class="text-cyan-400 font-bold mb-2 tracking-widest text-center">CONTROLS</div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-center">
@@ -268,7 +265,6 @@
     </div>
   </div>
 
-  <!-- AI Panel -->
   <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-3" id="ai-panel">
     <h2 class="text-2xl font-bold text-fuchsia-400 text-center mb-2 tracking-widest" id="ai-title">WUMBO AI</h2>
     
@@ -316,7 +312,6 @@
     </div>
   </div>
 
-  <!-- Controls side panel (shown only in single-player / normal-watch) -->
   <div id="controls-side" class="controls-box rounded-xl p-5 w-full lg:w-48 flex flex-col gap-3 order-4 hidden">
     <div class="text-cyan-400 font-bold tracking-widest text-center text-sm">CONTROLS</div>
     <div class="text-xs text-gray-300 space-y-2">
@@ -336,7 +331,7 @@ const ROWS = 20;
 const HIDDEN_ROWS = 2;
 const TOTAL_ROWS = ROWS + HIDDEN_ROWS;
 const BLOCK_SIZE = 30;
-const AI_LOOKAHEAD = 5; // pieces the AI looks ahead (including current)
+const AI_LOOKAHEAD = 5;
 
 const COLORS = {
   I: '#00f0f0', O: '#f0f000', T: '#a000f0', S: '#00f000',
@@ -414,7 +409,7 @@ class TetrisInstance {
     return true;
   }
 
-  spawnPiece(forcedType = null) {
+  spawnPiece(forcedType = null, opponent = null) {
     this.fillQueue();
     const type = forcedType || this.nextQueue.shift();
     const shape = SHAPES[type][0];
@@ -434,9 +429,8 @@ class TetrisInstance {
     this.drawNextPieces();
 
     if (this.isAI) {
-      // Lookahead: current + up to (AI_LOOKAHEAD - 1) more from the queue
       const nextTypes = this.nextQueue.slice(0, AI_LOOKAHEAD - 1);
-      const move = this.getBestMove(this.board, this.currentPiece.type, nextTypes);
+      const move = this.getBestMove(this.board, this.currentPiece.type, nextTypes, opponent, this.combo);
       if (move) {
         this.targetX = move.finalX;
         this.targetRot = move.finalRot;
@@ -537,33 +531,180 @@ class TetrisInstance {
     }
 
     updateUI();
-    this.spawnPiece();
+    this.spawnPiece(null, opponent);
   }
 
-  evaluateBoard(boardState, linesCleared) {
-    let holes = 0, bumpiness = 0, aggregateHeight = 0;
-    let heights = new Uint8Array(COLS);
+  // ============== SMART AI EVALUATION ==============
+
+  // Detects clean wells (deep columns suitable for I-piece tetrises)
+  detectTetrisWell(boardState) {
+    const heights = new Uint8Array(COLS);
     for (let c = 0; c < COLS; c++) {
-      let colHeight = 0, blockFound = false;
       for (let r = 0; r < TOTAL_ROWS; r++) {
         if (boardState[r][c] !== 0) {
-          if (!blockFound) { colHeight = TOTAL_ROWS - r; blockFound = true; }
-        } else if (blockFound) { holes++; }
+          heights[c] = TOTAL_ROWS - r;
+          break;
+        }
+      }
+    }
+
+    let bestWell = null;
+    for (let c = 0; c < COLS; c++) {
+      const leftH = c > 0 ? heights[c - 1] : heights[c];
+      const rightH = c < COLS - 1 ? heights[c + 1] : heights[c];
+      const depth = Math.min(leftH, rightH) - heights[c];
+      if (depth < 2) continue;
+
+      const wellTopRow = TOTAL_ROWS - heights[c];
+      const rimRow = TOTAL_ROWS - Math.min(leftH, rightH);
+      let isClean = true;
+
+      for (let r = rimRow; r < wellTopRow; r++) {
+        if (boardState[r][c] !== 0) { isClean = false; break; }
+      }
+      if (!isClean) continue;
+
+      for (let r = rimRow; r < wellTopRow; r++) {
+        if (c > 0 && boardState[r][c - 1] === 0) { isClean = false; break; }
+        if (c < COLS - 1 && boardState[r][c + 1] === 0) { isClean = false; break; }
+      }
+      if (!isClean) continue;
+
+      const edgeBonus = (c === 0 || c === COLS - 1) ? 1 : 0;
+      const score = depth * 2 + edgeBonus * 3;
+
+      if (!bestWell || score > bestWell.score) {
+        bestWell = { wellColumn: c, wellDepth: depth, isClean: true, edgeWell: (c === 0 || c === COLS - 1), score };
+      }
+    }
+    return bestWell;
+  }
+
+  // Check if an I-piece is in the IMMEDIATE next pieces (within 2) - meaning it can be used NOW
+  // Returns true only if an I-piece is close enough to actually complete a tetris setup
+  hasImmediateIPiece(nextTypes) {
+    // Only consider the first 2 upcoming pieces - beyond that, the board will change too much
+    for (let i = 0; i < Math.min(2, nextTypes.length); i++) {
+      if (nextTypes[i] === 'I') return true;
+    }
+    return false;
+  }
+
+  evaluateBoard(boardState, linesCleared, comboAfter, nextTypes = [], currentType = null) {
+    let holes = 0;
+    let coveredHoles = 0;
+    let bumpiness = 0;
+    let aggregateHeight = 0;
+    let maxHeight = 0;
+    const heights = new Uint8Array(COLS);
+
+    for (let c = 0; c < COLS; c++) {
+      let colHeight = 0;
+      let blockFound = false;
+      let blocksAbove = 0;
+      for (let r = 0; r < TOTAL_ROWS; r++) {
+        if (boardState[r][c] !== 0) {
+          if (!blockFound) {
+            colHeight = TOTAL_ROWS - r;
+            blockFound = true;
+          } else {
+            blocksAbove++;
+          }
+        } else if (blockFound) {
+          holes++;
+          if (blocksAbove > 0) coveredHoles += (1 + blocksAbove * 0.5);
+        }
       }
       heights[c] = colHeight;
       aggregateHeight += colHeight;
+      if (colHeight > maxHeight) maxHeight = colHeight;
     }
-    for (let c = 0; c < COLS - 1; c++) bumpiness += Math.abs(heights[c] - heights[c + 1]);
-    let lineScore = linesCleared === 1 ? 0.76 : linesCleared === 2 ? 1.5 : linesCleared === 3 ? 2.5 : linesCleared === 4 ? 5.0 : 0;
-    return (-0.51 * aggregateHeight) + lineScore + (-0.36 * holes) + (-0.18 * bumpiness);
+
+    for (let c = 0; c < COLS - 1; c++) {
+      bumpiness += Math.abs(heights[c] - heights[c + 1]);
+    }
+
+    // Line clear rewards - strongly favor clears, with tetris being the king
+    // These are EARNED rewards (lines actually cleared), not speculative
+    let lineScore = 0;
+    if (linesCleared === 1) lineScore = 1.2;
+    else if (linesCleared === 2) lineScore = 3.0;
+    else if (linesCleared === 3) lineScore = 6.0;
+    else if (linesCleared === 4) lineScore = 16.0; // TETRIS! Massive earned reward
+
+    // Combo rewards - chains are very valuable
+    let comboScore = 0;
+    if (linesCleared > 0 && comboAfter >= 2) {
+      comboScore = Math.pow(comboAfter, 1.8) * 0.7;
+    }
+    if (linesCleared > 0 && comboAfter >= 1) {
+      comboScore += comboAfter * 0.3;
+    }
+
+    // Stack risk - tall stacks are dangerous
+    const dangerThreshold = 14;
+    let stackRisk = 0;
+    if (maxHeight > dangerThreshold) {
+      stackRisk = Math.pow(maxHeight - dangerThreshold, 2) * 0.8;
+    }
+    if (maxHeight >= 18) stackRisk += (maxHeight - 17) * 8;
+
+    // ========= TETRIS OPPORTUNITY DETECTION =========
+    // KEY CHANGE: AI no longer SPECULATIVELY builds tetris wells.
+    // It only gets a bonus when an I-piece is IMMEDIATELY available (next 1-2 pieces)
+    // AND a clean 4-deep well already exists - meaning it can actually EXECUTE the tetris.
+    // This prevents the AI from wasting turns building risky wells that may never pay off.
+    let tetrisOpportunityScore = 0;
+    const well = this.detectTetrisWell(boardState);
+    const iPieceImmediate = currentType === 'I' || this.hasImmediateIPiece(nextTypes);
+
+    if (well && iPieceImmediate) {
+      // Only reward the tetris setup if we can actually use it RIGHT NOW
+      if (well.wellDepth >= 4 && well.isClean) {
+        // Perfect tetris-ready well AND we have an I-piece to use it
+        tetrisOpportunityScore += 5.0;
+        if (well.edgeWell) tetrisOpportunityScore += 1.5;
+      } else if (well.wellDepth === 3 && well.isClean) {
+        // Almost ready, one more piece to stack - small bonus only if I is immediate
+        tetrisOpportunityScore += 1.0;
+      }
+      // wellDepth 2 or less: NO bonus - too speculative, not worth the risk
+    }
+    // No I-piece immediate? No tetris bonus at all. Play normally.
+
+    // Flatness bonus: clean flat boards are great for chaining any clears
+    let flatnessBonus = 0;
+    if (maxHeight <= 8 && holes === 0) {
+      if (bumpiness <= 2) flatnessBonus += 2.0;
+      else if (bumpiness <= 4) flatnessBonus += 1.0;
+    }
+
+    // Bonus for being ready to clear lines on any upcoming piece
+    // (flat boards with low heights are "opportunity rich")
+    let opportunityBonus = 0;
+    if (holes === 0 && maxHeight <= 10 && bumpiness <= 3) {
+      opportunityBonus += 0.8;
+    }
+
+    const score =
+      (-0.51 * aggregateHeight) +
+      (-0.38 * holes) +
+      (-0.55 * coveredHoles) +
+      (-0.18 * bumpiness) +
+      (-stackRisk) +
+      lineScore +
+      comboScore +
+      tetrisOpportunityScore +
+      flatnessBonus +
+      opportunityBonus;
+
+    return score;
   }
 
-  // Greedy: find best single-placement score for a given piece type on a board.
-  // Returns { score, board, linesCleared }
-  findBestSinglePlacement(boardState, type) {
+  findBestSinglePlacement(boardState, type, comboBefore = 0, nextTypes = []) {
     let bestScore = -Infinity;
-    let bestBoard = null;
-    let bestLines = 0;
+    let bestResult = null;
+
     for (let rot = 0; rot < 4; rot++) {
       for (let x = -2; x < COLS + 2; x++) {
         let startY = 0;
@@ -582,35 +723,87 @@ class TetrisInstance {
             }
           }
         }
+
         let linesCleared = 0;
         for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
           if (newBoard[r].every(cell => cell !== 0)) {
-            newBoard.splice(r, 1); newBoard.unshift(new Array(COLS).fill(0)); linesCleared++; r++;
+            newBoard.splice(r, 1);
+            newBoard.unshift(new Array(COLS).fill(0));
+            linesCleared++;
+            r++;
           }
         }
-        const score = this.evaluateBoard(newBoard, linesCleared);
+
+        const comboAfter = linesCleared > 0 ? comboBefore + 1 : 0;
+        const remaining = nextTypes.slice(1);
+        const score = this.evaluateBoard(newBoard, linesCleared, comboAfter, remaining, null);
+
         if (score > bestScore) {
           bestScore = score;
-          bestBoard = newBoard;
-          bestLines = linesCleared;
+          bestResult = { score, board: newBoard, linesCleared, x, rot };
         }
       }
     }
-    return { score: bestScore, board: bestBoard, linesCleared: bestLines };
+    return bestResult;
   }
 
-  // Recursive greedy lookahead. At each depth, simulate the greedy-best placement
-  // of the next piece and weight its contribution by decay^depth.
-  lookahead(boardState, nextTypes, depth) {
+  lookahead(boardState, nextTypes, depth, currentCombo) {
     if (depth >= nextTypes.length) return 0;
-    const result = this.findBestSinglePlacement(boardState, nextTypes[depth]);
-    if (result.score === -Infinity || !result.board) return 0;
-    const weight = Math.pow(0.4, depth + 1);
-    return result.score * weight + this.lookahead(result.board, nextTypes, depth + 1);
+    const result = this.findBestSinglePlacement(boardState, nextTypes[depth], currentCombo, nextTypes.slice(depth + 1));
+    if (!result) return -100;
+
+    const newCombo = result.linesCleared > 0 ? currentCombo + 1 : 0;
+    const depthWeight = Math.pow(0.55, depth + 1);
+    const thisScore = this.evaluateBoard(result.board, result.linesCleared, newCombo, nextTypes.slice(depth + 1), nextTypes[depth]);
+
+    return thisScore * depthWeight + this.lookahead(result.board, nextTypes, depth + 1, newCombo);
   }
 
-  getBestMove(boardState, currentType, nextTypes) {
-    let bestScore = -Infinity, bestMove = null;
+  computeAggression(myBoard, opponent) {
+    if (!opponent || opponent.gameOver) return 0;
+
+    let myMaxH = 0;
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < TOTAL_ROWS; r++) {
+        if (myBoard[r][c] !== 0) {
+          const h = TOTAL_ROWS - r;
+          if (h > myMaxH) myMaxH = h;
+          break;
+        }
+      }
+    }
+
+    let oppMaxH = 0;
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < TOTAL_ROWS; r++) {
+        if (opponent.board[r][c] !== 0) {
+          const h = TOTAL_ROWS - r;
+          if (h > oppMaxH) oppMaxH = h;
+          break;
+        }
+      }
+    }
+
+    let aggression = 0;
+    if (oppMaxH >= 14) aggression += (oppMaxH - 13) * 0.6;
+    if (oppMaxH >= 17) aggression += 3;
+    if (myMaxH >= 12) aggression -= (myMaxH - 11) * 0.5;
+    if (myMaxH >= 16) aggression -= 4;
+    const scoreDiff = this.score - opponent.score;
+    if (scoreDiff > 2000) aggression -= 0.5;
+    else if (scoreDiff < -2000) aggression += 0.5;
+
+    return aggression;
+  }
+
+  getBestMove(boardState, currentType, nextTypes, opponent, currentCombo) {
+    const isVs = opponent && !opponent.gameOver;
+    const aggression = isVs ? this.computeAggression(boardState, opponent) : 0;
+    const iPieceImmediate = currentType === 'I' || this.hasImmediateIPiece(nextTypes);
+
+    let bestScore = -Infinity;
+    let bestMove = null;
+
     for (let rot = 0; rot < 4; rot++) {
       for (let x = -2; x < COLS + 2; x++) {
         let startY = 0;
@@ -629,24 +822,55 @@ class TetrisInstance {
             }
           }
         }
+
         let linesCleared = 0;
         for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
           if (newBoard[r].every(cell => cell !== 0)) {
-            newBoard.splice(r, 1); newBoard.unshift(new Array(COLS).fill(0)); linesCleared++; r++;
+            newBoard.splice(r, 1);
+            newBoard.unshift(new Array(COLS).fill(0));
+            linesCleared++;
+            r++;
           }
         }
-        let score = this.evaluateBoard(newBoard, linesCleared);
-        // Add lookahead contribution from the next pieces (weighted by depth)
-        score += this.lookahead(newBoard, nextTypes, 0);
 
-        if (score > bestScore) { bestScore = score; bestMove = { finalX: x, finalRot: rot }; }
+        const comboAfter = linesCleared > 0 ? currentCombo + 1 : 0;
+        // Pass currentType so evaluateBoard knows if THIS piece is an I (for opportunity detection)
+        let score = this.evaluateBoard(newBoard, linesCleared, comboAfter, nextTypes, currentType);
+
+        score += this.lookahead(newBoard, nextTypes, 0, comboAfter);
+
+        if (isVs) {
+          // VS bonuses for actual clears (earned, not speculative)
+          if (linesCleared >= 2) score += (linesCleared - 1) * (0.5 + aggression * 0.3);
+          // Actual tetris cleared = huge bonus (this is earned, the 4 lines DID clear)
+          if (linesCleared === 4) score += 6.0 + aggression * 2.0;
+          if (comboAfter >= 2) score += comboAfter * (0.8 + aggression * 0.4);
+          if (aggression < -1) {
+            let newMaxH = 0;
+            for (let c = 0; c < COLS; c++) {
+              for (let r = 0; r < TOTAL_ROWS; r++) {
+                if (newBoard[r][c] !== 0) {
+                  const h = TOTAL_ROWS - r;
+                  if (h > newMaxH) newMaxH = h;
+                  break;
+                }
+              }
+            }
+            if (newMaxH > 10) score -= (newMaxH - 10) * Math.abs(aggression) * 0.15;
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = { finalX: x, finalRot: rot };
+        }
       }
     }
     return bestMove;
   }
 
   getAIMoveSpeed() {
-    const stepsPerSec = 14 + (this.level - 1) * 0.5;
+    const stepsPerSec = 17 + (this.level - 1) * 0.5;
     const msPerStep = 1000 / stepsPerSec;
     return Math.max(10, Math.floor(msPerStep));
   }
