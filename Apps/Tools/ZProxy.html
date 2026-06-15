@@ -442,7 +442,7 @@
         <div id="homeScreen" class="home-screen">
             <div class="home-content">
                 <h1>ZProxy</h1>
-                <p>Select your proxy method above and enter a URL to begin browsing.<br>Text searches automatically use DuckDuckGo.</p>
+                <p>Select your proxy method above and enter a URL to begin browsing.<br>Text searches automatically use Bing.</p>
                 <div class="quick-links">
                     <div class="quick-link" onclick="loadSite('https://www.google.com')">
                         <div class="quick-link-icon">🔍</div>
@@ -534,7 +534,7 @@
                 url = url.replace(/\/$/, '');
                 loadSite(url);
             } else {
-                const searchUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(input);
+                const searchUrl = 'https://bing.com/?q=' + encodeURIComponent(input);
                 loadSite(searchUrl);
             }
         }
