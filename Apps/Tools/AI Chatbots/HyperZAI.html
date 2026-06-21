@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>HyperZAI</title>
+<script src="https://js.puter.com/v2/"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+<style>
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+/* --- STREAMING TYPEWRITER ANIMATION --- */
+@keyframes typeIn {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+.bubble.streaming .md > *:last-child,
+.bubble.streaming .plain {
+  animation: typeIn 0.12s ease-out forwards;
+  will-change: clip-path, opacity;
+}
+.bubble.streaming .md > *:last-child::after {
+  content: "▋";
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent);
+  animation: pulse 0.8s step-end infinite;
+  vertical-align: baseline;
+}
+.bubble:not(.streaming) .md > *:last-child::after { display: none; }
+/* -------------------------------------- */
+
+/* --- NEW SESSION ANIMATION --- */
+@keyframes sessionSlideIn {
+  from { opacity: 0; transform: translateX(-12px); max-height: 0; }
+  to { opacity: 1; transform: translateX(0); max-height: 60px; }
+}
+.session-wrapper.is-new {
+  animation: sessionSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+/* -------------------------------------- */
+
+:root{
+  --bg:#0b0d12; --sidebar:#10131a; --panel:#141821; --panel-2:#181d27;
+  --input:#11151d; --line:#252b36; --line-soft:#1d2330; --text:#eef2f7;
+  --muted:#8d98a8; --soft:#c9d2df; --accent:#e6edf7; --accent-text:#0d1117;
+  --danger:#ef6b73; --shadow:0 20px 70px rgba(0,0,0,.35);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+html,body{height:100%; width: 100%; overflow: hidden;}
+body{margin:0;color:var(--text);background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Arial,sans-serif;}
+button,input,select,textarea{font:inherit; font-size: 16px;}
+button{border:0;color:inherit;cursor:pointer;background:none}
+.app{height:100vh; height: 100dvh; display:grid;grid-template-columns:280px minmax(0,1fr);background:var(--bg);transition:grid-template-columns .22s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; position: relative;}
+.app.sidebar-collapsed{grid-template-columns:72px minmax(0,1fr)}
+.sidebar{
+  position: relative; 
+  min-height:0;background:var(--sidebar);border-right:1px solid var(--line-soft);
+  display:grid;grid-template-rows:auto auto 1fr auto;overflow:visible;
+  z-index: 20;
+}
+.sidebar-head{height:64px;padding:14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line-soft);}
+
+.logo{
+  width:34px;height:34px;border-radius:8px;
+  background:#f3f6fb;color:#0d1117;
+  display:grid;place-items:center;
+  font-weight:800;font-size:14px;letter-spacing:-0.5px;
+  flex:0 0 auto;
+}
+
+.brand{min-width:0; overflow: hidden;}.brand h1{margin:0;font-size:15px;letter-spacing:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.collapse-btn{margin-left:auto;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.collapse-btn:hover,.icon-btn:hover,.ghost:hover,.session:hover{background:var(--panel-2);color:var(--text)}
+.side-actions{padding:12px;display:grid;gap:8px;border-bottom:1px solid var(--line-soft)}
+.primary,.ghost,.icon-btn{min-height:38px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:9px;}
+.primary{background:var(--accent);color:var(--accent-text);font-weight:700;transition:background-color 0.2s ease}.primary:hover{background:#ffffff}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--soft)}
+.icon-btn{width:38px;border:1px solid transparent;color:var(--muted)}
+.sessions{min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px;display:grid;align-content:start;gap:4px}
+.session-wrapper{position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px;min-width:0;max-width:100%}
+.session-menu-btn{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--muted);opacity:0;transition:opacity 0.2s ease,background-color 0.2s ease}
+.session-wrapper:hover .session-menu-btn{opacity:1}
+.session-popup{position:absolute;top:100%;right:0;width:140px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;display:none;flex-direction:column;gap:2px;z-index:100;margin-top:4px;box-shadow:var(--shadow)}
+.session-popup.open{display:flex;animation:slideInUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)}
+.popup-item{width:100%;padding:8px 10px;border-radius:6px;text-align:left;font-size:12px;color:var(--soft);border:0;background:transparent;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background-color 0.2s ease}
+.popup-item:hover{background:var(--line)}.popup-item.danger{color:var(--danger)}.popup-item.danger:hover{background:#ef6b731a}
+.session{min-height:42px;border-radius:8px;padding:8px 10px;text-align:left;color:var(--soft);display:grid;gap:2px;border:1px solid transparent;min-width:0;transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;}
+.session.active{background:var(--panel);border-color:var(--line);color:var(--text)}
+.session strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.session span{font-size:11px;color:var(--muted)}
+
+/* UPDATED SIDEBAR FOOTER LAYOUT */
+.sidebar-foot{
+  position:relative;
+  padding:0; /* Removed padding to allow flush alignment */
+  border-top:1px solid var(--line-soft);
+  display:flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: var(--sidebar);
+  z-index: 30;
+}
+
+/* Settings Menu positioned exactly above the button divider */
+.settings-menu {
+  position: absolute;
+  bottom: 100%; /* Sits exactly on top of the footer container */
+  left: 0;
+  width: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-soft); /* Divider line between menu and button */
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+  padding: 16px;
+  display: none;
+  z-index: 100;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings-menu.open {
+  display: flex;
+  animation: settingsOpen 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+/* -------------------------------------- */
+
+@keyframes settingsOpen {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes settingsClose {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px); }
+}
+.settings-menu.closing{animation:settingsClose 0.2s ease forwards}
+.settings-menu h3{font-size:13px;margin:0;color:var(--text); font-weight: 600;}
+.settings-menu .section{display:grid;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
+.settings-menu .section:last-child{border-bottom:none; padding-bottom:0;}
+.setting{display:grid;gap:8px}
+.setting label{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+.toggle{display:flex;align-items:center;justify-content:space-between;color:var(--soft);font-size:13px; padding: 4px 0;}
+.toggle input{width:18px;height:18px;accent-color:#eef2f7}
+.field,select,textarea{width:100%;background:var(--input);border:1px solid var(--line);color:var(--text);border-radius:8px;outline:none; font-size: 16px;}
+.field,select{height:38px;padding:8px 10px}textarea{min-height:94px;resize:vertical;padding:10px;line-height:1.45}
+.range-row{display:grid;grid-template-columns:1fr 58px;gap:10px;align-items:center}input[type="range"]{width:100%;accent-color:#eef2f7; height: 24px;}
+
+.footer-controls {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  padding-bottom: calc(12px + var(--safe-bottom));
+}
+
+.user-row{min-height:38px;border-radius:8px;display:flex;align-items:center;gap:9px;color:var(--soft);padding:0 8px;font-size:13px}
+
+.main{min-width:0;min-height:0;display:grid;grid-template-rows:64px 1fr auto;background:var(--bg)}
+.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:0 22px;border-bottom:1px solid var(--line-soft);background:#0d1016; flex-shrink: 0;}
+.title-block{min-width:0; overflow: hidden;}.title-block h2{margin:0;font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{margin-top:3px;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-actions{display:flex;align-items:center;gap:8px; flex-shrink: 0;}.model-picker{width:min(410px,42vw); max-width: 200px;}.model-search{width:170px}
+
+.messages{
+  min-height:0;overflow-y:auto; overflow-x: hidden; padding:28px 22px;
+  display:flex;flex-direction:column;
+  justify-content: flex-start; 
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+.messages:has(.empty) {
+  justify-content: center;
+  align-items: center;
+}
+.empty{
+  width:min(720px,100%);
+  text-align:center;
+  padding:28px;
+  display:grid;gap:12px;
+  margin: 0; 
+}
+.message-wrap{width:min(850px,100%);margin:0 auto;display:grid;gap:18px}
+.empty h3{margin:0;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0}.empty p{margin:0;color:var(--muted);font-size:15px; line-height: 1.5;}
+.message{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start; width: 100%;}
+.message.new-message{animation: slideInUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);}
+.message.user{grid-template-columns:minmax(0,1fr) 34px}
+.avatar{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line-soft);display:grid;place-items:center;color:var(--muted);font-size:13px; flex-shrink: 0;}
+.message.user .avatar{grid-column:2;background:#e9eef6;color:#0d1117;border:0}
+.bubble{background:transparent;border:0;padding:4px 0;line-height:1.6;font-size:15px;overflow-wrap:anywhere;color:var(--text); min-width: 0;}
+.message.user .bubble{grid-column:1;grid-row:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.bubble.error{color:#ffd0d4}
+.md{font-size:15px;line-height:1.6;color:var(--text); word-wrap: break-word; overflow-wrap: break-word;}
+.md>*:first-child{margin-top:0}.md>*:last-child{margin-bottom:0}
+.md h1,.md h2,.md h3,.md h4{font-weight:700;line-height:1.3;margin:18px 0 8px}
+.md h1{font-size:1.4em;border-bottom:1px solid var(--line-soft);padding-bottom:6px}
+.md h2{font-size:1.25em;border-bottom:1px solid var(--line-soft);padding-bottom:5px}
+.md h3{font-size:1.1em}.md h4{font-size:1em;color:var(--soft)}
+.md p{margin:10px 0}.md strong{font-weight:700;color:var(--text)}.md em{font-style:italic}
+.md ul,.md ol{margin:10px 0;padding-left:24px;display:grid;gap:4px}.md li{margin:2px 0}.md li>ul,.md li>ol{margin:4px 0 0}
+.md a{color:#8ab4ff;text-decoration:underline;text-underline-offset:2px}.md a:hover{color:#a9c6ff}
+.md blockquote{margin:12px 0;padding:4px 14px;border-left:3px solid var(--line);color:var(--muted)}
+.md hr{border:0;border-top:1px solid var(--line-soft);margin:18px 0}
+.md code{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:4px;padding:2px 6px;font-size:.9em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space: pre-wrap; word-break: break-all;}
+.md pre{background:#0a0c11;border:1px solid var(--line-soft);border-radius:10px;padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative; max-width: 100%;}
+.md pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.55;display:block;color:#e3e8f0; white-space: pre; word-break: normal;}
+.md .code-block{position:relative}
+.md .code-lang{position:absolute;top:8px;right:42px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.md .code-copy{position:absolute;top:6px;right:8px;width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--muted);background:rgba(0,0,0,0.3)}
+.md .code-copy:hover{background:var(--panel-2);color:var(--text)}
+.md table{border-collapse:collapse;margin:12px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto; max-width: 100%;}
+.md th,.md td{border:1px solid var(--line-soft);padding:7px 11px;text-align:left}.md th{background:var(--panel-2);font-weight:600}
+.md tr:nth-child(even) td{background:#ffffff05}
+.md img{max-width:100%;border-radius:8px;margin:8px 0; height: auto;}
+.md input[type="checkbox"]{margin-right:6px;accent-color:#eef2f7}
+.meta{font-size:12px;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between;gap:12px}
+.copy-inline{margin-top:9px;color:var(--muted);font-size:12px;display:block; padding: 4px 0;}.copy-inline:hover{color:var(--text)}
+.composer{padding:16px 22px calc(22px + var(--safe-bottom));background:var(--bg); flex-shrink: 0;}
+.composer-box{
+  width:min(850px,100%);margin:0 auto;
+  background:var(--input);border:1px solid var(--line);border-radius:12px;
+  padding:6px;
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  box-shadow:0 14px 38px rgba(0,0,0,.22);
+  min-height: 56px;
+}
+#input{
+  flex: 1;
+  min-height:44px;
+  max-height:150px;
+  resize:none;background:transparent;border:0;color:var(--text);outline:none;
+  padding:10px 8px;line-height:1.5; font-size: 16px;
+  margin: 0;
+}
+.send{
+  width:44px;height:44px;
+  border-radius:8px;background:var(--accent);color:var(--accent-text);
+  display:grid;place-items:center; flex-shrink: 0;
+}
+.send.stop{background:#2a303b;color:#f0f3f8;border:1px solid var(--line)}.send:disabled{opacity:.55;cursor:not-allowed}
+.composer-note{width:min(850px,100%);margin:8px auto 0;color:var(--muted);font-size:11px;display:flex;justify-content:space-between;gap:10px; padding: 0 4px;}
+.collapsed-only{display:none}
+.app.sidebar-collapsed .logo,.app.sidebar-collapsed .brand,.app.sidebar-collapsed .btn-text,.app.sidebar-collapsed .session span,.app.sidebar-collapsed .session strong,.app.sidebar-collapsed .user-row span{display:none}
+.app.sidebar-collapsed .sidebar-head{justify-content:center;padding:14px 10px}.app.sidebar-collapsed .collapse-btn{margin-left:0}
+.app.sidebar-collapsed .side-actions,.app.sidebar-collapsed .footer-controls{padding:10px}
+.app.sidebar-collapsed .primary,.app.sidebar-collapsed .ghost{width:50px;padding:0}
+.app.sidebar-collapsed .session-wrapper{grid-template-columns:1fr;width:50px}.app.sidebar-collapsed .session-menu-btn{display:none}
+.app.sidebar-collapsed .session{width:50px;min-height:42px;padding:0;display:grid;place-items:center}
+.app.sidebar-collapsed .session::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.app.sidebar-collapsed .session.active::before{background:var(--text)}
+/* Hide settings menu when sidebar is collapsed on desktop to prevent floating orphan */
+.app.sidebar-collapsed .settings-menu { display: none !important; }
+.app.sidebar-collapsed .expanded-only{display:none}.app.sidebar-collapsed .collapsed-only{display:block}
+
+@media (max-width:820px){
+  .app,.app.sidebar-collapsed{grid-template-columns:1fr}
+  
+  /* Mobile Sidebar Logic */
+  .sidebar{
+    position:fixed;left:0;top:0;bottom:0;width:min(300px, 85vw);z-index:50;
+    transform:translateX(-100%);
+    transition:transform .3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    border-right: 1px solid var(--line);
+  }
+  
+  /* FORCE visibility when mobile sidebar is open, overriding collapsed state */
+  .app.mobile-sidebar-open .sidebar{
+    transform:translateX(0) !important;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+  }
+  
+  /* Backdrop for mobile sidebar */
+  .app::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
+  }
+  .app.mobile-sidebar-open::before {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .main{grid-template-rows:56px 1fr auto}
+  .topbar{padding:0 12px;grid-template-columns:auto 1fr auto; gap: 10px;}
+  .mobile-menu{display:grid!important}
+  .model-search{display:none}
+  .model-picker{width:auto; flex: 1; min-width: 0; max-width: none; margin: 0 4px;}
+  .messages{padding:20px 14px}
+  .composer{padding:12px 14px calc(16px + var(--safe-bottom))}
+  .empty h3{font-size:24px}
+  .empty p{font-size:14px}
+  
+  /* Mobile Settings Adjustment */
+  .settings-menu {
+    max-height: 65vh;
+  }
+}
+.mobile-menu{display:none}
+</style>
+</head>
+<body>
+<div id="app" class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="logo">HZ</div>
+      <div class="brand"><h1>HyperZAI</h1><p>AI Workspace</p></div>
+      <button id="collapseSidebar" class="collapse-btn" title="Collapse sidebar"><i data-lucide="panel-left-close"></i></button>
+    </div>
+    <div class="side-actions">
+      <button id="newChat" class="primary" title="New chat"><i data-lucide="plus"></i><span class="btn-text">New chat</span></button>
+      <button id="clearChat" class="ghost" title="Clear current chat"><i data-lucide="trash-2"></i><span class="btn-text">Clear chat</span></button>
+    </div>
+    <div id="sessions" class="sessions"></div>
+    
+    <!-- RESTRUCTURED SIDEBAR FOOTER -->
+    <div class="sidebar-foot">
+      <!-- Settings Menu (Now inside sidebar-foot, positioned absolutely to bottom:100%) -->
+      <div id="settingsMenu" class="settings-menu" role="dialog" aria-label="Settings">
+        <div class="section">
+          <h3>Mode & API</h3>
+          <div class="setting">
+            <label>Provider Mode</label>
+            <select id="providerMode" class="field">
+              <option value="puter">Puter AI (Default)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="poolside">Poolside (Demo)</option>
+            </select>
+          </div>
+          <div class="setting" id="apiKeySetting" style="display:none;">
+            <label>API Key</label>
+            <input id="apiKeyInput" type="password" class="field" placeholder="sk-..." autocomplete="off" />
+          </div>
+        </div>
+        <div class="section">
+          <h3>Generation</h3>
+          <label class="toggle"><span>Stream responses</span><input id="streamToggle" type="checkbox" checked /></label>
+          <label class="toggle"><span>Web search tool</span><input id="webSearchToggle" type="checkbox" /></label>
+        </div>
+        <div class="section">
+          <div class="setting"><label><span>Temperature</span><b id="tempValue">0.7</b></label><div class="range-row"><input id="temperature" type="range" min="0" max="2" value="0.7" step="0.1" /><input id="tempBox" class="field" value="0.7" /></div></div>
+          <div class="setting"><label><span>Max tokens</span><b id="maxValue">Auto</b></label><input id="maxTokens" class="field" type="number" min="1" placeholder="Auto" /></div>
+          <div class="setting"><label><span>System prompt</span></label><textarea id="systemPrompt">You are HyperZAI, a concise and helpful AI assistant. Be practical, accurate, and friendly. You are allowed to use standard Markdown formatting (bold, italic, lists, code blocks).
+
+Please do not use KaTeX/LaTeX formatting; this is mandatory for every message. Instead, use these Unicode characters for math: × ÷ ± ≠ ≈ ≤ ≥ ∞ ∑ ∏ √ ∛ ∜ ∝ ∅ ∈ ∉ ⊂ ⊃ ⊆ ⊇ ∪ ∩ ∧ ∨ ¬ ∀ ∃ ∄ ∇ ∂ ∫ ∮ α β γ δ ε ζ η θ ι κ λ μ ν ξ π ρ σ τ υ φ χ ψ ω Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω ⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ⁿ ₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉</textarea></div>
+        </div>
+        <div class="section">
+          <button id="signInBtn" class="ghost"><i data-lucide="log-in"></i>Sign in to Puter</button>
+          <button id="signOutBtn" class="ghost"><i data-lucide="log-out"></i>Sign out</button>
+        </div>
+      </div>
+      
+      <div class="footer-controls">
+        <button id="settingsBtn" class="ghost" title="Settings"><i data-lucide="settings"></i><span class="btn-text">Settings</span></button>
+        <div class="user-row"><i data-lucide="circle-user-round"></i><span>Local sessions</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button id="mobileMenu" class="icon-btn mobile-menu" title="Open sidebar"><i data-lucide="menu"></i></button>
+      <div class="title-block"><h2 id="activeTitle">New chat</h2><div id="status" class="status">Loading models...</div></div>
+      <div class="top-actions">
+        <input id="modelSearch" class="field model-search" placeholder="Filter models" aria-label="Filter models" />
+        <select id="model" class="model-picker" aria-label="AI model"></select>
+        <button id="copyLast" class="icon-btn" title="Copy last answer"><i data-lucide="copy"></i></button>
+        <button id="exportChat" class="icon-btn" title="Export chat"><i data-lucide="download"></i></button>
+      </div>
+    </header>
+    <section id="messages" class="messages"></section>
+    <footer class="composer">
+      <div class="composer-box">
+        <textarea id="input" placeholder="Message HyperZAI..." autocomplete="off" rows="1"></textarea>
+        <button id="sendBtn" class="send" title="Send"><i data-lucide="send-horizontal"></i></button>
+      </div>
+      <div class="composer-note"><span>Enter sends. Shift+Enter adds a line.</span><span id="tokenHint">0 chars</span></div>
+    </footer>
+  </main>
+</div>
+<script>
+if(window.marked){marked.setOptions({breaks:true,gfm:true})}
+
+// --- INDEXED DB MANAGER ---
+const DB_NAME = 'hyperzai_keys';
+const DB_STORE = 'api_keys';
+const dbManager = {
+  open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async get(key) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const store = tx.objectStore(DB_STORE);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || '');
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async set(key, value) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      const store = tx.objectStore(DB_STORE);
+      store.put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+};
+
+// --- MARKDOWN RENDERER ---
+function renderMarkdown(text){
+  const raw = String(text || "");
+  if(!window.marked || !window.DOMPurify) return raw.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const html = marked.parse(raw);
+  return DOMPurify.sanitize(html, {ADD_ATTR:["target"]});
+}
+
+function enhanceCodeBlocks(container){
+  container.querySelectorAll("pre code").forEach(block=>{
+    if(window.hljs){try{hljs.highlightElement(block)}catch{}}
+    const pre = block.parentElement;
+    if(pre.dataset.enhanced) return;
+    pre.dataset.enhanced = "1";
+    pre.classList.add("code-block");
+    const langMatch = (block.className||"").match(/language-(\w+)/);
+    if(langMatch){const tag=document.createElement("span");tag.className="code-lang";tag.textContent=langMatch[1];pre.appendChild(tag)}
+    const copyBtn=document.createElement("button");
+    copyBtn.className="code-copy";copyBtn.title="Copy code";copyBtn.innerHTML='<i data-lucide="copy"></i>';
+    copyBtn.onclick=()=>{navigator.clipboard.writeText(block.textContent||"");copyBtn.innerHTML='<i data-lucide="check"></i>';iconRefresh();setTimeout(()=>{copyBtn.innerHTML='<i data-lucide="copy"></i>';iconRefresh()},1200)};
+    pre.appendChild(copyBtn);
+  });
+}
+
+// --- STATE & ELEMENTS ---
+const els = {
+  app:document.getElementById("app"), messages:document.getElementById("messages"), input:document.getElementById("input"), sendBtn:document.getElementById("sendBtn"),
+  model:document.getElementById("model"), modelSearch:document.getElementById("modelSearch"), status:document.getElementById("status"), activeTitle:document.getElementById("activeTitle"),
+  sessions:document.getElementById("sessions"), newChat:document.getElementById("newChat"), clearChat:document.getElementById("clearChat"), exportChat:document.getElementById("exportChat"), copyLast:document.getElementById("copyLast"),
+  settingsBtn:document.getElementById("settingsBtn"), settingsMenu:document.getElementById("settingsMenu"), collapseSidebar:document.getElementById("collapseSidebar"), mobileMenu:document.getElementById("mobileMenu"),
+  temperature:document.getElementById("temperature"), tempValue:document.getElementById("tempValue"), tempBox:document.getElementById("tempBox"), maxTokens:document.getElementById("maxTokens"), maxValue:document.getElementById("maxValue"),
+  systemPrompt:document.getElementById("systemPrompt"), streamToggle:document.getElementById("streamToggle"), webSearchToggle:document.getElementById("webSearchToggle"), tokenHint:document.getElementById("tokenHint"),
+  signInBtn:document.getElementById("signInBtn"), signOutBtn:document.getElementById("signOutBtn"),
+  providerMode: document.getElementById("providerMode"), apiKeySetting: document.getElementById("apiKeySetting"), apiKeyInput: document.getElementById("apiKeyInput")
+};
+
+let allModels = [], sessions = [], activeId = "", generating = false, aborting = false;
+let currentMode = 'puter'; // puter, openrouter, openai, gemini, anthropic, deepseek, poolside
+let currentApiKey = '';
+
+const storeKey = "hyperzai.sessions.v6"; 
+const prefKey = "hyperzai.ui.v2";
+
+// Poolside Demo Key Constant
+const POOLSIDE_DEMO_KEY = "sky_enSMy5Td.I9EgVzf76AA1X785t87qfe2Tmws6SPg9";
+
+function uid(){return crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())}
+function active(){return sessions.find(s => s.id === activeId)}
+function save(){localStorage.setItem(storeKey, JSON.stringify({activeId,sessions}))}
+function savePrefs(){localStorage.setItem(prefKey, JSON.stringify({collapsed:els.app.classList.contains("sidebar-collapsed"), mode:currentMode}))}
+function setStatus(text){els.status.textContent = text}
+function modelLabel(item){return item.name || item.id}
+
+function makeSession(isNew = false){
+  return {
+    id: uid(),
+    title: "New chat",
+    createdAt: Date.now(),
+    _isNew: isNew,
+    messages: []
+  };
+}
+
+function loadSessions(){try{const data=JSON.parse(localStorage.getItem(storeKey)||"{}");sessions=Array.isArray(data.sessions)&&data.sessions.length?data.sessions:[makeSession()];activeId=data.activeId||sessions[0].id}catch{sessions=[makeSession()];activeId=sessions[0].id}if(!active())activeId=sessions[0].id}
+async function loadPrefs(){
+  try{
+    const data=JSON.parse(localStorage.getItem(prefKey)||"{}");
+    if(data.collapsed) els.app.classList.add("sidebar-collapsed");
+    if(data.mode) {
+      currentMode = data.mode;
+      els.providerMode.value = currentMode;
+    }
+    // Load API Key for current mode
+    if(currentMode !== 'puter' && currentMode !== 'poolside') {
+      currentApiKey = await dbManager.get(currentMode);
+      els.apiKeyInput.value = currentApiKey;
+    } else if (currentMode === 'poolside') {
+        // Pre-fill demo key but don't save it to user storage permanently as "their" key
+        els.apiKeyInput.value = POOLSIDE_DEMO_KEY;
+        currentApiKey = POOLSIDE_DEMO_KEY;
+    }
+    updateModeUI();
+  }catch{}
+}
+function iconRefresh(){if(window.lucide)lucide.createIcons()}
+
+// --- MODE & MODEL MANAGEMENT ---
+function updateModeUI() {
+  const isPuter = currentMode === 'puter';
+  const isPoolside = currentMode === 'poolside';
+  
+  // Show API Key setting for everything except Puter
+  els.apiKeySetting.style.display = isPuter ? 'none' : 'grid';
+  
+  // Disable API Key input for Poolside (Demo) to prevent accidental changes
+  els.apiKeyInput.disabled = isPoolside; 
+  
+  els.signInBtn.style.display = isPuter ? 'inline-flex' : 'none';
+  els.signOutBtn.style.display = isPuter ? 'inline-flex' : 'none';
+  
+  loadModelsForCurrentMode();
+}
+
+async function loadModelsForCurrentMode() {
+  els.model.disabled = true;
+  els.sendBtn.disabled = true;
+  setStatus(`Loading ${currentMode} models...`);
+  allModels = [];
+
+  try {
+    if (currentMode === 'puter') {
+      if(!window.puter?.ai?.listModels) throw new Error("Puter.js not loaded");
+      const models = await puter.ai.listModels();
+      allModels = models.filter(m=>m&&m.id).map(m => ({id: m.id, name: m.name || m.id, provider: 'puter'}));
+    } 
+    else if (currentMode === 'openrouter') {
+      const res = await fetch('https://openrouter.ai/api/v1/models');
+      const json = await res.json();
+      allModels = (json.data || []).map(m => ({id: m.id, name: m.name, provider: 'openrouter'}));
+    }
+    else if (currentMode === 'openai') {
+      allModels = [
+        {id:'gpt-4o', name:'GPT-4o', provider:'openai'},
+        {id:'gpt-4o-mini', name:'GPT-4o Mini', provider:'openai'},
+        {id:'gpt-4-turbo', name:'GPT-4 Turbo', provider:'openai'},
+        {id:'gpt-3.5-turbo', name:'GPT-3.5 Turbo', provider:'openai'}
+      ];
+    }
+    else if (currentMode === 'gemini') {
+      allModels = [
+        {id:'gemini-1.5-pro', name:'Gemini 1.5 Pro', provider:'gemini'},
+        {id:'gemini-1.5-flash', name:'Gemini 1.5 Flash', provider:'gemini'},
+        {id:'gemini-pro', name:'Gemini Pro', provider:'gemini'}
+      ];
+    }
+    else if (currentMode === 'anthropic') {
+      allModels = [
+        {id:'claude-3-5-sonnet-20241022', name:'Claude 3.5 Sonnet', provider:'anthropic'},
+        {id:'claude-3-opus-20240229', name:'Claude 3 Opus', provider:'anthropic'},
+        {id:'claude-3-haiku-20240307', name:'Claude 3 Haiku', provider:'anthropic'}
+      ];
+    }
+    else if (currentMode === 'deepseek') {
+      const res = await fetch('https://api.deepseek.com/models');
+      const json = await res.json();
+      // DeepSeek returns { data: [...] } similar to OpenRouter/OpenAI format
+      allModels = (json.data || []).map(m => ({id: m.id, name: m.id, provider: 'deepseek'}));
+    }
+    else if (currentMode === 'poolside') {
+      // Static list based on user requirements, NO "poolside/" prefix
+      allModels = [
+        {id: 'Laguna M.1', name: 'Laguna M.1', provider: 'poolside'},
+        {id: 'Laguna XS.2', name: 'Laguna XS.2', provider: 'poolside'},
+        {id: 'Malibu 2.2', name: 'Malibu 2.2', provider: 'poolside'},
+        {id: 'Point', name: 'Point', provider: 'poolside'}
+      ];
+    }
+    
+    // Sort alphabetically
+    allModels.sort((a,b) => a.name.localeCompare(b.name));
+    renderModels();
+    setStatus(`${allModels.length} ${currentMode} models ready`);
+  } catch(err) {
+    console.error(err);
+    
+    // FALLBACK LOGIC FOR POOLSIDE
+    if (currentMode === 'poolside') {
+        setStatus("Fetch failed. Loading fallback models...");
+        allModels = [
+            {id: 'Laguna M.1', name: 'Laguna M.1 (Fallback)', provider: 'poolside'},
+            {id: 'Laguna XS.2', name: 'Laguna XS.2 (Fallback)', provider: 'poolside'}
+        ];
+        renderModels();
+        setStatus(`Using fallback ${currentMode} models`);
+    } else {
+        setStatus(`Error: ${err.message}`);
+        allModels = [{id:'error', name:'Failed to load models', provider:'none'}];
+        renderModels();
+    }
+  } finally {
+    els.model.disabled = false;
+    els.sendBtn.disabled = false;
+    renderSendButton();
+  }
+}
+
+function renderModels(filter=""){
+  const current=els.model.value, needle=filter.trim().toLowerCase();
+  const filtered=allModels.filter(item=>`${item.id} ${item.name}`.toLowerCase().includes(needle));
+  els.model.innerHTML="";
+  filtered.forEach(item=>{
+    const opt=document.createElement("option");
+    opt.value=item.id;
+    opt.textContent=modelLabel(item);
+    opt.title=item.id;
+    els.model.appendChild(opt);
+  });
+  if(filtered.some(m=>m.id===current)) els.model.value=current;
+}
+
+// --- SIDEBAR RENDERING ---
+function renderSessions(){
+  els.sessions.innerHTML="";
+  sessions.forEach(s=>{
+    const wrapper=document.createElement("div");
+    wrapper.className="session-wrapper" + (s._isNew ? " is-new" : "");
+    if(s._isNew) delete s._isNew;
+    
+    const btn=document.createElement("button");btn.className="session"+(s.id===activeId?" active":"");btn.title=s.title||"New chat";
+    btn.innerHTML="<strong></strong><span></span>";
+    btn.querySelector("strong").textContent=s.title||"New chat";
+    const visibleCount = s.messages.filter(m => !m._hidden).length;
+    btn.querySelector("span").textContent=`${visibleCount} messages`;
+    btn.onclick=()=>{activeId=s.id;els.app.classList.remove("mobile-sidebar-open");renderAll()};
+    
+    const menuBtn=document.createElement("button");menuBtn.className="session-menu-btn";menuBtn.innerHTML='<i data-lucide="more-vertical"></i>';
+    menuBtn.onclick=e=>{e.stopPropagation();const menu=wrapper.querySelector(".session-popup");menu.classList.toggle("open")};
+    
+    const menu=document.createElement("div");menu.className="session-popup";
+    menu.innerHTML=`<button class="popup-item" onclick="renamChat('${s.id}')"><i data-lucide="edit-2"></i>Rename</button><button class="popup-item danger" onclick="deleteChat('${s.id}')"><i data-lucide="trash-2"></i>Delete</button>`;
+    
+    wrapper.appendChild(btn);wrapper.appendChild(menuBtn);wrapper.appendChild(menu);
+    els.sessions.appendChild(wrapper);
+  });
+  save();
+} 
+
+function emptyState(){const wrap=document.createElement("div");wrap.className="empty";wrap.innerHTML="<h3>Start a conversation</h3><p>Select a model, adjust settings, and ask HyperZAI anything.</p>";return wrap}
+
+function addMessageNode(m){
+  const row=document.createElement("article");
+  row.className="message "+m.role+(m.error?" error-row":"");
+  row.dataset.id=m._id;
+  const avatar=document.createElement("div");avatar.className="avatar";avatar.innerHTML=m.role==="user"?'<i data-lucide="user"></i>':'<i data-lucide="bot"></i>';
+  const bubble=document.createElement("div");bubble.className="bubble"+(m.error?" error":"");
+  const meta=document.createElement("div");meta.className="meta";meta.innerHTML=`<span>${m.role==="user"?"You":(m.model||"HyperZAI")}</span><span>${new Date(m.time||Date.now()).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</span>`;
+  bubble.appendChild(meta);
+  const body=document.createElement("div");
+  if(m.role==="assistant"&&!m.error){body.className="md";body.innerHTML=renderMarkdown(m.content)}
+  else{body.className="plain";body.style.whiteSpace="pre-wrap";body.style.overflowWrap="anywhere";body.textContent=String(m.content||"")}
+  bubble.appendChild(body);
+  if(m.role==="assistant"&&!m.error){const copy=document.createElement("button");copy.className="copy-inline";copy.textContent="Copy response";copy.onclick=()=>navigator.clipboard.writeText(m.content||"");bubble.appendChild(copy)}
+  row.append(avatar,bubble);
+  return row;
+}
+
+function updateMessageNode(row, m, isStreaming = false){
+  const body=row.querySelector(".md, .plain");
+  if(!body)return;
+  const bubble = row.querySelector(".bubble");
+  if (isStreaming) bubble.classList.add("streaming");
+  else bubble.classList.remove("streaming");
+  if(m.role==="assistant"&&!m.error) body.innerHTML=renderMarkdown(m.content);
+  else body.textContent=String(m.content||"");
+  row.classList.toggle("error-row",!!m.error);
+  row.querySelector(".bubble").classList.toggle("error",!!m.error);
+  enhanceCodeBlocks(body);
+}
+
+let renderedSessionId=null;
+function renderMessages(isStreaming = false){
+  const s=active();
+  const visibleMessages = s.messages.filter(m => !m._hidden);
+  if(!visibleMessages.length){els.messages.innerHTML="";els.messages.appendChild(emptyState());renderedSessionId=s.id;return}
+  let wrap=els.messages.querySelector(".message-wrap");
+  if(!wrap||els.messages.querySelector(".empty")||renderedSessionId!==s.id){
+    els.messages.innerHTML="";
+    wrap=document.createElement("div");wrap.className="message-wrap";
+    els.messages.appendChild(wrap);renderedSessionId=s.id;
+  }
+  visibleMessages.forEach((m, idx)=>{
+    if(!m._id)m._id=uid();
+    const isLastAssistant = isStreaming && m.role === "assistant" && idx === visibleMessages.length - 1;
+    let row=wrap.querySelector(`[data-id="${m._id}"]`);
+    if(!row){
+      row=addMessageNode(m);
+      wrap.appendChild(row);
+      enhanceCodeBlocks(row);
+    }else{
+      updateMessageNode(row, m, isLastAssistant);
+    }
+  });
+  els.messages.scrollTop=els.messages.scrollHeight;
+  iconRefresh();
+}
+
+function renderSendButton(){els.sendBtn.classList.toggle("stop", generating);els.sendBtn.title=generating?"Stop response":"Send";els.sendBtn.innerHTML=generating?'<i data-lucide="square"></i>':'<i data-lucide="send-horizontal"></i>';iconRefresh()}
+function renderAll(){renderSessions();renderMessages(false);els.activeTitle.textContent=active()?.title||"New chat";renderSendButton();save()}
+function updateCharCount(){els.tokenHint.textContent=`${els.input.value.length} chars`}
+function titleFrom(text){return text.trim().split(/\s+/).slice(0,7).join(" ")||"New chat"}
+
+// --- UNIFIED CHAT API HANDLERS ---
+function requestMessages(s){
+  return [
+    {role:"system", content: els.systemPrompt.value.trim() || "You are HyperZAI."},
+    ...s.messages.filter(m => !m.error && !m._hidden).map(m => ({role: m.role, content: m.content}))
+  ];
+}
+
+async function streamChatUnified(messages, opts, target) {
+  let text = "";
+  
+  // PUTER MODE
+  if (currentMode === 'puter') {
+    const stream = await puter.ai.chat(messages, false, {...opts, stream:true});
+    for await (const part of stream){
+      if(aborting) break;
+      let chunk = "";
+      if (typeof part === "string") chunk = part;
+      else if (part?.delta?.content) chunk = typeof part.delta.content === "string" ? part.delta.content : (part.delta.content?.map?.(p => p.text || "")?.join("") || "");
+      else if (part?.message?.content) chunk = typeof part.message.content === "string" ? part.message.content : (part.message.content?.map?.(p => p.text || "")?.join("") || "");
+      else if (part?.text) chunk = part.text;
+      if(chunk){ text += chunk; target.content = text; renderMessages(true); }
+    }
+  }
+  // OPENROUTER / OPENAI / DEEPSEEK / POOLSIDE COMPATIBLE MODE
+  else if (['openrouter', 'openai', 'deepseek', 'poolside'].includes(currentMode)) {
+    let baseUrl = '';
+    if (currentMode === 'openrouter') baseUrl = 'https://openrouter.ai/api/v1';
+    else if (currentMode === 'openai') baseUrl = 'https://api.openai.com/v1';
+    else if (currentMode === 'deepseek') baseUrl = 'https://api.deepseek.com';
+    else if (currentMode === 'poolside') baseUrl = 'https://api.poolside.ai/v1';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${currentApiKey}`
+    };
+    if(currentMode === 'openrouter') headers['HTTP-Referer'] = window.location.href;
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: opts.model,
+        messages: messages,
+        stream: true,
+        temperature: opts.temperature,
+        max_tokens: opts.max_tokens
+      })
+    });
+
+    if(!response.ok) throw new Error(`API Error: ${response.status}`);
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while(true) {
+      if(aborting) { reader.cancel(); break; }
+      const {done, value} = await reader.read();
+      if(done) break;
+      
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Keep incomplete line
+
+      for(const line of lines) {
+        const trimmed = line.trim();
+        if(!trimmed || !trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if(data === '[DONE]') break;
+        
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if(delta) {
+            text += delta;
+            target.content = text;
+            renderMessages(true);
+          }
+        } catch(e) {}
+      }
+    }
+  }
+  // GEMINI MODE
+  else if (currentMode === 'gemini') {
+    // Convert messages to Gemini format
+    const contents = messages.filter(m=>m.role!=='system').map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{text: m.content}]
+    }));
+    const sysInstr = messages.find(m=>m.role==='system')?.content;
+    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${opts.model}:streamGenerateContent?key=${currentApiKey}&alt=sse`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        contents,
+        systemInstruction: sysInstr ? {parts:[{text:sysInstr}]} : undefined,
+        generationConfig: {temperature: opts.temperature, maxOutputTokens: opts.max_tokens}
+      })
+    });
+    
+    if(!response.ok) throw new Error(`Gemini Error: ${response.status}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    
+    while(true) {
+      if(aborting) { reader.cancel(); break; }
+      const {done, value} = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      
+      for(const line of lines) {
+        if(line.startsWith('data:')) {
+          try {
+            const json = JSON.parse(line.slice(5));
+            const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if(chunk) { text += chunk; target.content = text; renderMessages(true); }
+          } catch(e){}
+        }
+      }
+    }
+  }
+  // ANTHROPIC MODE
+  else if (currentMode === 'anthropic') {
+    // Note: Anthropic streaming via browser CORS is often blocked. 
+    // Implementing basic SSE parsing assuming proxy or CORS-enabled environment.
+    const sysMsg = messages.find(m=>m.role==='system')?.content || "";
+    const chatMsgs = messages.filter(m=>m.role!=='system');
+    
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': currentApiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true' // Required for direct browser calls
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        max_tokens: opts.max_tokens || 4096,
+        system: sysMsg,
+        messages: chatMsgs,
+        stream: true
+      })
+    });
+    
+    if(!response.ok) throw new Error(`Anthropic Error: ${response.status}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    
+    while(true) {
+      if(aborting) { reader.cancel(); break; }
+      const {done, value} = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      
+      for(const line of lines) {
+        if(line.startsWith('data:')) {
+          try {
+            const json = JSON.parse(line.slice(5));
+            if(json.type === 'content_block_delta' && json.delta?.text) {
+              text += json.delta.text;
+              target.content = text;
+              renderMessages(true);
+            }
+          } catch(e){}
+        }
+      }
+    }
+  }
+  
+  return text || target.content;
+}
+
+async function send(){
+  if(generating){aborting=true;setStatus("Stopping response...");return}
+  const text=els.input.value.trim();
+  if(!text||els.sendBtn.disabled)return;
+  
+  // Validate API Key for non-Puter modes
+  if(currentMode !== 'puter' && !currentApiKey) {
+    alert(`Please enter your ${currentMode} API key in Settings.`);
+    return;
+  }
+
+  const s=active();
+  if(!s.title||s.title==="New chat")s.title=titleFrom(text);
+  s.messages.push({role:"user",content:text,time:Date.now()});
+  els.input.value="";
+  els.input.style.height = 'auto';
+  els.input.style.height = '44px';
+  
+  updateCharCount();aborting=false;generating=true;renderAll();
+  
+  const aiMsg={role:"assistant",content:"Thinking...",model:els.model.value,time:Date.now()};
+  s.messages.push(aiMsg);renderAll();
+  
+  try{
+    const msgs=requestMessages(s);
+    const opts = {
+      model: els.model.value,
+      temperature: Number(els.temperature.value),
+      max_tokens: Number(els.maxTokens.value) || undefined
+    };
+    
+    let answer;
+    if(els.streamToggle.checked) {
+      answer = await streamChatUnified(msgs, opts, aiMsg);
+    } else {
+      // Non-streaming fallback would go here, but streaming is default/recommended
+      answer = "Non-streaming mode not implemented for all providers yet.";
+    }
+    
+    aiMsg.content=answer||"Stopped.";aiMsg.time=Date.now();
+  }catch(err){aiMsg.content=err.message||String(err);aiMsg.error=true}
+  finally{generating=false;aborting=false;renderAll();els.input.focus()}
+}
+
+// --- UTILS & EVENTS ---
+function exportChat(){const s=active();const visible=s.messages.filter(m=>!m._hidden);const text=[`# ${s.title}`,`Model: ${els.model.value}`,"",...visible.map(m=>`## ${m.role}\n${m.content}`)].join("\n\n");const blob=new Blob([text],{type:"text/markdown"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${(s.title||"hyperzai-chat").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.md`;a.click();URL.revokeObjectURL(a.href)}
+function renamChat(id){const s=sessions.find(x=>x.id===id);if(!s)return;const newTitle=prompt("Rename chat:",s.title);if(newTitle&&newTitle.trim()){s.title=newTitle.trim();renderAll()}}
+function deleteChat(id){if(!confirm("Delete this chat?"))return;sessions=sessions.filter(s=>s.id!==id);if(activeId===id){activeId=sessions[0]?.id||makeSession().id;if(!sessions.find(s=>s.id===activeId)){const newSession=makeSession();sessions.unshift(newSession);activeId=newSession.id}}save();renderAll()}
+function copyLast(){const last=[...active().messages].reverse().find(m=>m.role==="assistant"&&!m.error&&!m._hidden);if(last)navigator.clipboard.writeText(last.content)}
+async function auth(action){try{if(action==="in")await puter.auth.signIn();else await puter.auth.signOut();setStatus(action==="in"?"Signed in to Puter":"Signed out of Puter")}catch(e){setStatus(e.message||String(e))}}
+
+// Event Listeners
+els.newChat.onclick=()=>{const s=makeSession(true);sessions.unshift(s);activeId=s.id;els.app.classList.remove("mobile-sidebar-open");renderAll();els.input.focus()};
+els.clearChat.onclick=()=>{const s=active();s.messages=s.messages.filter(m=>m._hidden);s.title="New chat";renderAll()};
+els.sendBtn.onclick=send;els.exportChat.onclick=exportChat;els.copyLast.onclick=copyLast;
+els.modelSearch.oninput=()=>renderModels(els.modelSearch.value);
+els.input.oninput=updateCharCount;
+els.input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
+
+// FIXED Settings Toggle Logic
+els.settingsBtn.onclick=e=>{
+  e.stopPropagation();
+  const menu = els.settingsMenu;
+  
+  if (menu.classList.contains('open')) {
+    // Close it
+    menu.classList.remove('open');
+    menu.classList.add('closing');
+    // Wait for animation to finish before removing closing class
+    setTimeout(() => {
+      menu.classList.remove('closing');
+    }, 200); // Match CSS animation duration
+  } else {
+    // Open it
+    menu.classList.remove('closing');
+    menu.classList.add('open');
+  }
+  iconRefresh();
+};
+
+// Close menus on outside click
+document.addEventListener("click",e=>{
+  // Close settings if clicked outside
+  if(!els.settingsMenu.contains(e.target) && !els.settingsBtn.contains(e.target)){
+    if(els.settingsMenu.classList.contains("open")){
+      els.settingsMenu.classList.remove('open');
+      els.settingsMenu.classList.add('closing');
+      setTimeout(()=>{els.settingsMenu.classList.remove('closing')}, 200);
+    }
+  }
+  // Close session popups
+  document.querySelectorAll(".session-popup.open").forEach(p=>{if(!p.contains(e.target))p.classList.remove("open")});
+});
+
+els.collapseSidebar.onclick=()=>{
+  els.app.classList.toggle("sidebar-collapsed");
+  els.collapseSidebar.innerHTML=els.app.classList.contains("sidebar-collapsed")?'<i data-lucide="panel-left-open"></i>':'<i data-lucide="panel-left-close"></i>';
+  savePrefs();iconRefresh();
+};
+
+els.mobileMenu.onclick=(e)=>{
+  e.stopPropagation();
+  els.app.classList.toggle("mobile-sidebar-open");
+};
+
+// Close mobile sidebar when clicking backdrop
+els.app.addEventListener("click", (e) => {
+  if(els.app.classList.contains("mobile-sidebar-open") && e.target === els.app) {
+     els.app.classList.remove("mobile-sidebar-open");
+  }
+});
+
+els.temperature.oninput=()=>{els.tempValue.textContent=els.temperature.value;els.tempBox.value=els.temperature.value};
+els.tempBox.onchange=()=>{const v=Math.max(0,Math.min(2,Number(els.tempBox.value)||0));els.temperature.value=v;els.tempValue.textContent=v.toFixed(1);els.tempBox.value=v.toFixed(1)};
+els.maxTokens.oninput=()=>{els.maxValue.textContent=els.maxTokens.value?els.maxTokens.value:"Auto"};
+els.signInBtn.onclick=()=>auth("in");els.signOutBtn.onclick=()=>auth("out");
+
+// Mode Switching Logic
+els.providerMode.onchange = async () => {
+  currentMode = els.providerMode.value;
+  savePrefs();
+  
+  // Handle Key Swapping Logic
+  if (currentMode === 'poolside') {
+      currentApiKey = POOLSIDE_DEMO_KEY;
+      els.apiKeyInput.value = POOLSIDE_DEMO_KEY;
+  } else if (currentMode !== 'puter') {
+      currentApiKey = await dbManager.get(currentMode);
+      els.apiKeyInput.value = currentApiKey;
+  }
+  
+  updateModeUI();
+};
+
+els.apiKeyInput.onchange = async () => {
+  currentApiKey = els.apiKeyInput.value.trim();
+  // Only save if not poolside demo key (optional, but keeps storage clean)
+  if (currentMode !== 'poolside') {
+      await dbManager.set(currentMode, currentApiKey);
+  }
+  setStatus("API Key updated");
+  setTimeout(() => setStatus(`${allModels.length} ${currentMode} models ready`), 2000);
+};
+
+// --- RESPONSIVE LAYOUT HANDLER ---
+// Automatically handles switching between desktop/mobile modes to prevent stuck states
+const mobileQuery = window.matchMedia('(max-width: 820px)');
+function handleResponsiveChange(e) {
+  if (e.matches) {
+    // Mobile Mode
+    els.app.classList.remove('sidebar-collapsed');
+    els.collapseSidebar.style.display = 'none';
+  } else {
+    // Desktop Mode
+    els.app.classList.remove('mobile-sidebar-open');
+    els.collapseSidebar.style.display = 'grid';
+    // Restore desktop preference
+    try {
+      const data = JSON.parse(localStorage.getItem(prefKey) || "{}");
+      if (data.collapsed) els.app.classList.add('sidebar-collapsed');
+    } catch(e){}
+  }
+  // Update icon state
+  els.collapseSidebar.innerHTML = els.app.classList.contains("sidebar-collapsed") 
+    ? '<i data-lucide="panel-left-open"></i>' 
+    : '<i data-lucide="panel-left-close"></i>';
+  iconRefresh();
+}
+
+// Listen for resize events
+mobileQuery.addEventListener('change', handleResponsiveChange);
+// Run once on load
+handleResponsiveChange(mobileQuery);
+
+// Init
+loadSessions();
+loadPrefs(); // Async, handles mode restoration
+renderAll();
+updateCharCount();
+iconRefresh();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Fast Audio DataURL Converter</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0f0f0f;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+
+#drop {
+    border: 3px dashed #555;
+    padding: 40px;
+    max-width: 600px;
+    margin: 20px auto;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+#drop.dragover {
+    border-color: #00ff99;
+}
+
+#fileInfo {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #aaa;
+}
+
+select, button {
+    margin: 8px;
+    padding: 8px;
+}
+
+textarea {
+    width: 95%;
+    height: 160px;
+    background: #111;
+    color: #0f0;
+    margin-top: 10px;
+}
+
+audio {
+    width: 90%;
+    margin-top: 10px;
+}
+
+#progressBar {
+    width: 90%;
+    height: 10px;
+    background: #333;
+    margin: 10px auto;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+#progress {
+    height: 100%;
+    width: 0%;
+    background: #00ff99;
+}
+</style>
+</head>
+
+<body>
+
+<h2>⚡ Fast Audio → Data URL Converter</h2>
+
+<div id="drop">
+    Drop audio file or click
+    <div id="fileInfo">No file selected</div>
+</div>
+
+<input type="file" id="file" accept="audio/*" hidden>
+
+<br>
+
+<label>Quality mode:</label>
+<select id="mode">
+    <option value="high">High (44.1kHz stereo)</option>
+    <option value="medium">Medium (22kHz stereo)</option>
+    <option value="low">Low (16kHz mono - smallest)</option>
+</select>
+
+<br>
+
+<button onclick="convert()">Convert</button>
+<button onclick="copy()">Copy Data URL</button>
+
+<div id="progressBar"><div id="progress"></div></div>
+
+<p id="status">Idle</p>
+
+<audio id="player" controls></audio>
+
+<textarea id="out"></textarea>
+
+<script>
+let fileData = null;
+
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file");
+const fileInfo = document.getElementById("fileInfo");
+const progress = document.getElementById("progress");
+const status = document.getElementById("status");
+const out = document.getElementById("out");
+const player = document.getElementById("player");
+
+function setProgress(p) {
+    progress.style.width = p + "%";
+}
+
+function showFile(file) {
+    fileData = file;
+
+    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+    fileInfo.innerText = `📄 ${file.name} (${sizeMB} MB)`;
+}
+
+drop.onclick = () => fileInput.click();
+
+fileInput.onchange = e => showFile(e.target.files[0]);
+
+drop.ondragover = e => {
+    e.preventDefault();
+    drop.classList.add("dragover");
+};
+
+drop.ondragleave = () => drop.classList.remove("dragover");
+
+drop.ondrop = e => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    showFile(e.dataTransfer.files[0]);
+};
+
+async function convert() {
+    if (!fileData) return alert("Drop a file first");
+
+    status.innerText = "Loading audio...";
+    setProgress(10);
+
+    const arrayBuffer = await fileData.arrayBuffer();
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const mode = document.getElementById("mode").value;
+
+    let sampleRate = 44100;
+    let channels = 2;
+
+    if (mode === "medium") {
+        sampleRate = 22050;
+        channels = 2;
+    }
+    if (mode === "low") {
+        sampleRate = 16000;
+        channels = 1;
+    }
+
+    status.innerText = "Processing audio...";
+    setProgress(40);
+
+    // Downmix + resample
+    const offlineCtx = new OfflineAudioContext(
+        channels,
+        audioBuffer.duration * sampleRate,
+        sampleRate
+    );
+
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineCtx.destination);
+    source.start();
+
+    const rendered = await offlineCtx.startRendering();
+
+    setProgress(80);
+
+    status.innerText = "Encoding Data URL...";
+
+    const wavBuffer = bufferToWav(rendered);
+
+    const blob = new Blob([wavBuffer], { type: "audio/wav" });
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        out.value = reader.result;
+        player.src = reader.result;
+
+        setProgress(100);
+        status.innerText = "Done ✔";
+    };
+
+    reader.readAsDataURL(blob);
+}
+
+function copy() {
+    out.select();
+    document.execCommand("copy");
+    alert("Copied!");
+}
+
+// Minimal WAV encoder (fast browser-native)
+function bufferToWav(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const length = buffer.length * numChannels * 2 + 44;
+
+    const arrayBuffer = new ArrayBuffer(length);
+    const view = new DataView(arrayBuffer);
+
+    function writeString(offset, str) {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+        }
+    }
+
+    writeString(0, "RIFF");
+    view.setUint32(4, length - 8, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, length - 44, true);
+
+    let offset = 44;
+    const channels = [];
+
+    for (let i = 0; i < numChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    for (let i = 0; i < buffer.length; i++) {
+        for (let ch = 0; ch < numChannels; ch++) {
+            let sample = Math.max(-1, Math.min(1, channels[ch][i]));
+            view.setInt16(offset, sample * 0x7FFF, true);
+            offset += 2;
+        }
+    }
+
+    return arrayBuffer;
+}
+</script>
+
+</body>
+</html>
