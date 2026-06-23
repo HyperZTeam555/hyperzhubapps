@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>HyperZStatsViewer</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f0f0f;
+    color: white;
+}
+
+header {
+    background: #1a1a1a;
+    padding: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+button {
+    padding: 8px 10px;
+    border: none;
+    background: #2d6cdf;
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+button:hover {
+    background: #1f4fb3;
+}
+
+input {
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+}
+
+.tab {
+    background: #333;
+}
+
+.tab.active {
+    background: #2d6cdf;
+}
+
+.container {
+    padding: 10px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #222;
+    text-align: left;
+}
+
+tr:hover {
+    background: #1a1a1a;
+}
+
+.badge {
+    background: #333;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.error {
+    color: #ff4d4d;
+}
+
+.loading {
+    color: #aaa;
+}
+</style>
+
+</head>
+
+<body>
+
+<header>
+    <strong>HyperZ Stats Viewer</strong>
+
+    <button class="tab active" onclick="switchTab('users')">Users</button>
+    <button class="tab" onclick="switchTab('levels')">Levels</button>
+
+    <input id="search" placeholder="Search..." />
+
+    <button onclick="prevPage()">Prev</button>
+    <button onclick="nextPage()">Next</button>
+
+    <span id="pageInfo">Page 1</span>
+</header>
+
+<div class="container">
+    <div id="status" class="loading"></div>
+
+    <!-- USERS TABLE -->
+    <table id="usersTable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>User</th>
+                <th>Country</th>
+                <th>Hardest Level</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- LEVELS TABLE -->
+    <table id="levelsTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Level</th>
+                <th>Position</th>
+                <th>Difficulty</th>
+                <th>List ID</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+let page = 1;
+let tab = "users";
+
+/* ================= LOAD CONTROLLER ================= */
+async function load() {
+    const status = document.getElementById("status");
+    status.textContent = "Loading...";
+
+    try {
+        if (tab === "users") {
+            await loadUsers();
+        } else {
+            await loadLevels();
+        }
+        status.textContent = "";
+    } catch (err) {
+        status.innerHTML = `<div class="error">Error: ${err.message}</div>`;
+        console.error(err);
+    }
+}
+
+/* ================= USERS ================= */
+async function loadUsers() {
+    const search = document.getElementById("search").value;
+
+    const url =
+        `https://api.globalstatsviewer.com/api/leaderboard?page=${page}&search=${encodeURIComponent(search)}`;
+
+    const res = await fetch(url);
+
+    if (!res.ok) throw new Error("Failed to load leaderboard");
+
+    const json = await res.json();
+
+    if (!json.leaderboard_data) {
+        throw new Error("Invalid leaderboard response");
+    }
+
+    const tbody = document.querySelector("#usersTable tbody");
+    tbody.innerHTML = "";
+
+    json.leaderboard_data.forEach(u => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${u.position}</td>
+            <td>${u.profile?.username ?? "?"}</td>
+            <td><span class="badge">${u.country_data?.main ?? "?"}</span></td>
+            <td>${u.hardest_data?.data?.name ?? "?"}</td>
+            <td>${Math.floor(u.points ?? 0)}</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("pageInfo").textContent = "Page " + page;
+}
+
+/* ================= LEVELS (FIXED + SORTED) ================= */
+async function loadLevels() {
+    const url = "https://api.globalstatsviewer.com/api/levels";
+
+    const res = await fetch(url);
+
+    if (!res.ok) {
+        throw new Error("Levels API failed");
+    }
+
+    const json = await res.json();
+
+    if (!json.levels) {
+        throw new Error("Invalid levels response");
+    }
+
+    // ✅ SORT BY POSITION (FIX)
+    const sorted = [...json.levels].sort((a, b) => {
+        const pa = a.per_list_position ?? 999999;
+        const pb = b.per_list_position ?? 999999;
+        return pa - pb;
+    });
+
+    const tbody = document.querySelector("#levelsTable tbody");
+    tbody.innerHTML = "";
+
+    sorted.forEach((lvl) => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>#${lvl.per_list_position ?? "?"}</td>
+            <td>${lvl.name ?? "?"}</td>
+            <td>${lvl.per_list_position ?? "?"}</td>
+            <td>${lvl.difficulty ?? "?"}</td>
+            <td>${lvl.list_id ?? "?"}</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
+/* ================= UI ================= */
+function switchTab(t) {
+    tab = t;
+    page = 1;
+
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    event.target.classList.add("active");
+
+    document.getElementById("usersTable").style.display = (t === "users") ? "" : "none";
+    document.getElementById("levelsTable").style.display = (t === "levels") ? "" : "none";
+
+    load();
+}
+
+function nextPage() {
+    if (tab === "users") {
+        page++;
+        load();
+    }
+}
+
+function prevPage() {
+    if (tab === "users" && page > 1) {
+        page--;
+        load();
+    }
+}
+
+document.getElementById("search").addEventListener("input", () => {
+    page = 1;
+    load();
+});
+
+load();
+</script>
+
+</body>
+</html>
