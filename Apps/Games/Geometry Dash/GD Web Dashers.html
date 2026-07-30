@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GDWEB+</title>
+  <title>GD Web Dashers</title>
 
   <style>
     html, body {
@@ -34,44 +34,84 @@
 <iframe id="frame"></iframe>
 
 <script>
-const REPO = "https://cdn.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main";
-
-// Try root index first, fallback to Public/index.html
-const CANDIDATES = [
-  `${REPO}/index.html`,
-  `${REPO}/Public/index.html`
+const REPOS = [
+  "https://cdn.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
+  "https://rawcdn.githack.com/web-dashers/web-dashers.github.io/main",
+  "https://cdn.statically.io/gh/web-dashers/web-dashers.github.io/main",
+  "https://raw.githubusercontent.com/web-dashers/web-dashers.github.io/main",
+  "https://cdn.jsdelivr.net/gh/web-dashers/web-dashers.github.io",
+  "https://fastly.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
+  "https://gcore.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
+  "https://testingcf.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
+  "https://originfastly.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
+  "https://purge.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main"
 ];
 
-async function load() {
-  let html = null;
+const PAGES = [
+  "index.html",
+  "Public/index.html"
+];
 
-  for (const url of CANDIDATES) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        html = await res.text();
-        break;
-      }
-    } catch {}
+async function tryUrl(base, page) {
+  const url = `${base}/${page}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      cache: "no-store"
+    });
+
+    if (!res.ok) throw new Error();
+
+    const html = await res.text();
+
+    clearTimeout(timeout);
+
+    return {
+      html,
+      base
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function load() {
+  document.getElementById("loading").textContent =
+    "Racing CDNs...";
+
+  const promises = [];
+
+  for (const base of REPOS) {
+    for (const page of PAGES) {
+      promises.push(tryUrl(base, page));
+    }
   }
 
-  if (!html) {
-    document.getElementById("loading").innerText = "Failed to load repo";
+  let result;
+
+  try {
+    result = await Promise.any(promises);
+  } catch {
+    document.getElementById("loading").textContent =
+      "Failed to load repo";
     return;
   }
 
-  // Force base URL so assets resolve from CDN
+  let { html, base } = result;
+
   html = html.replace(
     /<head>/i,
-    `<head><base href="${REPO}/">`
+    `<head><base href="${base}/">`
   );
 
-  // Rewrite relative asset paths
   html = html.replace(
     /(src|href)=["'](?!https?:\/\/|\/\/|data:|#)(.*?)["']/g,
-    (m, attr, path) => {
-      return `${attr}="${REPO}/${path.replace(/^\.?\//, "")}"`;
-    }
+    (_, attr, path) =>
+      `${attr}="${base}/${path.replace(/^\.?\//, "")}"`
   );
 
   const iframe = document.getElementById("frame");
