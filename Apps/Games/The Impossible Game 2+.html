@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TIG2+</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    iframe { width: 100%; height: 100%; border: none; }
+    #loading {
+      position: fixed; inset: 0; display: flex; justify-content: center; align-items: center;
+      color: white; font-family: sans-serif; background: #000; z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">Loading TIG2+...</div>
+<iframe id="frame"></iframe>
+
+<script>
+const GAME_URL = "https://e016.github.io/tig2plus/game/";
+
+const frame = document.getElementById("frame");
+const loading = document.getElementById("loading");
+
+frame.src = GAME_URL;
+
+frame.onload = () => {
+  loading.style.display = "none";
+};
+
+frame.onerror = () => {
+  loading.textContent = "Failed to load...";
+};
+</script>
+
+</body>
+</html>
