@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pac-Man Loader</title>
-
+  <title>Pacman</title>
   <style>
     html, body {
       margin: 0;
@@ -29,21 +28,86 @@
   </style>
 </head>
 <body>
-
-<div id="loading">Loading Pac-Man...</div>
-
+<div id="loading">Loading repo...</div>
 <iframe id="frame"></iframe>
-
 <script>
-const URL = "https://masonicgit.github.io/pacman/";
-
-const iframe = document.getElementById("frame");
-iframe.src = URL;
-
-iframe.onload = () => {
-  document.getElementById("loading").style.display = "none";
-};
+const SAVED_CDN = localStorage.getItem("lastCDN");
+const REPOS = [
+  SAVED_CDN,
+  "https://cdn.jsdelivr.net/gh/masonicGIT/pacman@main",
+  "https://cdn.jsdelivr.net/gh/masonicGIT/pacman",
+  "https://fastly.jsdelivr.net/gh/masonicGIT/pacman@main",
+  "https://gcore.jsdelivr.net/gh/masonicGIT/pacman@main",
+  "https://testingcf.jsdelivr.net/gh/masonicGIT/pacman@main",
+  "https://cdn.statically.io/gh/masonicGIT/pacman/main"
+].filter(Boolean);
+const PAGE = "index.html";
+async function tryUrl(base, signal) {
+  const url = `${base}/${PAGE}`;
+  const res = await fetch(url, {
+    signal,
+    cache: "no-store"
+  });
+  if (!res.ok) {
+    throw new Error(`${url} returned ${res.status}`);
+  }
+  const html = await res.text();
+  if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
+    throw new Error("Invalid HTML response");
+  }
+  return {
+    html,
+    base
+  };
+}
+async function raceCDNs() {
+  const controller = new AbortController();
+  const requests = REPOS.map(base =>
+    tryUrl(base, controller.signal)
+  );
+  try {
+    const winner = await Promise.any(requests);
+    controller.abort();
+    return winner;
+  } catch (err) {
+    controller.abort();
+    throw err;
+  }
+}
+async function load() {
+  const loading = document.getElementById("loading");
+  loading.textContent = "Racing CDNs...";
+  let result;
+  try {
+    result = await raceCDNs();
+  } catch (err) {
+    console.error(err);
+    loading.textContent = "Failed to load repo";
+    return;
+  }
+  let {
+    html,
+    base
+  } = result;
+  console.log("Loaded from:", base);
+  localStorage.setItem("lastCDN", base);
+  html = html.replace(
+    /<head>/i,
+    `<head><base href="${base}/">`
+  );
+  html = html.replace(
+    /(src|href)=["'](?!https?:\/\/|\/\/|data:|#)(.*?)["']/gi,
+    (_, attr, path) => {
+      return `${attr}="${base}/${path.replace(/^\.?\//, "")}"`;
+    }
+  );
+  const frame = document.getElementById("frame");
+  frame.srcdoc = html;
+  frame.onload = () => {
+    loading.style.display = "none";
+  };
+}
+load();
 </script>
-
 </body>
 </html>
