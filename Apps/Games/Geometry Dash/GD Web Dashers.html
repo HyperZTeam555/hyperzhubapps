@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>GD Web Dashers</title>
-
   <style>
     html, body {
       margin: 0;
@@ -29,62 +28,39 @@
   </style>
 </head>
 <body>
-
-<div id="loading">Loading repo...</div>
+<div id="loading">Racing CDNs...</div>
 <iframe id="frame"></iframe>
-
 <script>
-const SAVED_CDN = localStorage.getItem("lastCDN");
-
 const REPOS = [
-  SAVED_CDN,
   "https://cdn.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
   "https://cdn.jsdelivr.net/gh/web-dashers/web-dashers.github.io",
   "https://fastly.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
   "https://gcore.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
   "https://testingcf.jsdelivr.net/gh/web-dashers/web-dashers.github.io@main",
   "https://cdn.statically.io/gh/web-dashers/web-dashers.github.io/main"
-].filter(Boolean);
-
+];
 const PAGE = "index.html";
 
 async function tryUrl(base, signal) {
   const url = `${base}/${PAGE}`;
-
   const res = await fetch(url, {
     signal,
     cache: "no-store"
   });
-
-  if (!res.ok) {
-    throw new Error(`${url} returned ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
   const html = await res.text();
-
   if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
     throw new Error("Invalid HTML response");
   }
-
-  return {
-    html,
-    base
-  };
+  return { html, base };
 }
 
 async function raceCDNs() {
   const controller = new AbortController();
-
-  const requests = REPOS.map(base =>
-    tryUrl(base, controller.signal)
-  );
-
+  const requests = REPOS.map(base => tryUrl(base, controller.signal));
   try {
     const winner = await Promise.any(requests);
-
-    // Stop slower downloads
     controller.abort();
-
     return winner;
   } catch (err) {
     controller.abort();
@@ -94,11 +70,7 @@ async function raceCDNs() {
 
 async function load() {
   const loading = document.getElementById("loading");
-
-  loading.textContent = "Racing CDNs...";
-
   let result;
-
   try {
     result = await raceCDNs();
   } catch (err) {
@@ -106,41 +78,19 @@ async function load() {
     loading.textContent = "Failed to load repo";
     return;
   }
-
-  let {
-    html,
-    base
-  } = result;
-
+  let { html, base } = result;
   console.log("Loaded from:", base);
-
-  localStorage.setItem("lastCDN", base);
-
-  // Force relative assets to use the winning CDN
-  html = html.replace(
-    /<head>/i,
-    `<head><base href="${base}/">`
-  );
-
-  // Rewrite relative src/href paths
+  html = html.replace(/<head>/i, `<head><base href="${base}/">`);
   html = html.replace(
     /(src|href)=["'](?!https?:\/\/|\/\/|data:|#)(.*?)["']/gi,
-    (_, attr, path) => {
-      return `${attr}="${base}/${path.replace(/^\.?\//, "")}"`;
-    }
+    (_, attr, path) => `${attr}="${base}/${path.replace(/^\.?\//, "")}"`
   );
-
   const frame = document.getElementById("frame");
-
   frame.srcdoc = html;
-
-  frame.onload = () => {
-    loading.style.display = "none";
-  };
+  frame.onload = () => { loading.style.display = "none"; };
 }
 
 load();
 </script>
-
 </body>
 </html>
