@@ -2,1782 +2,714 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tetris</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TETRIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  @import url('https://cdn.jsdelivr.net/npm/fontsource-rajdhani@5.0.0/index.css');
-  body {
-    font-family: 'Rajdhani', sans-serif;
-    background: 
-      radial-gradient(circle at 50% 50%, rgba(0, 255, 255, 0.05) 0%, transparent 50%),
-      linear-gradient(180deg, #050a14 0%, #000000 100%);
-    color: #e0e0e0;
-    overflow: hidden;
-    user-select: none;
-  }
-  .glass {
-    background: rgba(10, 15, 30, 0.8);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(100, 200, 255, 0.2);
-    box-shadow: 0 0 20px rgba(0, 200, 255, 0.1), inset 0 0 20px rgba(0, 200, 255, 0.05);
-  }
-  .neon-text {
-    text-shadow: 0 0 5px #0ff, 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #0ff;
-  }
-  .neon-border {
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.2), inset 0 0 30px rgba(0, 255, 255, 0.05);
-  }
-  canvas {
-    image-rendering: pixelated;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
-  }
-  .btn {
-    transition: all 0.2s;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 20px currentColor;
-  }
-  .stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #0ff;
-    text-shadow: 0 0 8px #0ff;
-  }
-  .stat-label {
-    font-size: 0.75rem;
-    color: #88aacc;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  #tetris-flash {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(circle, rgba(0, 255, 255, 0.6) 0%, rgba(0, 255, 100, 0.3) 40%, transparent 70%);
-    transition: opacity 0.1s;
-    z-index: 50;
-  }
-  #tetris-flash.show { opacity: 1; }
-  #garbage-flash {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(circle, rgba(255, 50, 50, 0.5) 0%, rgba(255, 0, 0, 0.2) 40%, transparent 70%);
-    transition: opacity 0.15s;
-    z-index: 51;
-  }
-  #garbage-flash.show { opacity: 1; }
-  #start-screen, #game-over-screen, #watch-ai-menu {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.95);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .hidden { display: none !important; }
-  .piece-preview { display: grid; gap: 2px; }
-  .piece-cell { width: 18px; height: 18px; border-radius: 3px; }
-  #pause-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 90;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(5px);
-  }
-  .board-wrapper { position: relative; }
-  .combo-overlay {
-    position: absolute;
-    top: 8px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    pointer-events: none;
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(0, 0, 0, 0.35);
-    padding: 3px 0;
-    backdrop-filter: blur(2px);
-    opacity: 0;
-    transition: opacity 0.25s ease;
-    text-transform: uppercase;
-  }
-  .combo-overlay.show { opacity: 1; }
-  .combo-overlay.player { color: rgba(150, 240, 255, 0.9); }
-  .combo-overlay.ai { color: rgba(255, 160, 240, 0.9); }
-  .controls-box {
-    background: rgba(10, 15, 30, 0.6);
-    border: 1px solid rgba(100, 200, 255, 0.15);
-    backdrop-filter: blur(8px);
-  }
-  .garbage-bar {
-    position: absolute;
-    left: -10px;
-    bottom: 0;
-    width: 6px;
-    background: linear-gradient(180deg, #f33 0%, #900 100%);
-    border: 1px solid #f66;
-    box-shadow: 0 0 8px #f33;
-    transition: height 0.25s ease;
-    pointer-events: none;
-  }
-  .test-btn {
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-size: 0.8rem;
-    padding: 6px 8px;
-    border-radius: 6px;
-  }
-  .test-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px currentColor;
-  }
-  .test-btn:active {
-    transform: translateY(0);
-  }
-  .test-section {
-    border-bottom: 1px solid rgba(100, 200, 255, 0.15);
-    padding-bottom: 12px;
-    margin-bottom: 12px;
-  }
-  .test-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-  .test-section-title {
-    font-size: 0.7rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #88aacc;
-    margin-bottom: 8px;
-    font-weight: 700;
-  }
-  .piece-btn {
-    width: 42px;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
-    font-weight: 900;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
-    border: 2px solid transparent;
-  }
-  .piece-btn:hover {
-    transform: scale(1.1);
-    border-color: currentColor;
-  }
-  #test-log {
-    max-height: 120px;
-    overflow-y: auto;
-    font-family: 'Rajdhani', monospace;
-    font-size: 0.72rem;
-    color: #9fc;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(100, 200, 255, 0.1);
-    border-radius: 6px;
-    padding: 6px 8px;
-  }
-  #test-log::-webkit-scrollbar { width: 4px; }
-  #test-log::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-  #test-log::-webkit-scrollbar-thumb { background: rgba(100,200,255,0.3); border-radius: 2px; }
-  .log-entry { padding: 2px 0; border-bottom: 1px dashed rgba(100,200,255,0.08); }
-  .log-entry:last-child { border-bottom: none; }
+:root {
+  --bg-dark:#0f0f12; --bg-panel:#1a1a1d; --text-main:#ffffff; --text-dim:#888899; --accent:#4f7cff;
+  --c-i:#00e5ff; --c-j:#2979ff; --c-l:#ff9100; --c-o:#ffea00; --c-s:#00e676; --c-t:#d500f9; --c-z:#ff1744;
+}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;}
+body{background:var(--bg-dark);color:var(--text-main);font-family:'Exo 2',sans-serif;height:100vh;width:100vw;overflow:hidden;display:flex;justify-content:center;align-items:center;}
+#app{position:relative;width:100%;height:100%;max-width:1500px;display:flex;align-items:center;justify-content:center;}
+.game-wrapper{display:flex;gap:12px;align-items:flex-start;justify-content:center;padding:14px;z-index:1;}
+.sidebar{display:flex;flex-direction:column;gap:7px;min-width:126px;max-width:134px;}
+.sidebar.edge{min-width:94px;max-width:100px;}
+.sidebar-title{font-size:0.9rem;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:1px;margin-bottom:1px;}
+.panel{background:var(--bg-panel);border-radius:8px;padding:7px;box-shadow:0 4px 12px rgba(0,0,0,0.3);text-align:center;}
+.panel h3{font-size:0.58rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:1px;}
+.stat-val{font-size:1rem;font-weight:800;}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:1px 0;}
+.stat-row .lbl{font-size:0.58rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
+.boards-container{display:flex;gap:12px;flex-shrink:0;}
+.board-container{position:relative;border:2px solid #333;border-radius:4px;background:#000;overflow:hidden;}
+canvas{display:block;}
+.game-canvas{width:300px;height:600px;}
+.hold-canvas{width:120px;height:80px;margin:0 auto;}
+.next-queue{display:flex;flex-direction:column;gap:3px;align-items:center;}
+.mini-canvas{width:80px;height:60px;}
+.overlay{position:absolute;inset:0;background:rgba(15,15,18,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(8px);transition:opacity 0.2s;}
+.overlay.hidden{opacity:0;pointer-events:none;}
+.menu-title{font-size:3rem;font-weight:800;margin-bottom:2rem;text-transform:uppercase;letter-spacing:-2px;}
+.btn{background:transparent;border:2px solid var(--text-dim);color:var(--text-main);padding:12px 32px;font-family:inherit;font-size:1rem;font-weight:600;border-radius:4px;cursor:pointer;margin:8px;min-width:220px;transition:all 0.15s ease;text-transform:uppercase;}
+.btn:hover{border-color:var(--accent);background:var(--accent);color:#fff;transform:translateY(-2px);}
+.btn-secondary{border-color:#333;color:var(--text-dim);}
+.btn-secondary:hover{border-color:#555;background:#222;color:#fff;}
+.exit-pause-btn{position:absolute;top:12px;right:12px;z-index:60;background:rgba(255,23,68,0.15);border:1px solid var(--c-z);color:#ffb3c1;font-family:inherit;font-weight:700;font-size:0.68rem;letter-spacing:1px;padding:7px 12px;border-radius:6px;cursor:pointer;text-transform:uppercase;display:none;}
+.exit-pause-btn:hover{background:rgba(255,23,68,0.35);}
+.combo-overlay{position:absolute;top:8px;left:0;right:0;text-align:center;pointer-events:none;font-size:0.9rem;font-weight:700;letter-spacing:3px;color:#fff;background:rgba(0,0,0,0.6);padding:2px 0;opacity:0;transition:opacity 0.25s ease;text-transform:uppercase;}
+.combo-overlay.show{opacity:1;}
+.combo-overlay.player{color:var(--accent);}
+.combo-overlay.ai{color:var(--c-t);}
+.garbage-bar{position:absolute;left:0;bottom:0;width:100%;height:0;background:linear-gradient(0deg,rgba(255,23,68,0.7) 0%,rgba(255,23,68,0.3) 100%);transition:height 0.25s ease;pointer-events:none;z-index:10;}
+.garbage-bar.stalling{background:linear-gradient(0deg,rgba(255,234,0,0.7) 0%,rgba(255,145,0,0.3) 100%);animation:stallFlash 0.4s infinite alternate;}
+@keyframes stallFlash{from{background:linear-gradient(0deg,rgba(255,234,0,0.8) 0%,rgba(255,234,0,0.3) 100%);}to{background:linear-gradient(0deg,rgba(255,145,0,0.8) 0%,rgba(255,145,0,0.3) 100%);}}
+.test-panel{position:absolute;right:14px;top:56px;width:236px;background:var(--bg-panel);border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.5);z-index:50;display:none;max-height:88vh;overflow-y:auto;}
+.test-panel.show{display:block;}
+.test-btn{font-family:inherit;font-weight:700;text-transform:uppercase;cursor:pointer;transition:all 0.15s;font-size:0.6rem;padding:4px 6px;border-radius:4px;border:1px solid #333;background:#222;color:#fff;margin:2px;}
+.test-btn:hover{background:var(--accent);border-color:var(--accent);}
+.test-section{border-bottom:1px solid #333;padding-bottom:7px;margin-bottom:7px;}
+.test-section-title{font-size:0.56rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px;font-weight:700;}
+#test-log{max-height:96px;overflow-y:auto;font-family:monospace;font-size:0.56rem;color:#0f0;background:#000;border:1px solid #333;border-radius:4px;padding:5px;}
+.controls-hint{font-size:0.52rem;color:var(--text-dim);text-align:left;line-height:1.45;}
+.mobile-controls{display:none;position:absolute;bottom:14px;left:0;right:0;padding:0 14px;gap:10px;z-index:50;grid-template-columns:1fr 1fr;}
+.m-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;height:58px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:rgba(255,255,255,0.7);touch-action:manipulation;}
+.m-btn:active{background:rgba(79,124,255,0.3);border-color:var(--accent);}
+.m-dpad{grid-column:1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.m-actions{grid-column:2;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.m-big{grid-column:span 2;height:66px;font-weight:800;letter-spacing:1px;}
+@media (max-width:1200px){
+  .game-wrapper{flex-direction:column;align-items:center;gap:8px;padding:8px;}
+  .sidebar,.sidebar.edge{flex-direction:row;flex-wrap:wrap;justify-content:center;min-width:unset;max-width:100%;width:100%;gap:5px;}
+  .panel{padding:5px 8px;flex:1;min-width:72px;}
+  .boards-container{flex-direction:column;gap:8px;}
+  .next-queue{flex-direction:row;gap:3px;}
+  .mini-canvas{width:44px;height:32px;}
+  .game-canvas{width:240px;height:480px;}
+  .hold-canvas{width:94px;height:62px;}
+  .mobile-controls{display:grid;}
+  .controls-hint{display:none;}
+  .menu-title{font-size:2rem;}
+  .test-panel{position:relative;right:auto;top:auto;width:100%;margin-top:14px;}
+}
 </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body>
+<div id="app">
+  <button class="exit-pause-btn" id="exit-pause-btn" onclick="openPauseMenu()">EXIT / PAUSE</button>
 
-<div id="tetris-flash"></div>
-<div id="garbage-flash"></div>
-
-<div id="start-screen">
-  <h1 class="text-7xl md:text-9xl font-bold neon-text mb-12 tracking-widest text-center">TETRIS</h1>
-  <div class="flex flex-col gap-4 w-64">
-    <button class="btn px-6 py-3 rounded bg-cyan-900/40 border border-cyan-500 text-cyan-300 text-lg" onclick="startGame('single')">Play by Yourself</button>
-    <button class="btn px-6 py-3 rounded bg-fuchsia-900/40 border border-fuchsia-500 text-fuchsia-300 text-lg" onclick="startGame('vs_ai')">Vs. AI</button>
-    <button class="btn px-6 py-3 rounded bg-yellow-900/40 border border-yellow-500 text-yellow-300 text-lg" onclick="openWatchAIMenu()">Watch AI</button>
-    <button class="btn px-6 py-3 rounded bg-orange-900/40 border border-orange-500 text-orange-300 text-lg" onclick="startGame('test_ai')">Test AI</button>
+  <div id="menu-overlay" class="overlay">
+    <div class="menu-title">TETRIS</div>
+    <button class="btn" onclick="startGame('single')">Play Solo</button>
+    <button class="btn" onclick="openDifficulty()">Vs. AI</button>
+    <button class="btn" onclick="openWatchMenu()">Watch AI</button>
+    <button class="btn" onclick="startGame('test_ai')">Test AI</button>
   </div>
-</div>
 
-<div id="watch-ai-menu" class="hidden">
-  <div class="glass rounded-2xl p-8 flex flex-col gap-6 items-center min-w-[320px] max-w-md">
-    <h2 class="text-4xl font-bold neon-text mb-2 tracking-widest">WATCH AI</h2>
-    <p class="text-gray-400 text-sm tracking-wider text-center mb-2">Choose a viewing mode</p>
-    <button class="btn w-full px-6 py-3 rounded bg-fuchsia-900/40 border border-fuchsia-500 text-fuchsia-300 text-lg" onclick="startWatchAI('ai_vs_ai')">AI vs. AI</button>
-    <button class="btn w-full px-6 py-3 rounded bg-yellow-900/40 border border-yellow-500 text-yellow-300 text-lg" onclick="startWatchAI('normal')">Normal</button>
-    <button class="btn w-full px-6 py-2 rounded bg-gray-900/40 border border-gray-600 text-gray-400 text-sm mt-2" onclick="closeWatchAIMenu()">Back</button>
+  <div id="difficulty-overlay" class="overlay hidden">
+    <div class="menu-title" style="font-size:1.6rem;">AI Difficulty</div>
+    <p style="color:var(--text-dim);margin-bottom:12px;letter-spacing:1px;font-size:0.78rem;">pick an AI level</p>
+    <button class="btn" onclick="startGame('vs_ai',1)">Easy</button>
+    <button class="btn" onclick="startGame('vs_ai',2)">Normal</button>
+    <button class="btn" onclick="startGame('vs_ai',3)">Hard</button>
+    <button class="btn" onclick="startGame('vs_ai',4)">Very Hard</button>
+    <button class="btn" onclick="startGame('vs_ai',5)">Ultra</button>
+    <button class="btn" onclick="startGame('vs_ai',6)">Impossible</button>
+    <button class="btn btn-secondary" onclick="closeDifficulty()">Back</button>
   </div>
-</div>
 
-<div id="game-over-screen" class="hidden">
-  <h1 id="go-title" class="text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text">GAME OVER</h1>
-  <p id="go-subtitle" class="text-xl text-gray-400 mb-2 tracking-wider">THE AI WAS TOO FAST</p>
-  <p id="go-combo-info" class="text-lg text-fuchsia-400 mb-8 tracking-wider hidden"></p>
-  <div class="flex gap-4">
-    <button class="btn px-8 py-3 rounded bg-cyan-900/40 border border-cyan-500 text-cyan-300 text-lg" onclick="restartGame()">Play Again</button>
-    <button class="btn px-8 py-3 rounded bg-red-900/40 border border-red-500 text-red-300 text-lg" onclick="backToMenu()">Menu</button>
+  <div id="watch-overlay" class="overlay hidden">
+    <div class="menu-title" style="font-size:1.8rem;">WATCH AI</div>
+    <p style="color:var(--text-dim);margin-bottom:12px;letter-spacing:1px;font-size:0.78rem;">Choose a viewing mode</p>
+    <button class="btn" onclick="startGame('watch_ai',6,'ai_vs_ai')">AI vs. AI</button>
+    <button class="btn" onclick="startGame('watch_ai',6,'normal')">Normal</button>
+    <button class="btn btn-secondary" onclick="closeWatchMenu()">Back</button>
   </div>
-</div>
 
-<div id="pause-overlay" class="hidden">
-  <div class="glass rounded-xl p-8 flex flex-col gap-4 items-center min-w-[300px]">
-    <h2 class="text-3xl font-bold neon-text mb-4">PAUSED</h2>
-    <button class="btn w-full px-6 py-3 rounded bg-cyan-900/40 border border-cyan-500 text-cyan-300 text-lg" onclick="togglePause()">Resume</button>
-    <button class="btn w-full px-6 py-3 rounded bg-red-900/40 border border-red-500 text-red-300 text-lg" onclick="backToMenu()">Exit to Menu</button>
+  <div id="gameover-overlay" class="overlay hidden">
+    <div class="menu-title" style="color:var(--c-z)">GAME OVER</div>
+    <div style="color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;" id="go-subtitle">THE AI WAS TOO FAST</div>
+    <div class="stat-val" style="margin-bottom:18px" id="go-combo"></div>
+    <button class="btn" onclick="restartGame()">Play Again</button>
+    <button class="btn btn-secondary" onclick="resetToMenu()">Menu</button>
   </div>
-</div>
 
-<div id="game-ui" class="hidden flex-col lg:flex-row gap-6 items-center lg:items-start max-w-7xl w-full relative">
-  
-  <button class="absolute -top-12 right-0 lg:-right-20 lg:top-0 btn px-4 py-2 rounded bg-red-900/40 border border-red-500 text-red-300 text-sm z-10" onclick="openPauseMenu()">EXIT / PAUSE</button>
+  <div id="pause-overlay" class="overlay hidden">
+    <div class="menu-title">PAUSED</div>
+    <button class="btn" onclick="togglePause()">Resume</button>
+    <button class="btn btn-secondary" onclick="resetToMenu()">Exit to Menu</button>
+  </div>
 
-  <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-2 lg:order-1" id="player-panel">
-    <h2 class="text-2xl font-bold text-cyan-400 text-center mb-2 tracking-widest" id="player-title">PLAYER</h2>
-    <div class="mb-4 border-b border-cyan-900/50 pb-4">
-      <div class="stat-label mb-2 text-center">Hold (R)</div>
-      <div id="p-hold-piece" class="flex justify-center items-center h-16">
-        <span class="text-gray-600 text-xs">EMPTY</span>
-      </div>
+  <div class="game-wrapper" id="game-ui" style="display:none;">
+
+    <div class="sidebar edge" id="left-edge-sidebar" style="display:none;">
+      <div class="panel"><h3>Next</h3><div class="next-queue" id="p-next-queue-battle"></div></div>
+      <div class="panel controls-hint" id="p-controls-battle">← → Move<br>↑ Rotate<br>↓ Soft Drop<br>Space Hard Drop<br>R Hold Piece<br>Esc Pause</div>
     </div>
-    <div class="space-y-3">
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Score</span><span id="p-score" class="stat-value">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Level</span><span id="p-level" class="stat-value">1</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Lines</span><span id="p-lines" class="stat-value">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Tetrises</span><span id="p-tetrises" class="stat-value" style="color:#0f0; text-shadow:0 0 8px #0f0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Max Combo</span><span id="p-maxcombo" class="stat-value" style="color:#f0f; text-shadow:0 0 8px #f0f;">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">B2B</span><span id="p-b2b" class="stat-value" style="color:#fc0; text-shadow:0 0 8px #fc0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2 hidden" id="p-combo-row"><span class="stat-label">Current Combo</span><span id="p-combo" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-cyan-900/50 pb-2"><span class="stat-label">Gravity</span><span id="p-gravity" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">1.25/s</span></div>
-    </div>
-    <div class="mt-4 border-t border-cyan-900/50 pt-4">
-      <div class="stat-label mb-2 text-center">Next 5</div>
-      <div id="p-next-pieces" class="flex flex-col items-center gap-2"></div>
-    </div>
-  </div>
 
-  <div class="flex flex-col gap-4 order-1 lg:order-2 items-center" id="center-column">
-    <div class="flex gap-6 justify-center items-start flex-wrap">
-      <div class="board-wrapper glass rounded-xl p-4 neon-border" id="player-board-container">
-        <canvas id="p-canvas" width="300" height="600"></canvas>
+    <div class="sidebar" id="p-sidebar">
+      <h2 class="sidebar-title" id="p-title" style="color:var(--accent)">PLAYER</h2>
+      <div class="panel"><h3>Hold (R)</h3><canvas id="p-hold-canvas" class="hold-canvas" width="120" height="80"></canvas></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Score</span><span class="stat-val" id="p-score">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Level</span><span class="stat-val" id="p-level">1</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Lines</span><span class="stat-val" id="p-lines">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Tetrises</span><span class="stat-val" id="p-tetrises">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Max Combo</span><span class="stat-val" id="p-maxcombo">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">B2B</span><span class="stat-val" id="p-b2b">0</span></div></div>
+      <div class="panel" id="p-combo-panel" style="display:none;"><div class="stat-row"><span class="lbl">Current Combo</span><span class="stat-val" id="p-combo" style="color:var(--c-o)">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Gravity</span><span class="stat-val" id="p-gravity" style="color:var(--c-i)">1.25/s</span></div></div>
+    </div>
+
+    <div class="boards-container">
+      <div class="board-container" id="p-board-container">
+        <canvas id="p-canvas" class="game-canvas" width="300" height="600"></canvas>
         <div id="p-combo-overlay" class="combo-overlay player"></div>
-        <div id="p-garbage-bar" class="garbage-bar" style="height: 0px;"></div>
+        <div id="p-garbage-bar" class="garbage-bar" style="height:0px;"></div>
       </div>
-      <div class="board-wrapper glass rounded-xl p-4 neon-border hidden" id="ai-board-container">
-        <canvas id="ai-canvas" width="300" height="600"></canvas>
+      <div class="board-container" id="ai-board-container" style="display:none;">
+        <canvas id="ai-canvas" class="game-canvas" width="300" height="600"></canvas>
         <div id="a-combo-overlay" class="combo-overlay ai"></div>
-        <div id="a-garbage-bar" class="garbage-bar" style="height: 0px;"></div>
+        <div id="a-garbage-bar" class="garbage-bar" style="height:0px;"></div>
       </div>
     </div>
-    <div id="controls-under" class="controls-box rounded-xl p-4 text-xs text-gray-400 leading-relaxed hidden w-full max-w-[640px]">
-      <div class="text-cyan-400 font-bold mb-2 tracking-widest text-center">CONTROLS</div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-center">
-        <div><span class="text-white font-bold">← →</span> Move</div>
-        <div><span class="text-white font-bold">↑</span> Rotate</div>
-        <div><span class="text-white font-bold">↓</span> Soft Drop</div>
-        <div><span class="text-white font-bold">Space</span> Hard Drop</div>
-        <div><span class="text-white font-bold">R</span> Hold Piece</div>
-        <div><span class="text-white font-bold">Esc</span> Pause</div>
-      </div>
+
+    <div class="sidebar" id="ai-sidebar" style="display:none;">
+      <h2 class="sidebar-title" id="ai-title" style="color:var(--c-t)">WUMBO AI</h2>
+      <div class="panel"><h3>Hold</h3><canvas id="a-hold-canvas" class="hold-canvas" width="120" height="80"></canvas></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Score</span><span class="stat-val" id="a-score">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Level</span><span class="stat-val" id="a-level">1</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Lines</span><span class="stat-val" id="a-lines">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Tetrises</span><span class="stat-val" id="a-tetrises">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Max Combo</span><span class="stat-val" id="a-maxcombo">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">B2B</span><span class="stat-val" id="a-b2b">0</span></div></div>
+      <div class="panel" id="a-combo-panel" style="display:none;"><div class="stat-row"><span class="lbl">Current Combo</span><span class="stat-val" id="a-combo" style="color:var(--c-o)">0</span></div></div>
+      <div class="panel"><div class="stat-row"><span class="lbl">Gravity</span><span class="stat-val" id="a-gravity" style="color:var(--c-t)">1.25/s</span></div></div>
     </div>
+
+    <div class="sidebar edge" id="right-edge-sidebar" style="display:none;">
+      <div class="panel"><h3>Next</h3><div class="next-queue" id="a-next-queue-battle"></div></div>
+      <div class="panel controls-hint" id="a-controls-battle">← → Move<br>↑ Rotate<br>↓ Soft Drop<br>Space Hard Drop<br>R Hold Piece<br>Esc Pause</div>
+    </div>
+
+    <div class="sidebar" id="solo-right-sidebar" style="display:none;">
+      <div class="panel"><h3>Next</h3><div class="next-queue" id="p-next-queue-solo"></div></div>
+      <div class="panel controls-hint" id="solo-controls">← → Move<br>↑ Rotate<br>↓ Soft Drop<br>Space Hard Drop<br>R Hold Piece<br>Esc Pause</div>
+    </div>
+
   </div>
 
-  <div class="glass rounded-xl p-6 w-full lg:w-64 flex flex-col gap-4 order-3" id="ai-panel">
-    <h2 class="text-2xl font-bold text-fuchsia-400 text-center mb-2 tracking-widest" id="ai-title">WUMBO AI</h2>
-    <div class="mb-4 border-b border-fuchsia-900/50 pb-4">
-      <div class="stat-label mb-2 text-center">Hold</div>
-      <div id="a-hold-piece" class="flex justify-center items-center h-16"><span class="text-gray-600 text-xs">N/A</span></div>
-    </div>
-    <div class="space-y-3">
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Score</span><span id="a-score" class="stat-value" style="color:#f0f; text-shadow:0 0 8px #f0f;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Level</span><span id="a-level" class="stat-value" style="color:#f0f; text-shadow:0 0 8px #f0f;">1</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Lines</span><span id="a-lines" class="stat-value" style="color:#f0f; text-shadow:0 0 8px #f0f;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Tetrises</span><span id="a-tetrises" class="stat-value" style="color:#0f0; text-shadow:0 0 8px #0f0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Max Combo</span><span id="a-maxcombo" class="stat-value" style="color:#f0f; text-shadow:0 0 8px #f0f;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">B2B</span><span id="a-b2b" class="stat-value" style="color:#fc0; text-shadow:0 0 8px #fc0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2 hidden" id="a-combo-row"><span class="stat-label">Current Combo</span><span id="a-combo" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">0</span></div>
-      <div class="flex justify-between items-center border-b border-fuchsia-900/50 pb-2"><span class="stat-label">Gravity</span><span id="a-gravity" class="stat-value" style="color:#ff0; text-shadow:0 0 8px #ff0;">1.25/s</span></div>
-    </div>
-    <div class="mt-4 border-t border-fuchsia-900/50 pt-4">
-      <div class="stat-label mb-2 text-center">Next 5</div>
-      <div id="a-next-pieces" class="flex flex-col items-center gap-2"></div>
-    </div>
-  </div>
-
-  <!-- TEST AI CONTROL PANEL -->
-  <div id="test-panel" class="glass rounded-xl p-5 w-full lg:w-72 flex flex-col gap-3 order-4 hidden">
-    <h2 class="text-xl font-bold text-orange-400 text-center mb-1 tracking-widest" style="text-shadow: 0 0 8px #f80;">TEST AI LAB</h2>
-    <p class="text-center text-xs text-gray-500 tracking-wider mb-2">Torture the AI at will</p>
-
-    <!-- ATTACK SECTION -->
+  <div class="test-panel" id="test-panel">
+    <div class="test-section-title" style="color:var(--c-l);font-size:0.72rem;">TEST AI LAB</div>
+    <p style="font-size:0.52rem;color:var(--text-dim);margin-bottom:7px;text-align:center;">Torture the AI at will</p>
     <div class="test-section">
       <div class="test-section-title" style="color:#f66;">⚡ Send Garbage (One Hole Per Round)</div>
-      <p class="text-[10px] text-gray-500 mb-2">Each send is one block — one consistent hole</p>
-      <div class="grid grid-cols-4 gap-2">
-        <button class="test-btn bg-red-900/40 border border-red-500 text-red-200" onclick="testSendGarbage(1)">+1</button>
-        <button class="test-btn bg-red-900/40 border border-red-500 text-red-200" onclick="testSendGarbage(2)">+2</button>
-        <button class="test-btn bg-red-900/40 border border-red-500 text-red-200" onclick="testSendGarbage(4)">+4</button>
-        <button class="test-btn bg-red-900/40 border border-red-500 text-red-200" onclick="testSendGarbage(8)">+8</button>
-        <button class="test-btn bg-red-800/50 border border-red-400 text-red-100" onclick="testSendGarbage(10)">+10</button>
-        <button class="test-btn bg-red-700/60 border border-red-300 text-white" onclick="testSendGarbage(15)">+15</button>
-        <button class="test-btn col-span-2 bg-rose-700/70 border border-rose-300 text-white" onclick="testSendGarbage(20)" style="text-shadow: 0 0 6px #f00;">☢ NUKE (20)</button>
-      </div>
+      <p style="font-size:0.48rem;color:var(--text-dim);margin-bottom:3px;">Each send is one block — one consistent hole</p>
+      <button class="test-btn" onclick="testSendGarbage(1)">+1</button>
+      <button class="test-btn" onclick="testSendGarbage(2)">+2</button>
+      <button class="test-btn" onclick="testSendGarbage(4)">+4</button>
+      <button class="test-btn" onclick="testSendGarbage(8)">+8</button>
+      <button class="test-btn" onclick="testSendGarbage(10)">+10</button>
+      <button class="test-btn" onclick="testSendGarbage(15)">+15</button>
+      <button class="test-btn" onclick="testSendGarbage(20)" style="background:#7a1f2b;">☢ NUKE (20)</button>
     </div>
-
-    <!-- FORCE NEXT PIECE SECTION -->
     <div class="test-section">
       <div class="test-section-title" style="color:#9f9;">🎲 Force Next Piece</div>
-      <p class="text-[10px] text-gray-500 mb-2">Inject a piece at the front of the queue</p>
-      <div class="grid grid-cols-7 gap-1">
-        <button class="piece-btn" style="background:rgba(0,240,240,0.15); color:#00f0f0; border-color:rgba(0,240,240,0.4);" onclick="testForcePiece('I')">I</button>
-        <button class="piece-btn" style="background:rgba(240,240,0,0.15); color:#f0f000; border-color:rgba(240,240,0,0.4);" onclick="testForcePiece('O')">O</button>
-        <button class="piece-btn" style="background:rgba(160,0,240,0.2); color:#c060ff; border-color:rgba(160,0,240,0.4);" onclick="testForcePiece('T')">T</button>
-        <button class="piece-btn" style="background:rgba(0,240,0,0.15); color:#00f000; border-color:rgba(0,240,0,0.4);" onclick="testForcePiece('S')">S</button>
-        <button class="piece-btn" style="background:rgba(240,0,0,0.2); color:#ff5050; border-color:rgba(240,0,0,0.4);" onclick="testForcePiece('Z')">Z</button>
-        <button class="piece-btn" style="background:rgba(0,0,240,0.25); color:#6060ff; border-color:rgba(0,0,240,0.5);" onclick="testForcePiece('J')">J</button>
-        <button class="piece-btn" style="background:rgba(240,160,0,0.2); color:#ffa040; border-color:rgba(240,160,0,0.4);" onclick="testForcePiece('L')">L</button>
-      </div>
-      <button class="test-btn w-full mt-2 bg-cyan-900/40 border border-cyan-500 text-cyan-200" onclick="testForceFourI()">🎯 Queue 4 I-Pieces</button>
+      <p style="font-size:0.48rem;color:var(--text-dim);margin-bottom:3px;">Inject a piece at the front of the queue</p>
+      <button class="test-btn" onclick="testForcePiece('I')">I</button>
+      <button class="test-btn" onclick="testForcePiece('O')">O</button>
+      <button class="test-btn" onclick="testForcePiece('T')">T</button>
+      <button class="test-btn" onclick="testForcePiece('S')">S</button>
+      <button class="test-btn" onclick="testForcePiece('Z')">Z</button>
+      <button class="test-btn" onclick="testForcePiece('J')">J</button>
+      <button class="test-btn" onclick="testForcePiece('L')">L</button>
+      <button class="test-btn" style="width:100%;margin-top:3px;" onclick="testForceFourI()">🎯 Queue 4 I-Pieces</button>
     </div>
-
-    <!-- CHAOS SECTION -->
     <div class="test-section">
       <div class="test-section-title" style="color:#fc0;">🔥 Chaos</div>
-      <div class="grid grid-cols-2 gap-2">
-        <button class="test-btn bg-yellow-900/40 border border-yellow-500 text-yellow-200" onclick="testFillRows(3)">+3 Rows</button>
-        <button class="test-btn bg-yellow-900/40 border border-yellow-500 text-yellow-200" onclick="testFillRows(6)">+6 Rows</button>
-        <button class="test-btn bg-yellow-800/50 border border-yellow-400 text-yellow-100" onclick="testFillRows(10)">+10 Rows</button>
-        <button class="test-btn bg-orange-800/60 border border-orange-400 text-white" onclick="testFillRows(15)">+15 Rows</button>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <button class="test-btn bg-purple-900/40 border border-purple-500 text-purple-200" onclick="testSetLevel(1)">Lv 1</button>
-        <button class="test-btn bg-purple-900/40 border border-purple-500 text-purple-200" onclick="testSetLevel(10)">Lv 10</button>
-        <button class="test-btn bg-purple-800/50 border border-purple-400 text-purple-100" onclick="testSetLevel(20)">Lv 20</button>
-        <button class="test-btn bg-purple-700/60 border border-purple-300 text-white" onclick="testSetLevel(50)">Lv 50</button>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <button class="test-btn bg-gray-800/60 border border-gray-500 text-gray-200" onclick="testResetBoard()">🧹 Reset</button>
-        <button class="test-btn bg-red-900/60 border border-red-400 text-red-100" onclick="testKillAI()">💀 Kill</button>
-      </div>
+      <button class="test-btn" onclick="testFillRows(3)">+3 Rows</button>
+      <button class="test-btn" onclick="testFillRows(6)">+6 Rows</button>
+      <button class="test-btn" onclick="testFillRows(10)">+10 Rows</button>
+      <button class="test-btn" onclick="testFillRows(15)">+15 Rows</button>
+      <button class="test-btn" onclick="testSetLevel(1)">Lv 1</button>
+      <button class="test-btn" onclick="testSetLevel(10)">Lv 10</button>
+      <button class="test-btn" onclick="testSetLevel(20)">Lv 20</button>
+      <button class="test-btn" onclick="testSetLevel(50)">Lv 50</button>
+      <button class="test-btn" onclick="testResetBoard()">🧹 Reset</button>
+      <button class="test-btn" onclick="testKillAI()">💀 Kill</button>
     </div>
-
-    <!-- LOG -->
-    <div>
-      <div class="test-section-title" style="color:#88aacc;">📋 Action Log</div>
-      <div id="test-log">
-        <div class="log-entry" style="color:#888;">[ready] Test AI initialized...</div>
-      </div>
-    </div>
+    <div class="test-section-title">📋 Action Log</div>
+    <div id="test-log"><div style="color:#888;">[ready] Test AI initialized...</div></div>
   </div>
 
-  <div id="controls-side" class="controls-box rounded-xl p-5 w-full lg:w-48 flex flex-col gap-3 order-4 hidden">
-    <div class="text-cyan-400 font-bold tracking-widest text-center text-sm">CONTROLS</div>
-    <div class="text-xs text-gray-300 space-y-2">
-      <div><span class="text-white font-bold">← →</span> <span class="text-gray-400">Move</span></div>
-      <div><span class="text-white font-bold">↑</span> <span class="text-gray-400">Rotate</span></div>
-      <div><span class="text-white font-bold">↓</span> <span class="text-gray-400">Soft Drop</span></div>
-      <div><span class="text-white font-bold">Space</span> <span class="text-gray-400">Hard Drop</span></div>
-      <div><span class="text-white font-bold">R</span> <span class="text-gray-400">Hold Piece</span></div>
-      <div><span class="text-white font-bold">Esc</span> <span class="text-gray-400">Pause</span></div>
+  <div class="mobile-controls">
+    <div class="m-dpad">
+      <div class="m-btn" data-key="ArrowLeft">←</div>
+      <div class="m-btn" data-key="ArrowDown">↓</div>
+      <div class="m-btn" data-key="ArrowRight">→</div>
+    </div>
+    <div class="m-actions">
+      <div class="m-btn" data-key="r">R</div>
+      <div class="m-btn" data-key="ArrowUp">↻</div>
+      <div class="m-btn m-big" data-key=" ">DROP</div>
     </div>
   </div>
 </div>
 
 <script>
-const COLS = 10;
-const ROWS = 20;
-const HIDDEN_ROWS = 2;
-const TOTAL_ROWS = ROWS + HIDDEN_ROWS;
-const BLOCK_SIZE = 30;
-const BASE_LOOKAHEAD = 100;
-const LOOKAHEAD_PER_LEVEL = 5;
-const BEAM_WIDTH = 4;
-const VISUAL_PLAN_DEPTH = 5;
-
-const COLORS = {
-  I: '#00f0f0', O: '#f0f000', T: '#a000f0', S: '#00f000',
-  Z: '#f00000', J: '#0000f0', L: '#f0a000', G: '#666666',
-  ghost: 'rgba(255,255,255,0.15)'
+const COLS=10,ROWS=20,HIDDEN_ROWS=2,TOTAL_ROWS=ROWS+HIDDEN_ROWS,BLOCK_SIZE=30;
+const BASE_LOOKAHEAD=100,LOOKAHEAD_PER_LEVEL=5;
+const STALL_SOFT=10000,STALL_HARD=15000;
+const COLORS={I:'#00e5ff',O:'#ffea00',T:'#d500f9',S:'#00e676',Z:'#ff1744',J:'#2979ff',L:'#ff9100',G:'#444444',ghost:'rgba(255,255,255,0.15)'};
+const SHAPES={
+I:[[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]],[[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]],[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]],
+O:[[[1,1],[1,1]],[[1,1],[1,1]],[[1,1],[1,1]],[[1,1],[1,1]]],
+T:[[[0,1,0],[1,1,1],[0,0,0]],[[0,1,0],[0,1,1],[0,1,0]],[[0,0,0],[1,1,1],[0,1,0]],[[0,1,0],[1,1,0],[0,1,0]]],
+S:[[[0,1,1],[1,1,0],[0,0,0]],[[0,1,0],[0,1,1],[0,0,1]],[[0,0,0],[0,1,1],[1,1,0]],[[1,0,0],[1,1,0],[0,1,0]]],
+Z:[[[1,1,0],[0,1,1],[0,0,0]],[[0,0,1],[0,1,1],[0,1,0]],[[0,0,0],[1,1,0],[0,1,1]],[[0,1,0],[1,1,0],[1,0,0]]],
+J:[[[1,0,0],[1,1,1],[0,0,0]],[[0,1,1],[0,1,0],[0,1,0]],[[0,0,0],[1,1,1],[0,0,1]],[[0,1,0],[0,1,0],[1,1,0]]],
+L:[[[0,0,1],[1,1,1],[0,0,0]],[[0,1,0],[0,1,0],[0,1,1]],[[0,0,0],[1,1,1],[1,0,0]],[[1,1,0],[0,1,0],[0,1,0]]]
 };
+const COMBO_TABLE=[0,0,1,1,2,2,3,3,4,4,4,5,5,5,6,6,6,7,7,7,8];
+let mode='single',watchSubMode=null,aiDifficulty=3,player=null,ai=null,paused=false,animationId=null,lastTime=0;
 
-const SHAPES = {
-  I: [[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]], [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]], [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]],
-  O: [[[1,1],[1,1]], [[1,1],[1,1]], [[1,1],[1,1]], [[1,1],[1,1]]],
-  T: [[[0,1,0],[1,1,1],[0,0,0]], [[0,1,0],[0,1,1],[0,1,0]], [[0,0,0],[1,1,1],[0,1,0]], [[0,1,0],[1,1,0],[0,1,0]]],
-  S: [[[0,1,1],[1,1,0],[0,0,0]], [[0,1,0],[0,1,1],[0,0,1]], [[0,0,0],[0,1,1],[1,1,0]], [[1,0,0],[1,1,0],[0,1,0]]],
-  Z: [[[1,1,0],[0,1,1],[0,0,0]], [[0,0,1],[0,1,1],[0,1,0]], [[0,0,0],[1,1,0],[0,1,1]], [[0,1,0],[1,1,0],[1,0,0]]],
-  J: [[[1,0,0],[1,1,1],[0,0,0]], [[0,1,1],[0,1,0],[0,1,0]], [[0,0,0],[1,1,1],[0,0,1]], [[0,1,0],[0,1,0],[1,1,0]]],
-  L: [[[0,0,1],[1,1,1],[0,0,0]], [[0,1,0],[0,1,0],[0,1,1]], [[0,0,0],[1,1,1],[1,0,0]], [[1,1,0],[0,1,0],[0,1,0]]]
-};
+function baseGarbageForClear(l){if(l===1)return 0;if(l===2)return 1;if(l===3)return 2;if(l===4)return 4;return 0}
+function getAILookahead(level){return BASE_LOOKAHEAD+(level-1)*LOOKAHEAD_PER_LEVEL;}
+function getBeamWidth(){return [2,3,4,5,6,8][aiDifficulty-1]||4;}
+function getSearchDepth(){return [3,5,7,9,12,16][aiDifficulty-1]||7;}
+function getAIMoveSpeed(level){const speeds=[3,6,12,20,35,60];const base=speeds[aiDifficulty-1]||12;return Math.max(16,Math.floor(1000/(base+(level-1)*0.1)));}
+function getGravityDropSpeed(level){return Math.max(1,Math.floor(800*Math.pow(0.85,level-1)));}
+function formatGravity(level){const ms=getGravityDropSpeed(level);const rps=1000/ms;return rps>=10?rps.toFixed(1)+'/s':rps.toFixed(2)+'/s';}
 
-const COMBO_TABLE = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8];
-
-function baseGarbageForClear(linesCleared) {
-  if (linesCleared === 1) return 0;
-  if (linesCleared === 2) return 1;
-  if (linesCleared === 3) return 2;
-  if (linesCleared === 4) return 4;
-  return 0;
+class TetrisInstance{
+constructor(isAI,canvasId,holdCanvasId,comboOverlayId,garbageBarId,nextQueueId){
+this.isAI=isAI;this.canvas=document.getElementById(canvasId);this.ctx=this.canvas.getContext('2d');
+this.holdCtx=document.getElementById(holdCanvasId).getContext('2d');this.comboOverlayId=comboOverlayId;
+this.garbageBarId=garbageBarId;this.nextQueueId=nextQueueId;this.reset();
+}
+reset(){
+this.board=Array.from({length:TOTAL_ROWS},()=>Array(COLS).fill(0));
+this.currentPiece=null;this.nextQueue=[];this.holdPiece=null;this.canHold=true;
+this.score=0;this.level=1;this.lines=0;this.tetrises=0;this.combo=0;this.maxCombo=0;this.b2b=0;this.maxB2B=0;
+this.pendingGarbage=0;this.gameOver=false;this.aiState='IDLE';this.targetX=0;this.targetRot=0;this.dropTimer=0;this.moveTimer=0;
+this.garbageClock=0;this.stalling=false;this.distributeAmount=0;this.distributeRemaining=0;
+this.fillQueue();this.spawnPiece();this.drawHoldPiece();this.updateGarbageBar();this.drawNextQueue();
+}
+fillQueue(){
+const target=getAILookahead(this.level)+14;
+while(this.nextQueue.length<target){
+let p=['I','O','T','S','Z','J','L'];
+for(let i=p.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}
+this.nextQueue.push(...p);
+}
+}
+isValid(b,type,rot,x,y){const s=SHAPES[type][rot];for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){let nx=x+c,ny=y+r;if(nx<0||nx>=COLS||ny>=TOTAL_ROWS||(ny>=0&&b[ny][nx]!==0))return false;}return true;}
+hasBlockAboveVisible(b){
+for(let r=0;r<HIDDEN_ROWS;r++)for(let c=0;c<COLS;c++)if(b[r][c]!==0&&b[r][c]!=='G')return true;
+return false;
+}
+countHoles(b){let h=0;for(let c=0;c<COLS;c++){let seen=false;for(let r=0;r<TOTAL_ROWS;r++){if(b[r][c]!==0)seen=true;else if(seen)h++;}}return h;}
+isTetrisViable(){
+const cur=this.currentPiece?this.currentPiece.type:null;
+const hasI=cur==='I'||this.nextQueue.slice(0,14).includes('I');
+return hasI&&this.countHoles(this.board)<=3;
+}
+spawnPiece(forcedType,opponent){
+this.fillQueue();const type=forcedType||this.nextQueue.shift();
+this.currentPiece={type,rotation:0,x:Math.floor((COLS-SHAPES[type][0][0].length)/2),y:0};
+while(!this.isValid(this.board,this.currentPiece.type,0,this.currentPiece.x,this.currentPiece.y)&&this.currentPiece.y<TOTAL_ROWS)this.currentPiece.y++;
+if(this.currentPiece.y>=TOTAL_ROWS||!this.isValid(this.board,this.currentPiece.type,0,this.currentPiece.x,this.currentPiece.y)){this.gameOver=true;return;}
+this.canHold=true;
+if(this.isAI){
+const la=getAILookahead(this.level);
+const result=this.deepBeamSearch(this.board,this.currentPiece.type,this.nextQueue.slice(0,la),opponent,this.combo,this.b2b);
+if(result){this.targetX=result.finalX;this.targetRot=result.finalRot;this.aiState='ALIGNING';this.moveTimer=0;}
+else{this.aiState='DROPPING';this.dropTimer=0;}
+}
+this.drawNextQueue();
+}
+holdCurrentPiece(){
+if(!this.canHold||this.gameOver||this.isAI)return;
+const ct=this.currentPiece.type;
+const oldX=this.currentPiece.x;
+const oldRot=this.currentPiece.rotation;
+let newType,newX,newRot;
+if(this.holdPiece){
+newType=this.holdPiece;
+this.holdPiece=ct;
+}else{
+newType=this.holdPiece=ct;
+}
+newRot=0;
+newX=Math.floor((COLS-SHAPES[newType][0][0].length)/2);
+if(!this.isValid(this.board,newType,newRot,newX,0)){
+let found=false;
+const kicks=[[-1,0],[1,0],[-2,0],[2,0],[0,-1],[0,-2],[-1,-1],[1,-1]];
+for(let k=0;k<kicks.length;k++){
+if(this.isValid(this.board,newType,newRot,newX+kicks[k][0],0+kicks[k][1])){
+newX+=kicks[k][0];found=true;break;
+}
+}
+if(!found){
+for(let dy=-1;dy>=-3;dy--){
+if(this.isValid(this.board,newType,newRot,newX,dy)){
+this.currentPiece={type:newType,rotation:newRot,x:newX,y:dy};
+this.canHold=false;this.drawHoldPiece();return;
+}
+}
+this.holdPiece=ct;
+return;
+}
+}
+this.currentPiece={type:newType,rotation:newRot,x:newX,y:0};
+while(!this.isValid(this.board,this.currentPiece.type,0,this.currentPiece.x,this.currentPiece.y)&&this.currentPiece.y<TOTAL_ROWS)this.currentPiece.y++;
+if(this.currentPiece.y>=TOTAL_ROWS||!this.isValid(this.board,this.currentPiece.type,0,this.currentPiece.x,this.currentPiece.y)){
+this.holdPiece=ct;
+this.currentPiece={type:ct,rotation:oldRot,x:oldX,y:0};
+while(!this.isValid(this.board,this.currentPiece.type,oldRot,this.currentPiece.x,this.currentPiece.y)&&this.currentPiece.y<TOTAL_ROWS)this.currentPiece.y++;
+return;
+}
+this.canHold=false;
+this.drawHoldPiece();
+}
+applyGarbage(amount){
+if(amount<=0||this.gameOver)return;
+amount=Math.min(amount,30);const hole=Math.floor(Math.random()*COLS);
+for(let i=0;i<amount;i++){
+this.board.shift();const nr=Array(COLS).fill('G');nr[hole]=0;this.board.push(nr);
+if(this.hasBlockAboveVisible(this.board)){this.gameOver=true;return;}
+}
+this.combo=0;
+}
+queueGarbage(amount){
+if(amount<=0)return;
+if(this.pendingGarbage===0&&this.distributeAmount===0){this.garbageClock=0;this.stalling=false;}
+this.pendingGarbage+=amount;
+this.updateGarbageBar();
+}
+tickGarbage(dt){
+if(this.gameOver)return;
+if(this.pendingGarbage>0){
+this.garbageClock+=dt;
+if(this.garbageClock>=STALL_HARD){
+const total=this.pendingGarbage+this.distributeAmount;
+this.applyGarbage(total);
+this.pendingGarbage=0;this.distributeAmount=0;this.distributeRemaining=0;
+this.garbageClock=0;this.stalling=false;
+this.updateGarbageBar();
+}else if(this.garbageClock>=STALL_SOFT){
+if(!this.stalling){this.stalling=true;this.updateGarbageBar();}
+}
+}
+}
+updateGarbageBar(){
+const b=document.getElementById(this.garbageBarId);
+if(!b)return;
+const total=this.pendingGarbage+this.distributeAmount;
+const px=Math.min(ROWS*BLOCK_SIZE,total*BLOCK_SIZE);
+b.style.height=px+'px';
+if(this.stalling&&this.pendingGarbage>0)b.classList.add('stalling');
+else b.classList.remove('stalling');
+}
+processIncomingGarbage(){
+if(this.gameOver)return;
+if(this.distributeRemaining>0){
+const chunk=Math.ceil(this.distributeAmount/this.distributeRemaining);
+this.applyGarbage(chunk);
+this.distributeAmount-=chunk;
+this.distributeRemaining--;
+if(this.gameOver){this.updateGarbageBar();return;}
+}
+if(this.pendingGarbage>0){
+const wasStalling=this.stalling;
+const incoming=this.pendingGarbage;
+this.pendingGarbage=0;
+this.garbageClock=0;
+this.stalling=false;
+if(wasStalling){
+this.applyGarbage(incoming+this.distributeAmount);
+this.distributeAmount=0;
+this.distributeRemaining=0;
+}else{
+this.distributeAmount+=incoming;
+if(this.distributeRemaining<=0)this.distributeRemaining=3;
+}
+}
+this.updateGarbageBar();
+}
+lockPiece(opponent){
+const s=SHAPES[this.currentPiece.type][this.currentPiece.rotation];
+for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){let ny=this.currentPiece.y+r,nx=this.currentPiece.x+c;if(ny>=0&&ny<TOTAL_ROWS&&nx>=0&&nx<COLS)this.board[ny][nx]=this.currentPiece.type;}
+this.currentPiece=null;
+let lc=0;for(let r=TOTAL_ROWS-1;r>=0;r--)if(this.board[r].every(c=>c!==0)){this.board.splice(r,1);this.board.unshift(Array(COLS).fill(0));lc++;r++;}
+const idc=lc===4;
+if(lc>0){this.combo++;if(this.combo>this.maxCombo)this.maxCombo=this.combo;if(idc){this.b2b++;if(this.b2b>this.maxB2B)this.maxB2B=this.b2b;}else this.b2b=0;}else this.combo=0;
+this.score+=[0,100,300,500,800][lc]*this.level+(lc>0&&this.combo>1?50*(this.combo-1)*this.level:0)+(idc&&this.b2b>1?200*this.level:0);
+this.lines+=lc;this.level=Math.floor(this.lines/10)+1;
+if(lc===4){this.tetrises++;if(!this.isAI)flashTetris();}
+let pc=false;if(lc>0&&this.board.every(r=>r.every(c=>c===0))){pc=true;this.score+=3000*this.level;if(!this.isAI)flashTetris();}
+let gts=baseGarbageForClear(lc);
+if(idc&&this.b2b>1)gts=Math.floor(gts*1.5);
+if(this.combo>=2)gts+=this.combo-1<COMBO_TABLE.length?COMBO_TABLE[this.combo-1]:COMBO_TABLE[20];
+if(pc)gts+=10;
+if(gts>0&&opponent&&!opponent.gameOver){
+const cancelled=Math.min(gts,opponent.pendingGarbage);
+opponent.pendingGarbage-=cancelled;
+const net=gts-cancelled;
+if(net>0)opponent.queueGarbage(net);
+else opponent.updateGarbageBar();
+}
+this.processIncomingGarbage();
+updateUI();
+if(!this.gameOver)this.spawnPiece(null,opponent);
+}
+simulatePlacement(b,type,rot,x,y){
+const nb=b.map(r=>r.slice());const s=SHAPES[type][rot];const pc=[];
+for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){const ny=y+r,nx=x+c;if(ny>=0&&ny<TOTAL_ROWS&&nx>=0&&nx<COLS){nb[ny][nx]=type;pc.push({r:ny,c:nx});}}
+let lc=0,ec=0;
+for(let r=TOTAL_ROWS-1;r>=0;r--)if(nb[r].every(c=>c!==0)){for(const cell of pc)if(cell.r===r)ec++;nb.splice(r,1);nb.unshift(Array(COLS).fill(0));for(const cell of pc){if(cell.r<r)cell.r++;else if(cell.r===r)cell.r=-1;}lc++;r++;}
+return{board:nb,linesCleared:lc,erodedCells:ec,cells:pc.filter(c=>c.r>=0)};
+}
+evaluateBoard(b,lc,ca,ba,pi,ctx){
+const heights=new Uint8Array(COLS);
+let aggregate=0,maxH=0,holes=0,bump=0,blocks=0;
+for(let c=0;c<COLS;c++){
+let found=false,seen=false;
+for(let r=0;r<TOTAL_ROWS;r++){
+if(b[r][c]!==0){if(!found){heights[c]=TOTAL_ROWS-r;found=true;}seen=true;blocks++;}
+else if(seen){holes++;}
+}
+aggregate+=heights[c];if(heights[c]>maxH)maxH=heights[c];
+}
+for(let c=0;c<COLS-1;c++)bump+=Math.abs(heights[c]-heights[c+1]);
+let sc=0;
+sc-=aggregate*0.6;
+sc-=maxH*maxH*0.35;
+sc-=holes*1.2;
+sc-=bump*0.35;
+if(lc===1)sc+=4;else if(lc===2)sc+=10;else if(lc===3)sc+=18;else if(lc===4)sc+=40;
+if(lc>0)sc+=0.5*(pi?pi.erodedCells:0);
+if(lc>0&&ca>=2)sc+=Math.pow(ca,2.1)*1.6;
+if(lc===4&&ba>=2)sc+=ba*5;
+if(lc>0&&blocks===0)sc+=120;
+if(ctx.tetrisMode){
+if(lc===4)sc+=18+(ba>=2?ba*5:0);
+if(maxH<=8&&holes===0)sc+=6;
+let bestD=0,bestC=-1;
+for(let c=0;c<COLS;c++){const lH=c>0?heights[c-1]:99;const rH=c<COLS-1?heights[c+1]:99;const d=Math.min(lH,rH)-heights[c];if(d>bestD){bestD=d;bestC=c;}}
+if(bestD>=4&&(bestC===0||bestC===COLS-1)){sc+=9;if(ctx.currentType==='I'||ctx.nextTypes.slice(0,4).includes('I'))sc+=11;}
+}
+return sc;
+}
+findTopPlacements(b,type,cb,bb,ctx,topK){
+const cands=[];const rc=type==='O'?1:(type==='I'||type==='S'||type==='Z')?2:4;
+for(let rot=0;rot<rc;rot++)for(let x=-2;x<COLS+2;x++){
+let sy=0;while(!this.isValid(b,type,rot,x,sy)&&sy<TOTAL_ROWS)sy++;
+if(sy>=TOTAL_ROWS)continue;
+let y=sy;while(this.isValid(b,type,rot,x,y+1))y++;
+const sim=this.simulatePlacement(b,type,rot,x,y);
+const ca=sim.linesCleared>0?cb+1:0;const idc=sim.linesCleared===4;const ba=idc?bb+1:0;
+cands.push({score:this.evaluateBoard(sim.board,sim.linesCleared,ca,ba,sim,ctx),board:sim.board,linesCleared:sim.linesCleared,comboAfter:ca,b2bAfter:ba,x,rot,y});
+}
+cands.sort((a,b2)=>b2.score-a.score);
+return cands.slice(0,topK);
+}
+deepBeamSearch(b,ct,nt,opp,cc,cb){
+const myH=this.computeMaxHeight(b);
+const tetrisMode=aiDifficulty>=3&&this.isTetrisViable();
+const ctx={myMaxHBefore:myH,comboBefore:cc,b2bBefore:cb,tetrisMode,currentType:ct,nextTypes:nt};
+const allPieces=[ct,...nt];
+const searchDepth=Math.min(allPieces.length,getSearchDepth());
+const bw=getBeamWidth();
+let beam=[{board:b,combo:cc,b2b:cb,totalScore:0,sequence:[]}];
+for(let d=0;d<searchDepth;d++){
+const pt=allPieces[d];
+const dw=Math.pow(0.995,d);
+const nb=[];
+for(const st of beam){
+const c={...ctx,currentType:pt,nextTypes:allPieces.slice(d+1,d+8),myMaxHBefore:this.computeMaxHeight(st.board)};
+const pl=this.findTopPlacements(st.board,pt,st.combo,st.b2b,c,bw);
+for(const p of pl){
+nb.push({board:p.board,combo:p.comboAfter,b2b:p.b2bAfter,totalScore:st.totalScore+p.score*dw,sequence:st.sequence.concat([{type:pt,x:p.x,rot:p.rot}])});
+}
+}
+if(nb.length===0)break;
+nb.sort((a,b2)=>b2.totalScore-a.totalScore);
+beam=nb.slice(0,bw);
+}
+if(beam.length===0||!beam[0].sequence.length)return null;
+const fm=beam[0].sequence[0];
+return{finalX:fm.x,finalRot:fm.rot};
+}
+computeMaxHeight(b){for(let r=0;r<TOTAL_ROWS;r++)for(let c=0;c<COLS;c++)if(b[r][c]!==0)return TOTAL_ROWS-r;return 0;}
+update(dt,opponent){
+if(this.gameOver||!this.isAI)return;
+const ms=getAIMoveSpeed(this.level);
+if(this.aiState==='ALIGNING'){this.moveTimer+=dt;if(this.moveTimer>=ms){this.moveTimer-=ms;let al=true;
+if(this.currentPiece.rotation!==this.targetRot){al=false;const nr=(this.currentPiece.rotation+1)%4;
+if(this.isValid(this.board,this.currentPiece.type,nr,this.currentPiece.x,this.currentPiece.y))this.currentPiece.rotation=nr;
+else{let k=false;for(let dx of[-1,1,-2,2])if(this.isValid(this.board,this.currentPiece.type,nr,this.currentPiece.x+dx,this.currentPiece.y)){this.currentPiece.x+=dx;this.currentPiece.rotation=nr;k=true;break;}
+if(!k&&this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,this.currentPiece.y+1))this.currentPiece.y++;}}
+else if(this.currentPiece.x!==this.targetX){al=false;const d=this.targetX>this.currentPiece.x?1:-1;
+if(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x+d,this.currentPiece.y))this.currentPiece.x+=d;
+else if(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,this.currentPiece.y+1))this.currentPiece.y++;}
+if(al){this.aiState='DROPPING';this.dropTimer=0;}}}
+else if(this.aiState==='DROPPING'){while(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,this.currentPiece.y+1))this.currentPiece.y++;this.lockPiece(opponent);}
+}
+drawBlock(x,y,type,ghost){const px=x*BLOCK_SIZE,py=y*BLOCK_SIZE;if(ghost){this.ctx.fillStyle=COLORS.ghost;this.ctx.fillRect(px,py,BLOCK_SIZE,BLOCK_SIZE);this.ctx.strokeStyle='rgba(255,255,255,0.3)';this.ctx.lineWidth=1;this.ctx.strokeRect(px+0.5,py+0.5,BLOCK_SIZE-1,BLOCK_SIZE-1);return;}this.ctx.fillStyle=COLORS[type];this.ctx.fillRect(px,py,BLOCK_SIZE,BLOCK_SIZE);this.ctx.lineWidth=2;this.ctx.strokeStyle='rgba(255,255,255,0.3)';this.ctx.beginPath();this.ctx.moveTo(px,py+BLOCK_SIZE);this.ctx.lineTo(px,py);this.ctx.lineTo(px+BLOCK_SIZE,py);this.ctx.stroke();this.ctx.strokeStyle='rgba(0,0,0,0.3)';this.ctx.beginPath();this.ctx.moveTo(px+BLOCK_SIZE,py);this.ctx.lineTo(px+BLOCK_SIZE,py+BLOCK_SIZE);this.ctx.lineTo(px,py+BLOCK_SIZE);this.ctx.stroke();this.ctx.fillStyle='rgba(255,255,255,0.1)';this.ctx.fillRect(px+4,py+4,BLOCK_SIZE-8,BLOCK_SIZE-8);}
+draw(){this.ctx.fillStyle='#000';this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height);this.ctx.strokeStyle='rgba(255,255,255,0.05)';this.ctx.lineWidth=1;for(let r=0;r<=ROWS;r++){this.ctx.beginPath();this.ctx.moveTo(0,r*BLOCK_SIZE);this.ctx.lineTo(COLS*BLOCK_SIZE,r*BLOCK_SIZE);this.ctx.stroke();}for(let c=0;c<=COLS;c++){this.ctx.beginPath();this.ctx.moveTo(c*BLOCK_SIZE,0);this.ctx.lineTo(c*BLOCK_SIZE,ROWS*BLOCK_SIZE);this.ctx.stroke();}for(let r=HIDDEN_ROWS;r<TOTAL_ROWS;r++)for(let c=0;c<COLS;c++)if(this.board[r][c]!==0)this.drawBlock(c,r-HIDDEN_ROWS,this.board[r][c]);if(this.currentPiece&&!this.gameOver){let gy=this.currentPiece.y;while(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,gy+1))gy++;const s=SHAPES[this.currentPiece.type][this.currentPiece.rotation];for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){let dy=gy+r-HIDDEN_ROWS;if(dy>=0)this.drawBlock(this.currentPiece.x+c,dy,this.currentPiece.type,true);}for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){let dy=this.currentPiece.y+r-HIDDEN_ROWS;if(dy>=0)this.drawBlock(this.currentPiece.x+c,dy,this.currentPiece.type,false);}}}
+drawMini(ctx,type,w,h,s=16){ctx.clearRect(0,0,w,h);if(!type)return;const shape=SHAPES[type][0];const ox=(w-shape[0].length*s)/2,oy=(h-shape.length*s)/2;for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++)if(shape[y][x]){const px=ox+x*s,py=oy+y*s;ctx.fillStyle=COLORS[type];ctx.fillRect(px,py,s-1,s-1);ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.beginPath();ctx.moveTo(px,py+s-1);ctx.lineTo(px,py);ctx.lineTo(px+s-1,py);ctx.stroke();ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.moveTo(px+s-1,py);ctx.lineTo(px+s-1,py+s-1);ctx.lineTo(px,py+s-1);ctx.stroke();}}
+drawHoldPiece(){this.drawMini(this.holdCtx,this.holdPiece,120,80,20);}
+drawNextQueue(){
+const c=document.getElementById(this.nextQueueId);if(!c)return;
+if(!c.hasChildNodes()){for(let i=0;i<5;i++){const cv=document.createElement('canvas');cv.width=80;cv.height=60;cv.className='mini-canvas';c.appendChild(cv);}}
+const cvs=c.querySelectorAll('canvas');
+for(let i=0;i<5;i++){const ctx=cvs[i].getContext('2d');this.drawMini(ctx,this.nextQueue[i],80,60,12);}
+}
+handleInput(key,opponent){
+if(this.gameOver||this.isAI)return;
+if(key==='ArrowLeft'){if(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x-1,this.currentPiece.y))this.currentPiece.x--;}
+else if(key==='ArrowRight'){if(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x+1,this.currentPiece.y))this.currentPiece.x++;}
+else if(key==='ArrowDown'){if(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,this.currentPiece.y+1)){this.currentPiece.y++;this.score++;}}
+else if(key==='ArrowUp'){const nr=(this.currentPiece.rotation+1)%4;if(this.isValid(this.board,this.currentPiece.type,nr,this.currentPiece.x,this.currentPiece.y))this.currentPiece.rotation=nr;else if(this.isValid(this.board,this.currentPiece.type,nr,this.currentPiece.x-1,this.currentPiece.y)){this.currentPiece.x--;this.currentPiece.rotation=nr;}else if(this.isValid(this.board,this.currentPiece.type,nr,this.currentPiece.x+1,this.currentPiece.y)){this.currentPiece.x++;this.currentPiece.rotation=nr;}}
+else if(key===' '){while(this.isValid(this.board,this.currentPiece.type,this.currentPiece.rotation,this.currentPiece.x,this.currentPiece.y+1)){this.currentPiece.y++;this.score+=2;}this.lockPiece(opponent);}
+else if(key==='r'||key==='R')this.holdCurrentPiece();
+}
 }
 
-function getAILookahead(level) {
-  return BASE_LOOKAHEAD + (level - 1) * LOOKAHEAD_PER_LEVEL;
+function openDifficulty(){document.getElementById('difficulty-overlay').classList.remove('hidden');}
+function closeDifficulty(){document.getElementById('difficulty-overlay').classList.add('hidden');}
+function openWatchMenu(){document.getElementById('watch-overlay').classList.remove('hidden');}
+function closeWatchMenu(){document.getElementById('watch-overlay').classList.add('hidden');}
+function openPauseMenu(){if(player||ai)togglePause();}
+
+function initNextEl(id){const c=document.getElementById(id);if(!c)return;c.innerHTML='';for(let i=0;i<5;i++){const cv=document.createElement('canvas');cv.width=80;cv.height=60;cv.className='mini-canvas';c.appendChild(cv);}}
+
+function startGame(selectedMode,diff,subMode){
+mode=selectedMode;if(diff)aiDifficulty=diff;if(subMode)watchSubMode=subMode;
+if(mode==='watch_ai')aiDifficulty=6;
+document.querySelectorAll('.overlay').forEach(el=>el.classList.add('hidden'));
+document.getElementById('game-ui').style.display='flex';
+document.getElementById('exit-pause-btn').style.display='block';
+
+const leftEdge=document.getElementById('left-edge-sidebar');
+const rightEdge=document.getElementById('right-edge-sidebar');
+const pSidebar=document.getElementById('p-sidebar');
+const aiSidebar=document.getElementById('ai-sidebar');
+const soloRight=document.getElementById('solo-right-sidebar');
+const pTitle=document.getElementById('p-title');
+const aiTitle=document.getElementById('ai-title');
+const testPanel=document.getElementById('test-panel');
+
+document.getElementById('ai-board-container').style.display='none';
+testPanel.classList.remove('show');
+leftEdge.style.display='none';
+rightEdge.style.display='none';
+aiSidebar.style.display='none';
+soloRight.style.display='none';
+
+const battle=(mode==='vs_ai')||(mode==='watch_ai'&&watchSubMode==='ai_vs_ai');
+
+if(battle){
+leftEdge.style.display='flex';
+rightEdge.style.display='flex';
+aiSidebar.style.display='flex';
+document.getElementById('ai-board-container').style.display='block';
+initNextEl('p-next-queue-battle');
+initNextEl('a-next-queue-battle');
+if(mode==='vs_ai'){pTitle.innerText='PLAYER';aiTitle.innerText='WUMBO AI';
+player=new TetrisInstance(false,'p-canvas','p-hold-canvas','p-combo-overlay','p-garbage-bar','p-next-queue-battle');
+ai=new TetrisInstance(true,'ai-canvas','a-hold-canvas','a-combo-overlay','a-garbage-bar','a-next-queue-battle');}
+else{pTitle.innerText='ALPHA AI';aiTitle.innerText='OMEGA AI';
+player=new TetrisInstance(true,'p-canvas','p-hold-canvas','p-combo-overlay','p-garbage-bar','p-next-queue-battle');
+ai=new TetrisInstance(true,'ai-canvas','a-hold-canvas','a-combo-overlay','a-garbage-bar','a-next-queue-battle');}
+}else{
+soloRight.style.display='flex';
+initNextEl('p-next-queue-solo');
+if(mode==='single'){pTitle.innerText='PLAYER';player=new TetrisInstance(false,'p-canvas','p-hold-canvas','p-combo-overlay','p-garbage-bar','p-next-queue-solo');ai=null;}
+else if(mode==='watch_ai'){pTitle.innerText='WUMBO AI';player=new TetrisInstance(true,'p-canvas','p-hold-canvas','p-combo-overlay','p-garbage-bar','p-next-queue-solo');ai=null;}
+else if(mode==='test_ai'){pTitle.innerText='TEST AI';testPanel.classList.add('show');player=new TetrisInstance(true,'p-canvas','p-hold-canvas','p-combo-overlay','p-garbage-bar','p-next-queue-solo');ai=null;clearTestLog();logTest('ready','Test AI initialized...');}
 }
 
-class TetrisInstance {
-  constructor(isAI, canvasId, nextContainerId, holdContainerId, comboOverlayId, garbageBarId) {
-    this.isAI = isAI;
-    this.canvas = document.getElementById(canvasId);
-    this.ctx = this.canvas.getContext('2d');
-    this.nextContainerId = nextContainerId;
-    this.holdContainerId = holdContainerId;
-    this.comboOverlayId = comboOverlayId;
-    this.garbageBarId = garbageBarId;
-    this.reset();
-  }
-
-  reset() {
-    this.board = [];
-    for (let r = 0; r < TOTAL_ROWS; r++) this.board.push(new Array(COLS).fill(0));
-    this.currentPiece = null;
-    this.nextQueue = [];
-    this.holdPiece = null;
-    this.canHold = true;
-    this.score = 0;
-    this.level = 1;
-    this.lines = 0;
-    this.tetrises = 0;
-    this.combo = 0;
-    this.maxCombo = 0;
-    this.b2b = 0;
-    this.maxB2B = 0;
-    this.pendingGarbage = 0;
-    this.gameOver = false;
-    this.aiState = 'IDLE';
-    this.targetX = 0;
-    this.targetRot = 0;
-    this.dropTimer = 0;
-    this.moveTimer = 0;
-    this.plannedSequence = [];
-    this.fillQueue();
-    this.spawnPiece();
-    this.drawHoldPiece();
-    this.updateGarbageBar();
-  }
-
-  fillQueue() {
-    const target = getAILookahead(this.level) + 14;
-    while (this.nextQueue.length < target) {
-      const pieces = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
-      for (let i = pieces.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
-      }
-      this.nextQueue.push(...pieces);
-    }
-  }
-
-  isValid(boardState, type, rot, x, y) {
-    const shape = SHAPES[type][rot];
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        if (shape[r][c]) {
-          let nx = x + c, ny = y + r;
-          if (nx < 0 || nx >= COLS || ny >= TOTAL_ROWS) return false;
-          if (ny >= 0 && boardState[ny][nx] !== 0) return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  spawnPiece(forcedType = null, opponent = null) {
-    this.fillQueue();
-    const type = forcedType || this.nextQueue.shift();
-    const shape = SHAPES[type][0];
-    this.currentPiece = {
-      type: type, rotation: 0,
-      x: Math.floor((COLS - shape[0].length) / 2), y: 0
-    };
-    while (!this.isValid(this.board, this.currentPiece.type, 0, this.currentPiece.x, this.currentPiece.y) && this.currentPiece.y < TOTAL_ROWS) {
-      this.currentPiece.y++;
-    }
-    if (this.currentPiece.y >= TOTAL_ROWS || !this.isValid(this.board, this.currentPiece.type, 0, this.currentPiece.x, this.currentPiece.y)) {
-      this.gameOver = true;
-      return;
-    }
-
-    this.canHold = true;
-    this.drawNextPieces();
-
-    if (this.pendingGarbage > 0 && !this.gameOver) {
-      // Apply the ENTIRE pending amount as ONE round of garbage (one consistent hole column)
-      this.applyGarbage(this.pendingGarbage);
-      this.pendingGarbage = 0;
-      this.updateGarbageBar();
-    }
-
-    if (this.isAI) {
-      const lookahead = getAILookahead(this.level);
-      const nextTypes = this.nextQueue.slice(0, lookahead);
-      const result = this.deepBeamSearch(this.board, this.currentPiece.type, nextTypes, opponent, this.combo, this.b2b);
-      if (result) {
-        this.targetX = result.finalX;
-        this.targetRot = result.finalRot;
-        this.plannedSequence = result.plannedSequence || [];
-        this.aiState = 'ALIGNING';
-        this.moveTimer = 0;
-      } else {
-        this.aiState = 'DROPPING';
-        this.dropTimer = 0;
-        this.plannedSequence = [];
-      }
-    }
-  }
-
-  holdCurrentPiece() {
-    if (!this.canHold || this.gameOver || this.isAI) return;
-    const currentType = this.currentPiece.type;
-    if (this.holdPiece) {
-      const temp = this.holdPiece;
-      this.holdPiece = currentType;
-      this.spawnPiece(temp);
-    } else {
-      this.holdPiece = currentType;
-      this.spawnPiece();
-    }
-    this.canHold = false;
-    this.drawHoldPiece();
-  }
-
-  // Modern Tetris garbage: each CALL to applyGarbage produces ONE batch of rows,
-  // all sharing the SAME hole column. This creates "one big garbage with one big hole".
-  // Different calls (different rounds) may use different hole columns.
-  applyGarbage(amount) {
-    if (amount <= 0) return;
-    amount = Math.min(amount, 20);
-    // ONE consistent hole column for this entire batch (one round = one hole)
-    const holeCol = Math.floor(Math.random() * COLS);
-
-    for (let i = 0; i < amount; i++) {
-      if (this.board[0].some(cell => cell !== 0)) {
-        this.gameOver = true;
-        return;
-      }
-      this.board.shift();
-      const newRow = new Array(COLS).fill('G');
-      newRow[holeCol] = 0;  // same hole for every row in this batch
-      this.board.push(newRow);
-    }
-    if (this.currentPiece) {
-      this.currentPiece.y -= amount;
-      if (!this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y)) {
-        let safe = false;
-        for (let k = 1; k <= 4; k++) {
-          if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y - k)) {
-            this.currentPiece.y -= k;
-            safe = true;
-            break;
-          }
-        }
-        if (!safe) this.gameOver = true;
-      }
-    }
-    this.combo = 0;
-  }
-
-  queueGarbage(amount) {
-    if (amount <= 0) return;
-    this.pendingGarbage += amount;
-    this.updateGarbageBar();
-  }
-
-  updateGarbageBar() {
-    const bar = document.getElementById(this.garbageBarId);
-    if (!bar) return;
-    const maxPx = ROWS * BLOCK_SIZE;
-    const px = Math.min(maxPx, this.pendingGarbage * BLOCK_SIZE);
-    bar.style.height = px + 'px';
-  }
-
-  static cancelGarbage(mySend, theirPending) {
-    const cancelled = Math.min(mySend, theirPending);
-    return {
-      appliedToOpponent: mySend - cancelled,
-      cancelledFromMe: cancelled,
-      theirRemainingPending: theirPending - cancelled
-    };
-  }
-
-  lockPiece(opponent) {
-    const shape = SHAPES[this.currentPiece.type][this.currentPiece.rotation];
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        if (shape[r][c]) {
-          let ny = this.currentPiece.y + r, nx = this.currentPiece.x + c;
-          if (ny >= 0 && ny < TOTAL_ROWS && nx >= 0 && nx < COLS) {
-            this.board[ny][nx] = this.currentPiece.type;
-          }
-        }
-      }
-    }
-
-    let linesCleared = 0;
-    for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
-      if (this.board[r].every(cell => cell !== 0)) {
-        this.board.splice(r, 1);
-        this.board.unshift(new Array(COLS).fill(0));
-        linesCleared++;
-        r++;
-      }
-    }
-
-    const isDifficultClear = linesCleared === 4;
-
-    if (linesCleared > 0) {
-      this.combo += 1;
-      if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-      if (isDifficultClear) {
-        this.b2b += 1;
-        if (this.b2b > this.maxB2B) this.maxB2B = this.b2b;
-      } else {
-        this.b2b = 0;
-      }
-      if (this.combo >= 2 && !this.isAI) flashTetris();
-    } else {
-      this.combo = 0;
-      this.b2b = 0;
-    }
-
-    const lineScores = [0, 100, 300, 500, 800];
-    this.score += lineScores[linesCleared] * this.level;
-    if (linesCleared > 0 && this.combo > 1) {
-      this.score += 50 * (this.combo - 1) * this.level;
-    }
-    if (isDifficultClear && this.b2b > 1) {
-      this.score += 200 * this.level;
-    }
-
-    this.lines += linesCleared;
-    this.level = Math.floor(this.lines / 10) + 1;
-
-    if (linesCleared === 4) {
-      this.tetrises++;
-      if (!this.isAI) flashTetris();
-    }
-
-    let perfectClear = false;
-    if (linesCleared > 0) {
-      let empty = true;
-      for (let r = 0; r < TOTAL_ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          if (this.board[r][c] !== 0) { empty = false; break; }
-        }
-        if (!empty) break;
-      }
-      if (empty) {
-        perfectClear = true;
-        this.score += 3000 * this.level;
-        if (!this.isAI) flashTetris();
-      }
-    }
-
-    let garbageToSend = baseGarbageForClear(linesCleared);
-    if (isDifficultClear && this.b2b > 1) {
-      garbageToSend = Math.floor(garbageToSend * 1.5);
-    }
-    if (this.combo >= 2 && this.combo - 1 < COMBO_TABLE.length) {
-      garbageToSend += COMBO_TABLE[this.combo - 1];
-    } else if (this.combo - 1 >= COMBO_TABLE.length) {
-      garbageToSend += COMBO_TABLE[COMBO_TABLE.length - 1] + Math.floor((this.combo - COMBO_TABLE.length) * 0.5);
-    }
-    if (perfectClear) {
-      garbageToSend += 10;
-    }
-
-    if (garbageToSend > 0 && opponent && !opponent.gameOver) {
-      const result = TetrisInstance.cancelGarbage(garbageToSend, opponent.pendingGarbage);
-      opponent.pendingGarbage = result.theirRemainingPending;
-      opponent.updateGarbageBar();
-      if (result.appliedToOpponent > 0) {
-        opponent.queueGarbage(result.appliedToOpponent);
-      }
-    }
-
-    updateUI();
-    this.spawnPiece(null, opponent);
-  }
-
-  simulatePlacement(boardState, type, rot, x, y) {
-    const newBoard = boardState.map(row => [...row]);
-    const shape = SHAPES[type][rot];
-    const placedCells = [];
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        if (shape[r][c]) {
-          const ny = y + r, nx = x + c;
-          if (ny >= 0 && ny < TOTAL_ROWS && nx >= 0 && nx < COLS) {
-            newBoard[ny][nx] = type;
-            placedCells.push({ r: ny, c: nx });
-          }
-        }
-      }
-    }
-    let linesCleared = 0;
-    let erodedCells = 0;
-    for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
-      if (newBoard[r].every(cell => cell !== 0)) {
-        for (const cell of placedCells) {
-          if (cell.r === r) erodedCells++;
-        }
-        newBoard.splice(r, 1);
-        newBoard.unshift(new Array(COLS).fill(0));
-        for (const cell of placedCells) {
-          if (cell.r < r) cell.r++;
-          else if (cell.r === r) cell.r = -1;
-        }
-        linesCleared++;
-        r++;
-      }
-    }
-    const remainingCells = placedCells.filter(cell => cell.r >= 0);
-    return { board: newBoard, linesCleared, erodedCells, cells: remainingCells };
-  }
-
-  evaluateBoard(boardState, linesCleared, comboAfter, b2bAfter, placementInfo, context) {
-    let aggregateHeight = 0;
-    let maxHeight = 0;
-    let holes = 0;
-    let closedHoles = 0;
-    let holeDepthSum = 0;
-    let bumpiness = 0;
-    let rowTransitions = 0;
-    let totalBlocks = 0;
-    const heights = new Uint8Array(COLS);
-
-    for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < TOTAL_ROWS; r++) {
-        if (boardState[r][c] !== 0) {
-          heights[c] = TOTAL_ROWS - r;
-          break;
-        }
-      }
-      aggregateHeight += heights[c];
-      if (heights[c] > maxHeight) maxHeight = heights[c];
-    }
-
-    for (let c = 0; c < COLS; c++) {
-      let seenBlock = false;
-      let blocksAbove = 0;
-      for (let r = 0; r < TOTAL_ROWS; r++) {
-        if (boardState[r][c] !== 0) {
-          seenBlock = true;
-          blocksAbove++;
-          totalBlocks++;
-        } else if (seenBlock) {
-          holes++;
-          holeDepthSum += blocksAbove;
-          if (blocksAbove >= 2) closedHoles++;
-        }
-      }
-    }
-
-    for (let c = 0; c < COLS - 1; c++) bumpiness += Math.abs(heights[c] - heights[c + 1]);
-
-    for (let r = 0; r < TOTAL_ROWS; r++) {
-      let prev = true;
-      for (let c = 0; c < COLS; c++) {
-        const filled = boardState[r][c] !== 0;
-        if (filled !== prev) rowTransitions++;
-        prev = filled;
-      }
-      if (!prev) rowTransitions++;
-    }
-
-    let landingHeight = 0;
-    if (placementInfo && placementInfo.cells && placementInfo.cells.length > 0) {
-      let sum = 0;
-      for (const cell of placementInfo.cells) sum += (TOTAL_ROWS - cell.r);
-      landingHeight = sum / placementInfo.cells.length;
-    }
-    const erodedCells = placementInfo ? (placementInfo.erodedCells || 0) : 0;
-
-    let score = 0;
-
-    if (maxHeight >= 18) score -= 800;
-    else if (maxHeight >= 16) score -= 220;
-    else if (maxHeight >= 14) score -= 70;
-    else if (maxHeight >= 12) score -= 22;
-    else if (maxHeight >= 8) score -= maxHeight * 1.0;
-
-    score -= 0.55 * aggregateHeight;
-    score -= 0.90 * holes;
-    score -= 0.75 * closedHoles;
-    score -= 0.22 * holeDepthSum;
-    score -= 0.22 * bumpiness;
-    score -= 0.04 * rowTransitions;
-    score -= 0.75 * landingHeight;
-
-    if (linesCleared === 1) score += 2.5;
-    else if (linesCleared === 2) score += 6.0;
-    else if (linesCleared === 3) score += 12.0;
-    else if (linesCleared === 4) score += 32.0;
-
-    if (linesCleared > 0) score += 0.5 * erodedCells;
-
-    if (linesCleared > 0 && comboAfter >= 2) {
-      score += Math.pow(comboAfter, 2.2) * 1.5;
-    }
-    if (linesCleared > 0 && comboAfter >= 1) {
-      score += comboAfter * 0.6;
-    }
-
-    if (linesCleared === 4 && b2bAfter >= 2) {
-      score += b2bAfter * 4.0;
-    }
-
-    if (linesCleared > 0 && totalBlocks === 0) {
-      score += 120.0;
-    }
-
-    const { myMaxHBefore = 0 } = context;
-    if (myMaxHBefore >= 14 && linesCleared > 0) {
-      score += linesCleared * (myMaxHBefore - 13) * 1.8;
-    }
-    if (myMaxHBefore >= 16 && linesCleared >= 2) score += 25;
-    if (myMaxHBefore >= 18 && linesCleared >= 1) score += 40;
-
-    const { isVs = false, aggression = 0, oppMaxH = 0 } = context;
-    if (isVs) {
-      if (linesCleared >= 2) score += (linesCleared - 1) * (0.6 + Math.max(0, aggression) * 0.4);
-      if (linesCleared === 4) score += 8.0 + Math.max(0, aggression) * 2.5;
-      if (b2bAfter >= 2 && linesCleared === 4) score += b2bAfter * 2.0;
-      if (comboAfter >= 2) score += comboAfter * (1.0 + Math.max(0, aggression) * 0.5);
-      if (oppMaxH >= 16 && linesCleared >= 2) score += linesCleared * 3.5;
-      if (aggression < -1) {
-        score -= Math.max(0, maxHeight - 10) * Math.abs(aggression) * 0.25;
-      }
-    }
-
-    const { currentType = null, nextTypes = [] } = context;
-    if (maxHeight <= 10 && holes <= 1) {
-      for (let c = 0; c < COLS; c++) {
-        const leftH = c > 0 ? heights[c - 1] : heights[c];
-        const rightH = c < COLS - 1 ? heights[c + 1] : heights[c];
-        const depth = Math.min(leftH, rightH) - heights[c];
-        if (depth >= 4) {
-          const wellTop = TOTAL_ROWS - heights[c];
-          const rim = TOTAL_ROWS - Math.min(leftH, rightH);
-          let clean = true;
-          for (let r = rim; r < wellTop; r++) {
-            if (boardState[r][c] !== 0) { clean = false; break; }
-            if (c > 0 && boardState[r][c - 1] === 0) { clean = false; break; }
-            if (c < COLS - 1 && boardState[r][c + 1] === 0) { clean = false; break; }
-          }
-          if (clean) {
-            const iSoon = currentType === 'I' || nextTypes.slice(0, 3).some(t => t === 'I');
-            if (iSoon) {
-              score += 7.0;
-              if (c === 0 || c === COLS - 1) score += 2.5;
-            }
-          }
-        }
-      }
-    }
-
-    if (maxHeight <= 6 && holes === 0 && bumpiness <= 2) score += 2.2;
-    else if (maxHeight <= 8 && holes === 0 && bumpiness <= 3) score += 1.3;
-
-    return score;
-  }
-
-  findTopPlacements(boardState, type, comboBefore, b2bBefore, context, topK) {
-    const candidates = [];
-    const rotCount = (type === 'O') ? 1 : (type === 'I' || type === 'S' || type === 'Z') ? 2 : 4;
-
-    for (let rot = 0; rot < rotCount; rot++) {
-      for (let x = -2; x < COLS + 2; x++) {
-        let startY = 0;
-        while (!this.isValid(boardState, type, rot, x, startY) && startY < TOTAL_ROWS) startY++;
-        if (startY >= TOTAL_ROWS) continue;
-        let y = startY;
-        while (this.isValid(boardState, type, rot, x, y + 1)) y++;
-
-        const sim = this.simulatePlacement(boardState, type, rot, x, y);
-        const comboAfter = sim.linesCleared > 0 ? comboBefore + 1 : 0;
-        const isDifficult = sim.linesCleared === 4;
-        const b2bAfter = isDifficult ? b2bBefore + 1 : 0;
-
-        const score = this.evaluateBoard(sim.board, sim.linesCleared, comboAfter, b2bAfter, sim, context);
-
-        candidates.push({
-          score,
-          board: sim.board,
-          linesCleared: sim.linesCleared,
-          comboAfter,
-          b2bAfter,
-          x, rot, y
-        });
-      }
-    }
-
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates.slice(0, topK);
-  }
-
-  deepBeamSearch(boardState, currentType, nextTypes, opponent, currentCombo, currentB2B) {
-    const isVs = opponent && !opponent.gameOver;
-    const aggression = isVs ? this.computeAggression(boardState, opponent) : 0;
-    const myMaxHBefore = this.computeMaxHeight(boardState);
-    const oppMaxH = isVs ? this.computeMaxHeight(opponent.board) : 0;
-
-    const context = {
-      isVs, aggression, myMaxHBefore, oppMaxH,
-      currentType, nextTypes,
-      comboBefore: currentCombo,
-      b2bBefore: currentB2B
-    };
-
-    const allPieces = [currentType, ...nextTypes];
-    const searchDepth = Math.min(allPieces.length, getAILookahead(this.level));
-
-    let beam = [{
-      board: boardState,
-      combo: currentCombo,
-      b2b: currentB2B,
-      totalScore: 0,
-      sequence: []
-    }];
-
-    for (let d = 0; d < searchDepth; d++) {
-      const pieceType = allPieces[d];
-      const depthWeight = Math.pow(0.94, d);
-
-      const nextBeam = [];
-
-      for (const state of beam) {
-        const ctx = {
-          ...context,
-          currentType: pieceType,
-          nextTypes: allPieces.slice(d + 1, d + 6),
-          comboBefore: state.combo,
-          b2bBefore: state.b2b,
-          myMaxHBefore: this.computeMaxHeight(state.board)
-        };
-
-        const placements = this.findTopPlacements(state.board, pieceType, state.combo, state.b2b, ctx, BEAM_WIDTH);
-
-        for (const p of placements) {
-          const newTotal = state.totalScore + p.score * depthWeight;
-          const newSequence = state.sequence.concat([{ type: pieceType, x: p.x, rot: p.rot }]);
-
-          nextBeam.push({
-            board: p.board,
-            combo: p.comboAfter,
-            b2b: p.b2bAfter,
-            totalScore: newTotal,
-            sequence: newSequence
-          });
-        }
-      }
-
-      if (nextBeam.length === 0) break;
-
-      nextBeam.sort((a, b) => b.totalScore - a.totalScore);
-      beam = nextBeam.slice(0, BEAM_WIDTH);
-    }
-
-    if (beam.length === 0) return null;
-
-    const bestPath = beam[0];
-    if (!bestPath.sequence || bestPath.sequence.length === 0) return null;
-
-    const firstMove = bestPath.sequence[0];
-    const plannedSequence = bestPath.sequence.slice(1, VISUAL_PLAN_DEPTH + 1);
-
-    return {
-      finalX: firstMove.x,
-      finalRot: firstMove.rot,
-      plannedSequence
-    };
-  }
-
-  computeMaxHeight(boardState) {
-    for (let r = 0; r < TOTAL_ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (boardState[r][c] !== 0) return TOTAL_ROWS - r;
-      }
-    }
-    return 0;
-  }
-
-  computeAggression(myBoard, opponent) {
-    if (!opponent || opponent.gameOver) return 0;
-    const myMaxH = this.computeMaxHeight(myBoard);
-    const oppMaxH = this.computeMaxHeight(opponent.board);
-    let myHoles = 0;
-    for (let c = 0; c < COLS; c++) {
-      let found = false;
-      for (let r = 0; r < TOTAL_ROWS; r++) {
-        if (myBoard[r][c] !== 0) found = true;
-        else if (found) myHoles++;
-      }
-    }
-    let aggression = 0;
-    if (oppMaxH >= 14) aggression += (oppMaxH - 13) * 0.9;
-    if (oppMaxH >= 17) aggression += 5;
-    if (myMaxH >= 12) aggression -= (myMaxH - 11) * 0.7;
-    if (myMaxH >= 16) aggression -= 6;
-    if (myHoles >= 3) aggression -= myHoles * 0.4;
-    const scoreDiff = this.score - opponent.score;
-    if (scoreDiff > 3000) aggression -= 1.0;
-    else if (scoreDiff < -3000) aggression += 1.0;
-    return Math.max(-5, Math.min(5, aggression));
-  }
-
-  getAIMoveSpeed() {
-    const stepsPerSec = 17 + (this.level - 1) * 0.5;
-    const msPerStep = 1000 / stepsPerSec;
-    return Math.max(10, Math.floor(msPerStep));
-  }
-
-  update(dt, opponent) {
-    if (this.gameOver) return;
-    if (!this.isAI) return;
-    const moveSpeed = this.getAIMoveSpeed();
-    if (this.aiState === 'ALIGNING') {
-      this.moveTimer += dt;
-      if (this.moveTimer >= moveSpeed) {
-        this.moveTimer -= moveSpeed;
-        let aligned = true;
-        if (this.currentPiece.rotation !== this.targetRot) {
-          aligned = false;
-          const cwDist = (this.targetRot - this.currentPiece.rotation + 4) % 4;
-          const ccwDist = (this.currentPiece.rotation - this.targetRot + 4) % 4;
-          const nextRot = cwDist <= ccwDist ? (this.currentPiece.rotation + 1) % 4 : (this.currentPiece.rotation + 3) % 4;
-          if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x, this.currentPiece.y)) {
-            this.currentPiece.rotation = nextRot;
-          } else {
-            let kicked = false;
-            for (let dx of [-1, 1, -2, 2]) {
-              if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x + dx, this.currentPiece.y)) {
-                this.currentPiece.x += dx;
-                this.currentPiece.rotation = nextRot;
-                kicked = true;
-                break;
-              }
-            }
-            if (!kicked) {
-              if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-                this.currentPiece.y += 1;
-              }
-            }
-          }
-        } else if (this.currentPiece.x !== this.targetX) {
-          aligned = false;
-          const dir = this.targetX > this.currentPiece.x ? 1 : -1;
-          if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x + dir, this.currentPiece.y)) {
-            this.currentPiece.x += dir;
-          } else {
-            if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-              this.currentPiece.y += 1;
-            }
-          }
-        }
-        if (aligned) {
-          this.aiState = 'DROPPING';
-          this.dropTimer = 0;
-        }
-      }
-    } else if (this.aiState === 'DROPPING') {
-      while (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-        this.currentPiece.y++;
-      }
-      this.lockPiece(opponent);
-    }
-  }
-
-  drawPlannedSequence() {
-    if (!this.isAI || !this.plannedSequence || this.plannedSequence.length === 0) return;
-    if (!this.currentPiece || this.gameOver) return;
-
-    let simBoard = this.board.map(r => [...r]);
-
-    if (this.aiState === 'ALIGNING' || this.aiState === 'DROPPING') {
-      const useRot = this.targetRot !== undefined ? this.targetRot : this.currentPiece.rotation;
-      const useX = this.targetX !== undefined ? this.targetX : this.currentPiece.x;
-      const shape = SHAPES[this.currentPiece.type][useRot];
-      let finalY = 0;
-      while (this.isValid(simBoard, this.currentPiece.type, useRot, useX, finalY + 1)) finalY++;
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            const ny = finalY + r, nx = useX + c;
-            if (ny >= 0 && ny < TOTAL_ROWS && nx >= 0 && nx < COLS) simBoard[ny][nx] = this.currentPiece.type;
-          }
-        }
-      }
-      for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
-        if (simBoard[r].every(cell => cell !== 0)) {
-          simBoard.splice(r, 1);
-          simBoard.unshift(new Array(COLS).fill(0));
-          r++;
-        }
-      }
-    }
-
-    for (let i = 0; i < this.plannedSequence.length; i++) {
-      const plan = this.plannedSequence[i];
-      const shape = SHAPES[plan.type][plan.rot];
-      const color = COLORS[plan.type];
-
-      let dropY = 0;
-      while (this.isValid(simBoard, plan.type, plan.rot, plan.x, dropY + 1)) dropY++;
-
-      const alpha = Math.max(0.15, 0.50 - i * 0.07);
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            const drawY = dropY + r - HIDDEN_ROWS;
-            if (drawY >= 0 && drawY < ROWS) {
-              const px = (plan.x + c) * BLOCK_SIZE;
-              const py = drawY * BLOCK_SIZE;
-              this.ctx.strokeStyle = color;
-              this.ctx.globalAlpha = alpha;
-              this.ctx.lineWidth = 2;
-              this.ctx.strokeRect(px + 3, py + 3, BLOCK_SIZE - 6, BLOCK_SIZE - 6);
-              this.ctx.fillStyle = color;
-              this.ctx.globalAlpha = alpha * 0.22;
-              this.ctx.fillRect(px + 3, py + 3, BLOCK_SIZE - 6, BLOCK_SIZE - 6);
-              this.ctx.globalAlpha = 1;
-            }
-          }
-        }
-      }
-
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            const ny = dropY + r, nx = plan.x + c;
-            if (ny >= 0 && ny < TOTAL_ROWS && nx >= 0 && nx < COLS) simBoard[ny][nx] = plan.type;
-          }
-        }
-      }
-      for (let r = TOTAL_ROWS - 1; r >= 0; r--) {
-        if (simBoard[r].every(cell => cell !== 0)) {
-          simBoard.splice(r, 1);
-          simBoard.unshift(new Array(COLS).fill(0));
-          r++;
-        }
-      }
-    }
-  }
-
-  draw() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.fillStyle = 'rgba(5, 10, 20, 0.85)';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    this.ctx.strokeStyle = 'rgba(100, 200, 255, 0.08)';
-    this.ctx.lineWidth = 1;
-    for (let r = 0; r <= ROWS; r++) {
-      this.ctx.beginPath(); this.ctx.moveTo(0, r * BLOCK_SIZE); this.ctx.lineTo(COLS * BLOCK_SIZE, r * BLOCK_SIZE); this.ctx.stroke();
-    }
-    for (let c = 0; c <= COLS; c++) {
-      this.ctx.beginPath(); this.ctx.moveTo(c * BLOCK_SIZE, 0); this.ctx.lineTo(c * BLOCK_SIZE, ROWS * BLOCK_SIZE); this.ctx.stroke();
-    }
-
-    for (let r = HIDDEN_ROWS; r < TOTAL_ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (this.board[r][c] !== 0) this.drawBlock(c, r - HIDDEN_ROWS, this.board[r][c]);
-      }
-    }
-
-    this.drawPlannedSequence();
-
-    if (this.currentPiece && !this.gameOver) {
-      let ghostY = this.currentPiece.y;
-      while (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, ghostY + 1)) ghostY++;
-      const shape = SHAPES[this.currentPiece.type][this.currentPiece.rotation];
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            let dy = ghostY + r - HIDDEN_ROWS;
-            if (dy >= 0) this.drawBlock(this.currentPiece.x + c, dy, this.currentPiece.type, true);
-          }
-        }
-      }
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            let dy = this.currentPiece.y + r - HIDDEN_ROWS;
-            if (dy >= 0) this.drawBlock(this.currentPiece.x + c, dy, this.currentPiece.type, false);
-          }
-        }
-      }
-    }
-  }
-
-  drawBlock(x, y, type, ghost = false) {
-    const px = x * BLOCK_SIZE, py = y * BLOCK_SIZE;
-    if (ghost) {
-      this.ctx.fillStyle = COLORS.ghost;
-      this.ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
-      this.ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      this.ctx.lineWidth = 1;
-      this.ctx.strokeRect(px + 0.5, py + 0.5, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
-      return;
-    }
-    this.ctx.fillStyle = COLORS[type];
-    this.ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
-    this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    this.ctx.fillRect(px, py, BLOCK_SIZE, 3);
-    this.ctx.fillRect(px, py, 3, BLOCK_SIZE);
-    this.ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    this.ctx.fillRect(px + BLOCK_SIZE - 3, py, 3, BLOCK_SIZE);
-    this.ctx.fillRect(px, py + BLOCK_SIZE - 3, BLOCK_SIZE, 3);
-    this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    this.ctx.fillRect(px + 4, py + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
-  }
-
-  handleInput(key) {
-    if (this.gameOver || this.isAI) return;
-    if (key === 'ArrowLeft') {
-      if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x - 1, this.currentPiece.y)) this.currentPiece.x--;
-    } else if (key === 'ArrowRight') {
-      if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x + 1, this.currentPiece.y)) this.currentPiece.x++;
-    } else if (key === 'ArrowDown') {
-      if (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-        this.currentPiece.y++;
-        this.score += 1;
-      }
-    } else if (key === 'ArrowUp') {
-      const nextRot = (this.currentPiece.rotation + 1) % 4;
-      if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x, this.currentPiece.y)) {
-        this.currentPiece.rotation = nextRot;
-      } else if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x - 1, this.currentPiece.y)) {
-        this.currentPiece.x--; this.currentPiece.rotation = nextRot;
-      } else if (this.isValid(this.board, this.currentPiece.type, nextRot, this.currentPiece.x + 1, this.currentPiece.y)) {
-        this.currentPiece.x++; this.currentPiece.rotation = nextRot;
-      }
-    } else if (key === ' ') {
-      while (this.isValid(this.board, this.currentPiece.type, this.currentPiece.rotation, this.currentPiece.x, this.currentPiece.y + 1)) {
-        this.currentPiece.y++;
-        this.score += 2;
-      }
-      this.lockPiece(mode === 'vs_ai' ? ai : null);
-    } else if (key === 'r' || key === 'R') {
-      this.holdCurrentPiece();
-    }
-  }
-
-  drawNextPieces() {
-    const container = document.getElementById(this.nextContainerId);
-    if (!container) return;
-    container.innerHTML = '';
-    for (let i = 0; i < Math.min(5, this.nextQueue.length); i++) {
-      const type = this.nextQueue[i];
-      const shape = SHAPES[type][0];
-      const h = shape.length;
-      const w = shape[0].length;
-      const color = COLORS[type];
-      const div = document.createElement('div');
-      div.className = 'piece-preview';
-      div.style.gridTemplateColumns = `repeat(${w}, 18px)`;
-      for (let r = 0; r < h; r++) {
-        for (let c = 0; c < w; c++) {
-          const cell = document.createElement('div');
-          cell.className = 'piece-cell';
-          if (shape[r][c]) {
-            cell.style.backgroundColor = color;
-            cell.style.boxShadow = `0 0 8px ${color}`;
-          } else {
-            cell.style.backgroundColor = 'transparent';
-          }
-          div.appendChild(cell);
-        }
-      }
-      container.appendChild(div);
-    }
-  }
-
-  drawHoldPiece() {
-    const container = document.getElementById(this.holdContainerId);
-    if (!container) return;
-    container.innerHTML = '';
-    if (!this.holdPiece) {
-      container.innerHTML = '<span class="text-gray-600 text-xs">' + (this.isAI ? 'N/A' : 'EMPTY') + '</span>';
-      return;
-    }
-    const type = this.holdPiece;
-    const shape = SHAPES[type][0];
-    const h = shape.length;
-    const w = shape[0].length;
-    const color = COLORS[type];
-    const div = document.createElement('div');
-    div.className = 'piece-preview';
-    div.style.gridTemplateColumns = `repeat(${w}, 18px)`;
-    for (let r = 0; r < h; r++) {
-      for (let c = 0; c < w; c++) {
-        const cell = document.createElement('div');
-        cell.className = 'piece-cell';
-        if (shape[r][c]) {
-          cell.style.backgroundColor = color;
-          cell.style.boxShadow = `0 0 8px ${color}`;
-        } else {
-          cell.style.backgroundColor = 'transparent';
-        }
-        div.appendChild(cell);
-      }
-    }
-    container.appendChild(div);
-  }
+updateUI();lastTime=performance.now();paused=false;
+if(animationId)cancelAnimationFrame(animationId);
+animationId=requestAnimationFrame(gameLoop);
 }
 
-function getGravityDropSpeed(level) {
-  const levelFactor = Math.pow(0.85, level - 1);
-  return Math.max(1, Math.floor(800 * levelFactor));
+function updateUI(){
+if(player){
+document.getElementById('p-score').innerText=player.score;document.getElementById('p-level').innerText=player.level;
+document.getElementById('p-lines').innerText=player.lines;document.getElementById('p-tetrises').innerText=player.tetrises;
+document.getElementById('p-maxcombo').innerText=player.maxCombo;document.getElementById('p-b2b').innerText=player.b2b;
+document.getElementById('p-gravity').innerText=formatGravity(player.level);
+const cp=document.getElementById('p-combo-panel');if(player.combo>=2){cp.style.display='block';document.getElementById('p-combo').innerText=player.combo;}else cp.style.display='none';
+const co=document.getElementById('p-combo-overlay');if(player.combo>=2){co.innerText='Combo x'+player.combo;co.classList.add('show');}else co.classList.remove('show');
+}
+if(ai){
+document.getElementById('a-score').innerText=ai.score;document.getElementById('a-level').innerText=ai.level;
+document.getElementById('a-lines').innerText=ai.lines;document.getElementById('a-tetrises').innerText=ai.tetrises;
+document.getElementById('a-maxcombo').innerText=ai.maxCombo;document.getElementById('a-b2b').innerText=ai.b2b;
+document.getElementById('a-gravity').innerText=formatGravity(ai.level);
+const cp=document.getElementById('a-combo-panel');if(ai.combo>=2){cp.style.display='block';document.getElementById('a-combo').innerText=ai.combo;}else cp.style.display='none';
+const co=document.getElementById('a-combo-overlay');if(ai.combo>=2){co.innerText='Combo x'+ai.combo;co.classList.add('show');}else co.classList.remove('show');
+}
 }
 
-function formatGravity(level) {
-  const ms = getGravityDropSpeed(level);
-  const rowsPerSec = 1000 / ms;
-  let label;
-  if (rowsPerSec >= 100) label = Math.round(rowsPerSec) + '/s';
-  else if (rowsPerSec >= 10) label = rowsPerSec.toFixed(1) + '/s';
-  else label = rowsPerSec.toFixed(2) + '/s';
-  return { label, ms };
+function restartGame(){startGame(mode,aiDifficulty,watchSubMode);}
+function resetToMenu(){
+if(animationId)cancelAnimationFrame(animationId);
+document.getElementById('game-ui').style.display='none';
+document.getElementById('exit-pause-btn').style.display='none';
+document.getElementById('test-panel').classList.remove('show');
+document.querySelectorAll('.overlay').forEach(el=>el.classList.add('hidden'));
+document.getElementById('menu-overlay').classList.remove('hidden');
+player=null;ai=null;paused=false;
+}
+function togglePause(){paused=!paused;if(paused)document.getElementById('pause-overlay').classList.remove('hidden');else{document.getElementById('pause-overlay').classList.add('hidden');lastTime=performance.now();animationId=requestAnimationFrame(gameLoop);}}
+function showGameOver(winner){
+paused=true;if(animationId)cancelAnimationFrame(animationId);
+const title=document.querySelector('#gameover-overlay .menu-title');
+const sub=document.getElementById('go-subtitle');
+const combo=document.getElementById('go-combo');
+title.innerText='GAME OVER';
+if(mode==='watch_ai'&&watchSubMode==='ai_vs_ai'){
+if(winner==='player'){title.innerText='ALPHA WINS';sub.innerText='ALPHA OUTLASTED OMEGA';}
+else{title.innerText='OMEGA WINS';sub.innerText='OMEGA OUTLASTED ALPHA';}
+combo.innerText='Max Combo — Alpha: '+(player?player.maxCombo:0)+' | Omega: '+(ai?ai.maxCombo:0);
+}else if(mode==='vs_ai'){
+if(winner==='player'){title.innerText='YOU WIN';sub.innerText="THE AI COULDN'T KEEP UP";}
+else{title.innerText='YOU LOSE';sub.innerText='THE AI WAS TOO FAST';}
+combo.innerText='Max Combo — You: '+(player?player.maxCombo:0)+' | AI: '+(ai?ai.maxCombo:0);
+}else if(mode==='test_ai'){
+title.innerText='AI ELIMINATED';sub.innerText='FINAL SCORE: '+(player?player.score.toLocaleString():0);
+combo.innerText='Max Combo: '+(player?player.maxCombo:0)+' | Best B2B: '+(player?player.maxB2B:0);
+}else{
+title.innerText='GAME OVER';sub.innerText='FINAL SCORE: '+(player?player.score.toLocaleString():0);
+combo.innerText='Max Combo: '+(player?player.maxCombo:0)+' | Best B2B: '+(player?player.maxB2B:0);
+}
+document.getElementById('gameover-overlay').classList.remove('hidden');
+}
+function flashTetris(){}
+
+function clearTestLog(){const l=document.getElementById('test-log');if(l)l.innerHTML='';}
+function logTest(t,m){const l=document.getElementById('test-log');if(!l)return;const e=document.createElement('div');e.innerText='['+t+'] '+m;l.appendChild(e);l.scrollTop=l.scrollHeight;}
+function testSendGarbage(a){if(!player||player.gameOver){logTest('death','Cannot send garbage: AI is dead');return;}player.queueGarbage(a);logTest('attack','⚡ Round: +'+a+' garbage (one clean hole) — pending: '+player.pendingGarbage);}
+function testForcePiece(t){if(!player||player.gameOver){logTest('death','Cannot force piece: AI is dead');return;}player.nextQueue.unshift(t);logTest('piece','🎲 Forced next piece: '+t);player.drawNextQueue();}
+function testForceFourI(){if(!player||player.gameOver){logTest('death','Cannot force pieces: AI is dead');return;}for(let i=0;i<4;i++)player.nextQueue.unshift('I');logTest('piece','🎯 Queued 4 I-pieces');player.drawNextQueue();}
+function testFillRows(a){if(!player||player.gameOver){logTest('death','Cannot fill rows: AI is dead');return;}const hole=Math.floor(Math.random()*COLS);for(let i=0;i<a;i++){player.board.shift();const n=Array(COLS).fill('G');n[hole]=0;player.board.push(n);if(player.hasBlockAboveVisible(player.board)){player.gameOver=true;logTest('death','💀 Board overflowed after '+i+' rows');break;}}logTest('chaos','🔥 Round: +'+a+' garbage rows (hole @ col '+hole+')');}
+function testSetLevel(l){if(!player||player.gameOver){logTest('death','Cannot set level: AI is dead');return;}const old=player.level;player.level=l;player.lines=(l-1)*10;logTest('chaos','📊 Level set: '+old+' → '+l);}
+function testResetBoard(){if(!player)return;player.reset();logTest('chaos','🧹 Board reset (stats preserved)');}
+function testKillAI(){if(!player)return;player.gameOver=true;logTest('death','💀 AI terminated by user');}
+
+function gameLoop(timestamp){
+if(!paused){
+const dt=timestamp-lastTime;lastTime=timestamp;
+if(player&&!player.gameOver){
+player.tickGarbage(dt);
+if(player.isAI)player.update(dt,ai);
+else{const ds=getGravityDropSpeed(player.level);player.dropTimer=(player.dropTimer||0)+dt;while(player.dropTimer>=ds&&!player.gameOver){player.dropTimer-=ds;if(player.isValid(player.board,player.currentPiece.type,player.currentPiece.rotation,player.currentPiece.x,player.currentPiece.y+1))player.currentPiece.y++;else player.lockPiece(ai);}}
+}
+if(ai&&!ai.gameOver){
+ai.tickGarbage(dt);
+ai.update(dt,player);
+}
+if(player){player.draw();player.drawHoldPiece();}
+if(ai){ai.draw();ai.drawHoldPiece();}
+if(player&&player.gameOver){showGameOver('ai');return;}
+if(ai&&ai.gameOver){showGameOver('player');return;}
+}
+animationId=requestAnimationFrame(gameLoop);
 }
 
-function gravityColor(ms) {
-  if (ms <= 10) return { color: '#f00', shadow: '0 0 10px #f00' };
-  if (ms <= 50) return { color: '#f60', shadow: '0 0 8px #f60' };
-  if (ms <= 150) return { color: '#ff0', shadow: '0 0 8px #ff0' };
-  return { color: '#0ff', shadow: '0 0 8px #0ff' };
-}
-
-let mode = 'single';
-let watchSubMode = null;
-let player, ai;
-let lastTime = 0;
-let paused = false;
-let animationId = null;
-
-function openWatchAIMenu() { document.getElementById('watch-ai-menu').classList.remove('hidden'); }
-function closeWatchAIMenu() { document.getElementById('watch-ai-menu').classList.add('hidden'); }
-function startWatchAI(subMode) { watchSubMode = subMode; closeWatchAIMenu(); startGame('watch_ai'); }
-
-function startGame(selectedMode) {
-  mode = selectedMode;
-  document.getElementById('start-screen').classList.add('hidden');
-  document.getElementById('game-over-screen').classList.add('hidden');
-  document.getElementById('pause-overlay').classList.add('hidden');
-  document.getElementById('watch-ai-menu').classList.add('hidden');
-  document.getElementById('game-ui').classList.remove('hidden');
-  document.getElementById('game-ui').classList.add('flex');
-
-  const pContainer = document.getElementById('player-board-container');
-  const aContainer = document.getElementById('ai-board-container');
-  const pPanel = document.getElementById('player-panel');
-  const aPanel = document.getElementById('ai-panel');
-  const pTitle = document.getElementById('player-title');
-  const aTitle = document.getElementById('ai-title');
-  const pComboRow = document.getElementById('p-combo-row');
-  const aComboRow = document.getElementById('a-combo-row');
-  const controlsUnder = document.getElementById('controls-under');
-  const controlsSide = document.getElementById('controls-side');
-  const testPanel = document.getElementById('test-panel');
-
-  pTitle.textContent = 'PLAYER';
-  aTitle.textContent = 'WUMBO AI';
-
-  testPanel.classList.add('hidden');
-
-  if (mode === 'vs_ai') { pComboRow.classList.remove('hidden'); aComboRow.classList.remove('hidden'); }
-  else { pComboRow.classList.add('hidden'); aComboRow.classList.add('hidden'); }
-
-  if (mode === 'single') {
-    pContainer.classList.remove('hidden'); aContainer.classList.add('hidden');
-    pPanel.classList.remove('hidden'); aPanel.classList.add('hidden');
-    controlsUnder.classList.add('hidden'); controlsSide.classList.remove('hidden'); controlsSide.classList.add('flex');
-    player = new TetrisInstance(false, 'p-canvas', 'p-next-pieces', 'p-hold-piece', 'p-combo-overlay', 'p-garbage-bar');
-    ai = null;
-  } else if (mode === 'watch_ai') {
-    if (watchSubMode === 'ai_vs_ai') {
-      pContainer.classList.remove('hidden'); aContainer.classList.remove('hidden');
-      pPanel.classList.remove('hidden'); aPanel.classList.remove('hidden');
-      pTitle.textContent = 'AI ALPHA'; aTitle.textContent = 'AI OMEGA';
-      controlsUnder.classList.remove('hidden'); controlsSide.classList.add('hidden'); controlsSide.classList.remove('flex');
-      player = new TetrisInstance(true, 'p-canvas', 'p-next-pieces', 'p-hold-piece', 'p-combo-overlay', 'p-garbage-bar');
-      ai = new TetrisInstance(true, 'ai-canvas', 'a-next-pieces', 'a-hold-piece', 'a-combo-overlay', 'a-garbage-bar');
-    } else {
-      pContainer.classList.add('hidden'); aContainer.classList.remove('hidden');
-      pPanel.classList.add('hidden'); aPanel.classList.remove('hidden');
-      controlsUnder.classList.add('hidden'); controlsSide.classList.remove('hidden'); controlsSide.classList.add('flex');
-      ai = new TetrisInstance(true, 'ai-canvas', 'a-next-pieces', 'a-hold-piece', 'a-combo-overlay', 'a-garbage-bar');
-      player = null;
-    }
-  } else if (mode === 'test_ai') {
-    pContainer.classList.add('hidden'); aContainer.classList.remove('hidden');
-    pPanel.classList.add('hidden'); aPanel.classList.remove('hidden');
-    aTitle.textContent = 'TEST AI';
-    controlsUnder.classList.add('hidden'); controlsSide.classList.add('hidden'); controlsSide.classList.remove('flex');
-    testPanel.classList.remove('hidden');
-    ai = new TetrisInstance(true, 'ai-canvas', 'a-next-pieces', 'a-hold-piece', 'a-combo-overlay', 'a-garbage-bar');
-    player = null;
-    clearTestLog();
-    logTest('ready', 'Test AI lab initialized. Each garbage round = one consistent hole.');
-  } else if (mode === 'vs_ai') {
-    pContainer.classList.remove('hidden'); aContainer.classList.remove('hidden');
-    pPanel.classList.remove('hidden'); aPanel.classList.remove('hidden');
-    controlsUnder.classList.remove('hidden'); controlsSide.classList.add('hidden'); controlsSide.classList.remove('flex');
-    player = new TetrisInstance(false, 'p-canvas', 'p-next-pieces', 'p-hold-piece', 'p-combo-overlay', 'p-garbage-bar');
-    ai = new TetrisInstance(true, 'ai-canvas', 'a-next-pieces', 'a-hold-piece', 'a-combo-overlay', 'a-garbage-bar');
-  }
-
-  updateUI();
-  lastTime = performance.now();
-  paused = false;
-  if (animationId) cancelAnimationFrame(animationId);
-  animationId = requestAnimationFrame(gameLoop);
-}
-
-function backToMenu() {
-  if (animationId) cancelAnimationFrame(animationId);
-  document.getElementById('game-ui').classList.add('hidden');
-  document.getElementById('game-ui').classList.remove('flex');
-  document.getElementById('game-over-screen').classList.add('hidden');
-  document.getElementById('pause-overlay').classList.add('hidden');
-  document.getElementById('watch-ai-menu').classList.add('hidden');
-  document.getElementById('start-screen').classList.remove('hidden');
-  player = null; ai = null; paused = false; watchSubMode = null;
-}
-
-function restartGame() { startGame(mode); }
-
-function openPauseMenu() {
-  if (!player && !ai) return;
-  paused = true;
-  document.getElementById('pause-overlay').classList.remove('hidden');
-}
-
-function togglePause() {
-  paused = !paused;
-  if (paused) document.getElementById('pause-overlay').classList.remove('hidden');
-  else { document.getElementById('pause-overlay').classList.add('hidden'); lastTime = performance.now(); }
-}
-
-function showGameOver(winner) {
-  paused = true;
-  if (animationId) cancelAnimationFrame(animationId);
-  const screen = document.getElementById('game-over-screen');
-  const title = document.getElementById('go-title');
-  const sub = document.getElementById('go-subtitle');
-  const comboInfo = document.getElementById('go-combo-info');
-  screen.classList.remove('hidden');
-  document.getElementById('pause-overlay').classList.add('hidden');
-  
-  if (mode === 'vs_ai' && player && ai) {
-    comboInfo.classList.remove('hidden');
-    comboInfo.textContent = `Max Combo — You: ${player.maxCombo}  |  AI: ${ai.maxCombo}`;
-  } else if (mode === 'watch_ai' && watchSubMode === 'ai_vs_ai' && player && ai) {
-    comboInfo.classList.remove('hidden');
-    comboInfo.textContent = `Max Combo — Alpha: ${player.maxCombo}  |  Omega: ${ai.maxCombo}`;
-  } else if (mode === 'test_ai' && ai) {
-    comboInfo.classList.remove('hidden');
-    comboInfo.textContent = `Max Combo: ${ai.maxCombo}  |  Best B2B: ${ai.maxB2B}  |  Score: ${ai.score.toLocaleString()}`;
-  } else if (player) {
-    comboInfo.classList.remove('hidden');
-    comboInfo.textContent = `Max Combo: ${player.maxCombo}  |  Best B2B: ${player.maxB2B}`;
-  } else if (ai) {
-    comboInfo.classList.remove('hidden');
-    comboInfo.textContent = `AI Max Combo: ${ai.maxCombo}  |  Best B2B: ${ai.maxB2B}`;
-  } else comboInfo.classList.add('hidden');
-  
-  if (mode === 'watch_ai' && watchSubMode === 'ai_vs_ai') {
-    if (winner === 'player') { title.textContent = "ALPHA WINS"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text text-green-400"; sub.textContent = "ALPHA OUTLASTED OMEGA"; }
-    else if (winner === 'ai') { title.textContent = "OMEGA WINS"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text text-fuchsia-400"; sub.textContent = "OMEGA OUTLASTED ALPHA"; }
-    else { title.textContent = "MATCH ENDED"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text"; sub.textContent = `Alpha: ${(player ? player.score : 0).toLocaleString()} | Omega: ${(ai ? ai.score : 0).toLocaleString()}`; }
-  } else if (mode === 'test_ai') {
-    title.textContent = "AI ELIMINATED";
-    title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text text-orange-400";
-    sub.textContent = `FINAL SCORE: ${ai ? ai.score.toLocaleString() : 0} — LINES: ${ai ? ai.lines : 0}`;
-  } else if (winner === 'player') { title.textContent = "YOU WIN"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text text-green-400"; sub.textContent = "THE AI COULDN'T KEEP UP"; }
-  else if (winner === 'ai') { title.textContent = "YOU LOSE"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text text-red-500"; sub.textContent = "THE AI WAS TOO FAST"; }
-  else { title.textContent = "GAME OVER"; title.className = "text-6xl md:text-8xl font-bold mb-4 tracking-widest text-center neon-text"; sub.textContent = `FINAL SCORE: ${player ? player.score.toLocaleString() : (ai ? ai.score.toLocaleString() : 0)}`; }
-}
-
-function flashTetris() {
-  const flash = document.getElementById('tetris-flash');
-  flash.classList.add('show');
-  setTimeout(() => flash.classList.remove('show'), 300);
-}
-
-function flashGarbage() {
-  const flash = document.getElementById('garbage-flash');
-  flash.classList.add('show');
-  setTimeout(() => flash.classList.remove('show'), 350);
-}
-
-function updateComboOverlay(instance) {
-  if (!instance || !instance.comboOverlayId) return;
-  const el = document.getElementById(instance.comboOverlayId);
-  if (!el) return;
-  if (instance.combo >= 2) { el.textContent = `Combo x${instance.combo}`; el.classList.add('show'); }
-  else el.classList.remove('show');
-}
-
-function updateUI() {
-  if (player) {
-    document.getElementById('p-score').textContent = player.score.toLocaleString();
-    document.getElementById('p-level').textContent = player.level;
-    document.getElementById('p-lines').textContent = player.lines;
-    document.getElementById('p-tetrises').textContent = player.tetrises;
-    document.getElementById('p-maxcombo').textContent = player.maxCombo;
-    document.getElementById('p-b2b').textContent = player.maxB2B;
-    const pComboEl = document.getElementById('p-combo');
-    if (pComboEl) pComboEl.textContent = player.combo;
-    const gravEl = document.getElementById('p-gravity');
-    if (gravEl) {
-      const { label, ms } = formatGravity(player.level);
-      const colors = gravityColor(ms);
-      gravEl.textContent = label; gravEl.style.color = colors.color; gravEl.style.textShadow = colors.shadow;
-    }
-    updateComboOverlay(player);
-  }
-  if (ai) {
-    document.getElementById('a-score').textContent = ai.score.toLocaleString();
-    document.getElementById('a-level').textContent = ai.level;
-    document.getElementById('a-lines').textContent = ai.lines;
-    document.getElementById('a-tetrises').textContent = ai.tetrises;
-    document.getElementById('a-maxcombo').textContent = ai.maxCombo;
-    document.getElementById('a-b2b').textContent = ai.maxB2B;
-    const aComboEl = document.getElementById('a-combo');
-    if (aComboEl) aComboEl.textContent = ai.combo;
-    const aGravEl = document.getElementById('a-gravity');
-    if (aGravEl) {
-      const { label, ms } = formatGravity(ai.level);
-      const colors = gravityColor(ms);
-      aGravEl.textContent = label; aGravEl.style.color = colors.color; aGravEl.style.textShadow = colors.shadow;
-    }
-    updateComboOverlay(ai);
-  }
-}
-
-// ============== TEST AI CONTROL FUNCTIONS ==============
-
-function clearTestLog() {
-  const log = document.getElementById('test-log');
-  if (log) log.innerHTML = '';
-}
-
-function logTest(type, message) {
-  const log = document.getElementById('test-log');
-  if (!log) return;
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  let color = '#9fc';
-  if (type === 'attack') color = '#f88';
-  else if (type === 'piece') color = '#8ef';
-  else if (type === 'chaos') color = '#fc6';
-  else if (type === 'death') color = '#f44';
-  else if (type === 'ready') color = '#888';
-  entry.innerHTML = `<span style="color:#666;">[${time}]</span> <span style="color:${color};">${message}</span>`;
-  log.appendChild(entry);
-  log.scrollTop = log.scrollHeight;
-  while (log.children.length > 50) log.removeChild(log.firstChild);
-}
-
-// Send garbage as ONE ROUND = one consistent hole column for the entire batch
-function testSendGarbage(amount) {
-  if (!ai || ai.gameOver) {
-    logTest('death', 'Cannot send garbage: AI is dead');
-    return;
-  }
-  ai.queueGarbage(amount);
-  flashGarbage();
-  logTest('attack', `⚡ Round: +${amount} garbage (one clean hole) — pending: ${ai.pendingGarbage}`);
-  updateUI();
-}
-
-function testForcePiece(type) {
-  if (!ai || ai.gameOver) {
-    logTest('death', 'Cannot force piece: AI is dead');
-    return;
-  }
-  ai.nextQueue.unshift(type);
-  logTest('piece', `🎲 Forced next piece: <span style="color:${COLORS[type]}; text-shadow: 0 0 6px ${COLORS[type]};">${type}</span>`);
-  ai.drawNextPieces();
-}
-
-function testForceFourI() {
-  if (!ai || ai.gameOver) {
-    logTest('death', 'Cannot force pieces: AI is dead');
-    return;
-  }
-  for (let i = 0; i < 4; i++) {
-    ai.nextQueue.unshift('I');
-  }
-  logTest('piece', `🎯 Queued 4 I-pieces (TETRIS SETUPS!)`);
-  ai.drawNextPieces();
-}
-
-// Test-lab fill rows: one click = ONE ROUND = one consistent hole column for the entire batch.
-// So "+10 Rows" creates one big 10-row block with one big consistent hole column.
-// "+3 Rows" creates a smaller 3-row block with its own single hole.
-function testFillRows(amount) {
-  if (!ai || ai.gameOver) {
-    logTest('death', 'Cannot fill rows: AI is dead');
-    return;
-  }
-  // ONE hole column for the entire batch (one round, one hole)
-  const holeCol = Math.floor(Math.random() * COLS);
-  for (let i = 0; i < amount; i++) {
-    if (ai.board[0].some(cell => cell !== 0)) {
-      ai.gameOver = true;
-      logTest('death', `💀 Board overflowed after ${i} rows`);
-      break;
-    }
-    ai.board.shift();
-    const newRow = new Array(COLS).fill('G');
-    newRow[holeCol] = 0;
-    ai.board.push(newRow);
-  }
-  if (ai.currentPiece) {
-    ai.currentPiece.y -= amount;
-    if (!ai.isValid(ai.board, ai.currentPiece.type, ai.currentPiece.rotation, ai.currentPiece.x, ai.currentPiece.y)) {
-      let safe = false;
-      for (let k = 1; k <= 4; k++) {
-        if (ai.isValid(ai.board, ai.currentPiece.type, ai.currentPiece.rotation, ai.currentPiece.x, ai.currentPiece.y - k)) {
-          ai.currentPiece.y -= k;
-          safe = true;
-          break;
-        }
-      }
-      if (!safe) {
-        ai.gameOver = true;
-        logTest('death', `💀 Current piece crushed by added rows`);
-      }
-    }
-  }
-  logTest('chaos', `🔥 Round: +${amount} garbage rows (hole @ col ${holeCol})`);
-  flashGarbage();
-  updateUI();
-}
-
-function testSetLevel(level) {
-  if (!ai || ai.gameOver) {
-    logTest('death', 'Cannot set level: AI is dead');
-    return;
-  }
-  const oldLevel = ai.level;
-  ai.level = level;
-  ai.lines = (level - 1) * 10;
-  logTest('chaos', `📊 Level set: ${oldLevel} → ${level} (gravity now ${formatGravity(level).label})`);
-  updateUI();
-}
-
-function testResetBoard() {
-  if (!ai) return;
-  ai.board = [];
-  for (let r = 0; r < TOTAL_ROWS; r++) ai.board.push(new Array(COLS).fill(0));
-  ai.combo = 0;
-  ai.b2b = 0;
-  ai.pendingGarbage = 0;
-  ai.gameOver = false;
-  ai.fillQueue();
-  ai.spawnPiece();
-  ai.drawHoldPiece();
-  ai.updateGarbageBar();
-  logTest('chaos', `🧹 Board reset (stats preserved)`);
-  updateUI();
-}
-
-function testKillAI() {
-  if (!ai) return;
-  ai.gameOver = true;
-  logTest('death', `💀 AI terminated by user`);
-  updateUI();
-}
-
-function gameLoop(timestamp) {
-  if (!paused) {
-    const dt = timestamp - lastTime;
-    lastTime = timestamp;
-    let gameOverTriggered = false;
-
-    if (player && !player.gameOver) {
-      if (player.isAI) player.update(dt, ai);
-      else {
-        const dropSpeed = getGravityDropSpeed(player.level);
-        player.dropTimer = (player.dropTimer || 0) + dt;
-        while (player.dropTimer >= dropSpeed && !player.gameOver) {
-          player.dropTimer -= dropSpeed;
-          if (player.isValid(player.board, player.currentPiece.type, player.currentPiece.rotation, player.currentPiece.x, player.currentPiece.y + 1)) player.currentPiece.y += 1;
-          else player.lockPiece(ai);
-        }
-      }
-      if (player.gameOver) gameOverTriggered = true;
-    }
-
-    if (ai) {
-      ai.update(dt, player);
-      ai.draw();
-      if (ai.gameOver && !gameOverTriggered) {
-        if (mode === 'vs_ai') { showGameOver('player'); return; }
-        else if (mode === 'watch_ai' && watchSubMode === 'ai_vs_ai') { showGameOver('player'); return; }
-        else if (mode === 'test_ai') { showGameOver('none'); return; }
-      }
-    }
-
-    if (player) {
-      player.draw();
-      if (player.gameOver && !gameOverTriggered) {
-        if (mode === 'vs_ai') { showGameOver('ai'); return; }
-        else if (mode === 'watch_ai' && watchSubMode === 'ai_vs_ai') { showGameOver('ai'); return; }
-        else { showGameOver('none'); return; }
-      }
-    }
-  }
-  animationId = requestAnimationFrame(gameLoop);
-}
-
-window.addEventListener('keydown', (e) => {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-  if (player && !player.isAI) player.handleInput(e.key);
-  if (e.key === 'Escape') {
-    if (!document.getElementById('watch-ai-menu').classList.contains('hidden')) closeWatchAIMenu();
-    else if (document.getElementById('pause-overlay').classList.contains('hidden')) openPauseMenu();
-    else togglePause();
-  }
+document.addEventListener('keydown',e=>{
+if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+if(e.key==='Escape'){if(!document.getElementById('pause-overlay').classList.contains('hidden'))togglePause();else if(player||ai)togglePause();return;}
+if(player&&!player.isAI&&!paused){player.handleInput(e.key,ai);updateUI();}
 });
-
-const tempCtx = document.getElementById('p-canvas').getContext('2d');
-tempCtx.fillStyle = 'rgba(5, 10, 20, 0.85)';
-tempCtx.fillRect(0, 0, 300, 600);
+document.querySelectorAll('.m-btn').forEach(btn=>{
+btn.addEventListener('touchstart',e=>{e.preventDefault();const k=btn.dataset.key;if(player&&!player.isAI&&!paused){player.handleInput(k,ai);updateUI();}},{passive:false});
+});
 </script>
 </body>
 </html>
-
