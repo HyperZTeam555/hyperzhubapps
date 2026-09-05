@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Noahs Academy</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
+    iframe { width: 100%; height: 100%; border: none; display: block; }
+    #loading { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; color: white; background: #000; z-index: 5; }
+    
+    #overlay-container { display: none; position: fixed; inset: 0; z-index: 100; background: #000; }
+    .close-btn {
+      position: absolute; top: 10px; left: 12px;
+      font-size: 18px; line-height: 1;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(6px);
+      border: 1px solid orange; color: orange;
+      padding: 2px 8px; border-radius: 8px;
+      cursor: pointer; z-index: 101; user-select: none;
+    }
+    .close-btn:hover { background: orange; color: black; }
+  </style>
+</head>
+<body>
+
+<div id="loading">Racing CDNs for Noah... 🥀</div>
+<iframe id="main-frame"></iframe>
+
+<div id="overlay-container">
+  <div class="close-btn" onclick="closeOverlay()">✕</div>
+  <iframe id="overlay-frame"></iframe>
+</div>
+
+<script>
+const REPOS = [
+  "https://cdn.jsdelivr.net/gh/NoahsAmazingTutoringHelp/totallynotthelinks@main",
+  "https://cdn.jsdelivr.net/gh/NoahsAmazingTutoringHelp/totallynotthelinks",
+  "https://fastly.jsdelivr.net/gh/NoahsAmazingTutoringHelp/totallynotthelinks@main",
+  "https://gcore.jsdelivr.net/gh/NoahsAmazingTutoringHelp/totallynotthelinks@main",
+  "https://testingcf.jsdelivr.net/gh/NoahsAmazingTutoringHelp/totallynotthelinks@main",
+  "https://cdn.statically.io/gh/NoahsAmazingTutoringHelp/totallynotthelinks/main"
+];
+const PAGE = "index.html";
+
+async function tryUrl(base, signal) {
+  const url = `${base}/${PAGE}`;
+  const res = await fetch(url, { signal, cache: "no-store" });
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  const html = await res.text();
+  if (!html.includes("<html") && !html.includes("<!DOCTYPE")) throw new Error("Invalid HTML");
+  return { html, base };
+}
+
+async function raceCDNs() {
+  const controller = new AbortController();
+  const requests = REPOS.map(base => tryUrl(base, controller.signal));
+  try {
+    const winner = await Promise.any(requests);
+    controller.abort();
+    return winner;
+  } catch (err) {
+    controller.abort();
+    throw err;
+  }
+}
+
+// Normalize a possibly-malformed absolute URL like "https:/example.com"
+// (single slash) into a proper "https://example.com". Leaves everything
+// else untouched. Kept only as defense-in-depth; the real fix is not
+// corrupting <script> source below.
+function normalizeUrl(u) {
+  if (!u) return u;
+  return u.replace(/^(https?:)\/(?!\/)/i, '$1' + '/' + '/');
+}
+
+// ROOT CAUSE (found by inspecting the actual fetched repo):
+// The rewrite regex used to run over the ENTIRE raw HTML string, including
+// the contents of script tags. Pages that build links dynamically via JS,
+// e.g.
+//     card.innerHTML = `... <a href="${link.url}" ...> ...`;
+// have literal text "href=\"${link.url}\"" sitting in the JS SOURCE CODE.
+// The regex can't tell that apart from a real HTML attribute, sees a value
+// ("${link.url}") that doesn't start with "http", and "helpfully" rewrites
+// it to "href=\"${base}/${link.url}\"". That corrupted-but-still-valid JS
+// then runs at page load and produces hrefs like
+//     BASE/https://noahstutoring.academy/
+// which jsDelivr reports back (with the doubled slash collapsed) as
+// "Couldn't find the requested file /https:/noahstutoring.academy/ in ...".
+// This wasn't a bad URL in the source at all — every dynamically-built link
+// on the page was getting mangled the same way.
+//
+// Fix: pull script blocks out before doing the src/href
+// rewrite, then splice the ORIGINAL, untouched script content back in.
+function processHtml(html, base) {
+  const scriptBlocks = [];
+  const withoutScripts = html.replace(
+    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+    (match) => {
+      scriptBlocks.push(match);
+      return `\u0000SCRIPT_PLACEHOLDER_${scriptBlocks.length - 1}\u0000`;
+    }
+  );
+
+  // Rewrite relative src/href to absolute (skip already-absolute URLs).
+  // Only ever touches markup OUTSIDE <script> blocks now.
+  let processed = withoutScripts.replace(
+    /(src|href)\s*=\s*["'](?!https?:\/*|\/\/|data:|#|mailto:|blob:)([^"']*?)["']/gi,
+    (match, attr, path) => {
+      const cleanPath = path.replace(/^\.?\//, "");
+      return `${attr}="${base}/${cleanPath}"`;
+    }
+  );
+
+  // Also normalize any malformed absolute URLs left in markup src/href
+  // (single-slash "https:/..." -> proper "https://...").
+  processed = processed.replace(
+    /(src|href)\s*=\s*["'](https?:\/(?!\/)[^"']*)["']/gi,
+    (match, attr, url) => `${attr}="${normalizeUrl(url)}"`
+  );
+
+  // Restore the original, untouched script blocks.
+  processed = processed.replace(
+    /\u0000SCRIPT_PLACEHOLDER_(\d+)\u0000/g,
+    (match, i) => scriptBlocks[Number(i)]
+  );
+
+  // Inject click interceptor using getAttribute for RAW href value.
+  // (This template literal's content is the LITERAL SOURCE of a <script>
+  // tag that will run inside the fetched page. Kept comment-free on
+  // purpose: a text-based comment-stripping pass run over this whole
+  // file can't tell "this // is inside a JS string" from "this // is a
+  // real comment", so anything here is at risk of being truncated mid
+  // statement. Explanations for the logic live in this comment instead.)
+  const interceptor = `
+    <script>
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a');
+        if (link) {
+          var rawHref = link.getAttribute('href');
+          if (rawHref && !rawHref.startsWith('javascript:') && !rawHref.startsWith('#') && !rawHref.startsWith('mailto:')) {
+            e.preventDefault();
+            e.stopPropagation();
+            var fixedHref = rawHref.replace(/^(https?:)\\/(?!\\/)/i, '$1' + '/' + '/');
+            window.parent.postMessage({ type: 'NOAH_OVERLAY', url: fixedHref }, '*');
+          }
+        }
+      }, true);
+    <\/script>
+  `;
+
+  processed = processed.replace(/<\/head>/i, `${interceptor}</head>`);
+  return processed;
+}
+
+// GOATED ERROR SCRAPER - handles mangled URLs from github error pages
+// (kept as a fallback safety net in case a malformed URL still slips
+// through somewhere and jsDelivr reports it back to us)
+function extractCleanUrl(messyUrl) {
+  // Pattern: "Couldn't find the requested file /https:/domain.com/ in NoahsAmazingTutoringHelp/totallynotthelinks."
+  const match = messyUrl.match(/Couldn't find the requested file \/(.+?) in NoahsAmazingTutoringHelp\/totallynotthelinks\./i);
+  if (match && match[1]) {
+    let extracted = match[1].trim();
+    extracted = normalizeUrl(extracted);
+    return extracted;
+  }
+
+  // Also handle if somehow just the mangled URL was sent directly
+  if (/^https?:\/(?!\/)/.test(messyUrl) && !messyUrl.includes("Couldn't find")) {
+    return normalizeUrl(messyUrl);
+  }
+
+  return messyUrl;
+}
+
+async function load() {
+  const loading = document.getElementById("loading");
+  try {
+    const { html, base } = await raceCDNs();
+    console.log("Loaded from:", base);
+    
+    const finalHtml = processHtml(html, base);
+    const frame = document.getElementById("main-frame");
+    frame.srcdoc = finalHtml;
+    frame.onload = () => { loading.style.display = "none"; };
+  } catch (err) {
+    console.error(err);
+    loading.textContent = "Failed to load repo 💔";
+  }
+}
+
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'NOAH_OVERLAY' && e.data.url) {
+    const cleanUrl = extractCleanUrl(e.data.url);
+    console.log("Opening overlay:", cleanUrl);
+    openOverlay(cleanUrl);
+  }
+});
+
+function openOverlay(url) {
+  const container = document.getElementById('overlay-container');
+  const frame = document.getElementById('overlay-frame');
+  container.style.display = 'block';
+  frame.src = url;
+}
+
+function closeOverlay() {
+  const container = document.getElementById('overlay-container');
+  const frame = document.getElementById('overlay-frame');
+  container.style.display = 'none';
+  frame.src = 'about:blank';
+}
+
+load();
+</script>
+</body>
+</html>
