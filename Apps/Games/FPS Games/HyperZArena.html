@@ -244,7 +244,7 @@ canvas{display:block}
 </div></div>
 <div id="srvpick"><div id="srvbox">
  <h3>SERVER LIST</h3>
- <div id="srvtools"><button id="srvcreate">+ CREATE ROOM</button><span id="srvinfo">CONNECTING…</span></div>
+ <div id="srvtools"><button id="srvcreate">+ CREATE ROOM</button><span id="srvinfo">SCANNING…</span></div>
  <div id="srvcreatebox">
   <div class="crrow"><span class="crn">NAME</span><input id="srvname" maxlength="20" placeholder="SERVER NAME" autocomplete="off"></div>
   <div class="crrow"><span class="crn">VISIBILITY</span><div class="srvis"><button id="vpub" class="on">PUBLIC</button><button id="vpriv">PRIVATE</button></div><span class="crn" id="srvisn">ANYONE CAN JOIN · MAX 7 PLAYERS</span></div>
@@ -335,7 +335,7 @@ const ROOMSETS={
 const NEED={'1v1':2,'2v2':4,'3v3':6,'4v4':8};
 const FFA_ROOMS=['9182','4172','8593','2630','7348','5926','3817','9485','6209','1754','8362'];
 const FFA_CAP=25;
-let NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:''};
+let NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:'',vis:'public',regName:''};
 const QUEUE_CAP=25,CREATED_CAP=7,LAGGY_N=10;
 const PID=(function(){try{let p=localStorage.getItem('hza_pid');if(!p){p='p'+Math.random().toString(36).slice(2,10);localStorage.setItem('hza_pid',p);}return p;}catch(e){return 'p'+Math.random().toString(36).slice(2,10);}})();
 let REG=null,regFails=0;
@@ -1293,6 +1293,30 @@ function regEnter(info){REG=info;regFails=0;regHeartbeat();}
 function regLeave(){const r=REG;if(!r)return;REG=null;regFails=0;regPost({a:'leave',id:r.id,pid:PID});}
 setInterval(function(){if(!REG||!connected)return;regHeartbeat();},4000);
 window.addEventListener('pagehide',function(){if(REG){try{navigator.sendBeacon(regBase()+'/api/rooms',new Blob([JSON.stringify({a:'leave',id:REG.id,pid:PID})],{type:'application/json'}));}catch(e){}}});
+/* ---------- LOBBY MESH — relay-side room directory (works from file://) ----------
+   The /api/rooms registry is same-origin only, so file:// copies can never reach it.
+   Instead, every host announces its room on the relay mesh room 'hzalobby' and the
+   Server List listens there. FFA queue rooms are additionally discovered by probing
+   their deterministic IDs. No registry, no redeploy — pure relay features. */
+let lobWs=null;const lobRooms=new Map();
+function lobOpen(){if(lobWs&&(lobWs.readyState===0||lobWs.readyState===1))return;
+ try{lobWs=new WebSocket(hzBase()+(hzBase().includes('?')?'&':'/?')+new URLSearchParams({room:'hzalobby',role:'m',id:myId,name:me.name||'P'}).toString());}catch(e){lobWs=null;return;}
+ lobWs.onmessage=ev=>{let j=null;try{j=JSON.parse(ev.data);}catch(e){return;}
+  if(j&&j.t==='ann'&&j.id)lobRooms.set(String(j.id).slice(0,64),{rid:String(j.id).slice(0,64),name:String(j.name||'ROOM').slice(0,24),n:Math.max(0,j.n|0),cap:Math.max(2,j.cap|0)||CREATED_CAP,vis:j.vis==='private'?'private':'public',t:Date.now()});};
+ lobWs.onclose=()=>{lobWs=null;};
+ lobWs.onerror=()=>{try{lobWs.close();}catch(e){}};}
+function lobClose(){try{if(lobWs){const l=lobWs;lobWs=null;l.onclose=null;l.onmessage=null;try{l.close(1000,'bye');}catch(e){}}}catch(e){}}
+function lobAnn(){if(mode!=='host'||!connected)return;
+ if(NETP.vis==='private')return; // private rooms: 6-digit code join only, never listed
+ if(!lobWs||lobWs.readyState!==1)return;
+ let nm;
+ if(NETP.regId&&REG&&REG.name)nm=REG.name;
+ else if(NETP.rid)nm=NETP.regName||'ROOM';
+ else nm='FFA QUEUE '+(NETP.code||'');
+ try{lobWs.send(JSON.stringify({t:'ann',id:netId(),name:nm,n:roster.size,cap:NETP.regCap||(NETP.mode==='ffa'?FFA_CAP:CREATED_CAP),vis:'public',pid:PID}));}catch(e){}}
+setInterval(function(){try{if(lobWs&&lobWs.readyState===1)lobWs.send('p');}catch(e){}
+ if(mode==='host'&&connected)lobAnn();
+ const now=Date.now();lobRooms.forEach((v,k)=>{if(now-v.t>9000)lobRooms.delete(k);});},3000);
 function mkConn(id){const evts={};
  const c={open:true,_mid:null,_last:Date.now(),
   on:(ev,fn)=>{(evts[ev]=evts[ev]||[]).push(fn);},
@@ -1547,7 +1571,7 @@ function findGame(){if(mode==='host')return;
      hostConn=mkHostConn();stat('LINKED — SYNCING');wireClient(hostConn,s);wsOnOpenAndMessage(s);
      hostConn.send({t:'hi',id:myId,name:me.name,color:me.color,skin:me.skinId});
      netTO(()=>{if(s===netSession&&!connected&&!playing){hzGrey.add(rid);findGame();}},5000);return true;}
-    if(m.t==='noroom'){wsClose();if(++tries<4){netTO(attempt,250);}else{joinAt(j+1);}return true;}
+    if(m.t==='noroom'){wsClose();if(++tries<8){netTO(attempt,300);}else{joinAt(j+1);}return true;}
     if(m.t==='exists'||m.t==='full'){joinAt(j+1);return true;}
     return false;};
    wsOnOpenAndMessage(s);};
@@ -1629,16 +1653,37 @@ function srvCreateBox(on){$('srvcreatebox').style.display=on?'block':'none';$('s
  $('srvcreate').style.display=on?'none':'inline-block';
  if(on&&!$('srvname').value)$('srvname').value=(me.name||'')+'S ROOM';}
 function refreshServerList(){if($('srvpick').style.display!=='flex')return;
- regList().then(j=>{if(!j||!j.rooms||$('srvpick').style.display!=='flex')return;
-  srvCache=j.rooms;$('srvinfo').textContent=srvCache.length+' ACTIVE SERVER'+(srvCache.length===1?'':'S')+' · LIVE';
-  renderServerList();}).catch(()=>{});}
+ lobOpen();
+ const scan=hzScan(FFA_ROOMS.map(c=>'hyperzarena-'+c)).catch(()=>null);
+ const regp=regList().catch(()=>null);
+ Promise.all([scan,regp]).then(rs=>{
+  if($('srvpick').style.display!=='flex')return;
+  const m=rs[0],reg=rs[1],byRid=new Map();
+  const PRI={lob:3,reg:2,probe:1};
+  const put=r=>{const p=byRid.get(r.rid);
+   if(!p){byRid.set(r.rid,r);return;}
+   if(r.id)p.id=r.id;
+   if(r.regName)p.regName=r.regName;
+   if(r.createdAt&&r.createdAt>(p.createdAt||0))p.createdAt=r.createdAt;
+   if(r.vis==='private')p.vis='private';
+   if((PRI[r.via]||0)>=(PRI[p.via]||0)){p.name=r.name||p.name;p.cap=r.cap||p.cap;p.via=r.via;}
+   if((r.n|0)>(p.n|0))p.n=r.n|0;};
+  if(m)Object.keys(m).forEach(k=>{const x=m[k];if(x.exists)put({rid:x.id,id:null,name:'FFA QUEUE '+String(x.id).split('-').pop(),n:x.n,cap:FFA_CAP,vis:'public',via:'probe',sys:1});});
+  const now=Date.now();
+  lobRooms.forEach(v=>{if(now-v.t<9000)put({rid:v.rid,id:null,name:v.name,n:v.n,cap:v.cap,vis:v.vis,via:'lob'});});
+  const rr=(reg&&reg.rooms)?reg.rooms:[];
+  rr.forEach(r=>put({rid:r.rid,id:r.id,regName:r.name,name:r.name,n:r.n,cap:r.cap||CREATED_CAP,vis:r.vis,createdAt:r.createdAt,via:'reg',sys:r.system}));
+  srvCache=[...byRid.values()].filter(r=>r.vis==='public'||r.id);
+  srvCache.sort((a,b)=>b.n-a.n||(b.createdAt||0)-(a.createdAt||0));
+  $('srvinfo').textContent=m?(srvCache.length+' ACTIVE SERVER'+(srvCache.length===1?'':'S')+' · LIVE'):'RELAY UNREACHABLE — RETRYING';
+  renderServerList();});}
 function renderServerList(){
  const list=srvCache.slice().sort((a,b)=>b.n-a.n||(b.createdAt||0)-(a.createdAt||0));
  const row=(r,isP)=>{
-  const tag=isP?'<span class="srtag pv">PRIVATE</span>':'<span class="srtag pb">PUBLIC'+(r.system?' · SYSTEM':' · CUSTOM')+'</span>';
-  const btn=isP?('<button class="srjoin" data-priv="'+escH(r.id)+'">JOIN</button>'):('<button class="srjoin" data-join="'+escH(r.id)+'">JOIN</button>');
-  return '<div class="srrow"><span class="srname">'+escH(r.name)+'</span>'+tag+
-   '<span class="srcount">PLAYERS '+r.n+'/'+r.cap+'</span>'+btn+'</div>'+
+  const tag=isP?'<span class="srtag pv">PRIVATE</span>':'<span class="srtag pb">PUBLIC'+(r.sys?' · SYSTEM':' · CUSTOM')+'</span>';
+  const btn=isP?('<button class="srjoin" data-priv="'+escH(r.id||'')+'">JOIN</button>'):('<button class="srjoin" data-join="'+escH(r.rid||'')+'">JOIN</button>');
+  return '<div class="srrow"><span class="srname">'+escH(r.name||'ROOM')+'</span>'+tag+
+   '<span class="srcount">PLAYERS '+(r.n|0)+'/'+(r.cap||CREATED_CAP)+'</span>'+btn+'</div>'+
    (isP&&srvPending===r.id?'<div class="srcodewrap"><input id="srvcodein" maxlength="6" inputmode="numeric" placeholder="••••••" autocomplete="off"><button class="srjoin" id="srvcodego">UNLOCK</button></div>':'');};
  let h='';
  const pub=list.filter(r=>r.vis==='public'),priv=list.filter(r=>r.vis==='private');
@@ -1657,10 +1702,17 @@ $('srvlist').addEventListener('click',e=>{
  const pj=b.dataset.priv;
  if(pj){srvPending=pj;renderServerList();return;}
  const jn=b.dataset.join;
- if(jn){const r=srvCache.find(x=>x.id===jn);if(r)joinServerListRoom(r,'');}});
+ if(jn){const r=srvCache.find(x=>x.rid===jn);if(r)joinListPublic(r);}});
+/* Public rows join straight through the relay — no registry round-trip, so this
+   works identically from file:// and http. Registry presence is best-effort. */
+function joinListPublic(r){
+ closeServerList();prep();
+ NETP={mode:'ffa',code:String(r.rid||'').split('-').pop()||'',gun:0,_rq:0,rid:r.rid||'',regId:'',regCap:r.cap||FFA_CAP,regCode:'',vis:'public',regName:r.name||''};
+ stat('JOINING '+String(r.name||'ROOM').toUpperCase());
+ joinRelayRoom(r.rid,r.cap||FFA_CAP);}
 function joinServerListRoom(r,code){
  closeServerList();prep();
- NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:''};
+ NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:'',vis:r.vis||'public',regName:r.name||''};
  stat('JOINING '+String(r.name||'ROOM').toUpperCase());
  regPost({a:'join',id:r.id,pid:PID,name:me.name,code:code||''}).then(j=>{
   if(!j||!j.ok){const e=(j&&j.err)||'srv';
@@ -1683,7 +1735,7 @@ function joinRelayRoom(rid,cap){
     hostConn=mkHostConn();stat('LINKED — SYNCING');wireClient(hostConn,s);wsOnOpenAndMessage(s);
     hostConn.send({t:'hi',id:myId,name:me.name,color:me.color,skin:me.skinId});
     netTO(()=>{if(s===netSession&&!connected&&!playing){hzGrey.add(rid);becomeHost();}},5000);return true;}
-   if(m.t==='noroom'){wsClose();if(++tries<4){netTO(attempt,250);}else{finished=true;NETP.code=rid;becomeHost();}return true;}
+   if(m.t==='noroom'){wsClose();if(++tries<10){netTO(attempt,300);}else{finished=true;NETP.code=rid;becomeHost();}return true;}
    if(m.t==='exists'||m.t==='full'){wsClose();lastErr=m.t;
     if(++tries<4){netTO(attempt,400);return true;}
     if(finished)return true;finished=true;wsWelcome=null;
@@ -1704,16 +1756,24 @@ $('vpriv').onclick=()=>{srvVis='private';$('vpriv').classList.add('on');$('vpub'
  $('srvcoderow').style.display='flex';$('srvisn').textContent='CODE REQUIRED TO JOIN · MAX 7 PLAYERS';
  if(!srvCode)$('srvgencode').click();};
 $('srvgencode').onclick=()=>{regPost({a:'gencode'}).then(j=>{
- if(j&&j.ok&&j.code){srvCode=String(j.code);$('srvcodeview').textContent=srvCode;$('srvcodeview').classList.add('has');}});};
+ if(j&&j.ok&&j.code){srvCode=String(j.code);}
+ else{srvCode=''+((Math.random()*900000|0)+100000);} // registry unreachable (file://) — local code
+ $('srvcodeview').textContent=srvCode;$('srvcodeview').classList.add('has');});};
 $('srvgo').onclick=()=>{
  const nm=($('srvname').value||'').trim().slice(0,20)||'MY ROOM';
  if(srvVis==='private'&&!srvCode){$('srvgencode').click();return;}
- regPost({a:'create',name:nm,vis:srvVis,code:srvVis==='private'?srvCode:'',pid:PID,playerName:me.name}).then(j=>{
-  if(!j||!j.ok){stat((j&&j.err==='codeused')?'CODE ALREADY IN USE — GENERATE A NEW ONE':'COULD NOT CREATE SERVER',1);return;}
-  const room=j.room||{},code=j.code||srvCode;
+ const code=srvCode||(''+((Math.random()*900000|0)+100000));
+ const rid='hzar-'+code; // deterministic relay id: anyone with the code can join, registry optional
+ regPost({a:'create',name:nm,vis:srvVis,code:code,pid:PID,playerName:me.name,rid:rid}).then(j=>{
+  if(j&&!j.ok){stat(j.err==='codeused'?'CODE ALREADY IN USE — GENERATE A NEW ONE':'COULD NOT CREATE SERVER',1);return;}
   srvCode='';$('srvcodeview').textContent='------';$('srvcodeview').classList.remove('has');
-  if(code){setTimeout(()=>{if(NETP.mode==='ffa'&&!NETP.rid&&!NETP.regId&&!playing)joinServerListRoom({id:room.id,name:room.name,n:1,cap:room.cap||CREATED_CAP,vis:room.vis||srvVis},code);},1500);}
-  else joinServerListRoom({id:room.id,name:room.name,n:1,cap:room.cap||CREATED_CAP,vis:room.vis||srvVis},'');});};
+  hostMyRoom(rid,code,nm,srvVis,j&&j.ok?(j.room||{}):null);});};
+function hostMyRoom(rid,code,name,vis,reg){
+ closeServerList();prep();
+ NETP={mode:'ffa',code:code,gun:0,_rq:0,rid:rid,regId:(reg&&reg.id)||'',regCap:CREATED_CAP,regCode:code,vis:vis,regName:name};
+ if(reg&&reg.id)regEnter({id:reg.id,rid:rid,name:name,vis:vis,cap:CREATED_CAP});
+ stat('HOSTING '+name.toUpperCase());
+ becomeHost();}
 function hzSelfCheck(){
  if(mode!=='host'||!connected)return;
  if(hzHostSince&&Date.now()-hzHostSince<8000)return;
@@ -1730,6 +1790,7 @@ let hostFailT=0,hostFailN=0,hzHostSince=0;
 function transferHostToMe(){
  if(mode!=='client'||!connected)return;
  mode='host';reconnecting=false;connected=true;hzHostSince=Date.now();stat('');
+ lobOpen();
  hostConn=mkHostConn();
  idToConn.clear();joinOrder=[myId];
  roster.forEach((v,id)=>{if(id===myId)return;const c=mkConn(id);c._mid=id;c._last=Date.now();idToConn.set(id,c);joinOrder.push(id);});
@@ -1760,7 +1821,7 @@ function becomeHost(){const s=++netSession;mode='claim';stat('CLAIMING ROOM');re
   if(m.t==='ok'){clearTimeout(claimTo);
    hostFailT=0;hostFailN=0;
    const reclaimed=m.r===1;
-   mode='host';connected=true;hzHostSince=Date.now();wsWelcome=null;wsOnOpenAndMessage(s);
+   mode='host';connected=true;hzHostSince=Date.now();wsWelcome=null;wsOnOpenAndMessage(s);lobOpen();
    if(NETP.regId&&!REG)regEnter({id:NETP.regId,rid:netId(),name:'',vis:'public',cap:NETP.regCap||QUEUE_CAP});
    if(!reclaimed){
     roster.clear();roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});
@@ -2035,7 +2096,7 @@ document.addEventListener('keyup',e=>{if(e.code==='Tab'){e.preventDefault();show
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouseDown=false;aiming=false;});
 $('resume').onclick=()=>{requestLock();};
 function leaveToMenu(){
- regLeave();
+ regLeave();lobClose();
  netSession++;mode='idle';
  clearNetTimers();
  wsClose();wsWelcome=null;
@@ -2057,7 +2118,7 @@ function leaveToMenu(){
  $('gpick').style.display='none';$('rlbar').style.display='none';
  $('login').style.display='flex';
  $('bffa').disabled=false;$('bduel').disabled=false;$('dpanel').style.display='none';$('skinpick').style.display='none';setQueueUI(false);
- NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:''};
+ NETP={mode:'ffa',code:'',gun:0,_rq:0,rid:'',regId:'',regCap:0,regCode:'',vis:'public',regName:''};
  stat('');
  if(document.exitPointerLock){try{document.exitPointerLock();}catch(e){}}}
 $('leave').onclick=leaveToMenu;
@@ -2093,7 +2154,7 @@ function setSkin(id){const sid=Math.max(0,Math.min(SKINS.length-1,id|0));me.skin
 $('skinlist').addEventListener('click',e=>{const c=e.target.closest('.skcell');if(c)setSkin(+c.dataset.skin);});
 $('skcancel').onclick=closeSkinPicker;
 function setQueueUI(on){$('bskin').style.display='block';$('bskin').classList.toggle('stop',!!on);$('bskin').textContent=on?'STOP QUEUE':'SELECT SKIN';$('bskin').onclick=on?stopQueue:openSkinPicker;}
-function stopQueue(){netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
+function stopQueue(){netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();lobClose();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
 renderSkins();
 $('uname').focus();
 function prep(){audio();if(AC&&AC.state==='suspended')AC.resume();
