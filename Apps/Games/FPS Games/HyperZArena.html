@@ -1268,8 +1268,11 @@ const lstat=$('lstat');
 function stat(t,e){lstat.textContent=t;lstat.className=e?'err':'';}
 function hzBase(){return HZ_CLOUD;}
 function hzMarkDead(){return false;}
-/* Rooms that accepted a join but never welcomed us (zombie host) — skip on scans. */
-const hzGrey=new Set();
+/* Rooms that accepted a join but never welcomed us (zombie host) — skip on scans.
+   Map rid->time so stale greys expire (a room can legitimately come back). */
+const hzGrey=new Map();
+function greyAdd(rid){hzGrey.set(rid,Date.now());}
+setInterval(function(){const now=Date.now();hzGrey.forEach((t,k)=>{if(now-t>45000)hzGrey.delete(k);});},5000);
 function hzHttp(path){const b=hzBase().replace(/^ws/,'http');
  const qi=b.indexOf('?');
  return (qi>=0?b.slice(0,qi):b).replace(/\/+$/,'')+path+(qi>=0?'?'+b.slice(qi+1)+'&':'?');}
@@ -1535,7 +1538,7 @@ function hostLost(s){
  netTO(()=>{if(s!==netSession)return;reconnecting=false;findGame();},1200);}
 function hzScan(ids){
  const q='rooms='+encodeURIComponent(ids.join(','))+'&n='+Math.random().toString(36).slice(2,8);
- return Promise.all([0,1,2,3].map(()=>fetch(hzHttp('/probe')+q).then(r=>r.json()).catch(()=>null)))
+ return Promise.all([0,1,2,3,4,5].map(()=>fetch(hzHttp('/probe')+q).then(r=>r.json()).catch(()=>null)))
   .then(rs=>{let okN=0;const m={};
    rs.forEach(j=>{if(!j)return;okN++;
     (j.rooms||[]).forEach(x=>{
@@ -1544,10 +1547,13 @@ function hzScan(ids){
       const s=(x.socks||[]).find(v=>String(v).slice(0,2)==='h:');if(s)c.h=String(s).slice(2).split(':')[0];}});});
    if(!okN)throw new Error('probe');
    return m;});}
+/* single-room probe — used by persistent join retries. On probe error assume the
+   room still exists so we keep trying to JOIN instead of forking a host claim. */
+function probeRid(rid){return fetch(hzHttp('/probe')+'room='+encodeURIComponent(rid)+'&n='+Math.random().toString(36).slice(2,8)).then(r=>r.json()).then(j=>!!(j&&j.exists)).catch(()=>true);}
 function findGame(){if(mode==='host')return;
  if(NETP.mode!=='ffa')return findDuelRoom();
  const s=++netSession;mode='search';connected=false;hostConn=null;reconnecting=false;
- stat('SCANNING FOR MATCH');
+ stat('SCANNING FOR MATCH');phaseStart=Date.now();
  wsClose();wsWelcome=null;hzSawMsg=false;
  const ids=FFA_ROOMS.map(c=>'hyperzarena-'+c);
  let cands=[],fresh=[],done=false,scanTo=0;
@@ -1559,19 +1565,33 @@ function findGame(){if(mode==='host')return;
   if(j>=cands.length){claim();return;}
   const cand=cands[j],rid=cand.id;NETP.code=rid.split('-').pop()||NETP.code;
   stat('JOINING FFA ROOM '+NETP.code);
-  let tries=0;
+  let tries=0,openToT=0;
   const attempt=()=>{
    if(s!==netSession||done)return;
+   if(Date.now()-phaseStart>24000){joinAt(j+1);return;}
    wsClose();hzSawMsg=false;
    try{ws=new WebSocket(wsUrl('c',rid,cand.cap||FFA_CAP));}catch(e){joinAt(j+1);return;}
+   const w=ws;
+   if(openToT){clearTimeout(openToT);openToT=0;}
+   openToT=setTimeout(()=>{try{if(s===netSession&&!done&&ws===w&&w.readyState===0){
+    w.onclose=null;w.onmessage=null;try{w.close();}catch(e){}ws=null;netTO(attempt,250);}}catch(e){}},5000);
    wsWelcome=m=>{
-    if(m.t==='ok'){if(done)return false;done=true;clearTimeout(scanTo);wsWelcome=null;
+    if(openToT){clearTimeout(openToT);openToT=0;}
+    if(m.t==='ok'){
+     /* hl: hostless grace room — nobody will answer our sync. Skip instantly. */
+     if(m.hl){if(done)return true;wsClose();greyAdd(rid);joinAt(j+1);return true;}
+     if(done)return false;done=true;clearTimeout(scanTo);wsWelcome=null;
      if(cand.reg){NETP.rid=rid;NETP.regId=cand.reg;NETP.regCap=cand.cap||FFA_CAP;
       regEnter({id:cand.reg,rid:rid,name:cand.regName||'',vis:'public',cap:NETP.regCap});}
      hostConn=mkHostConn();stat('LINKED — SYNCING');wireClient(hostConn,s);wsOnOpenAndMessage(s);
      hostConn.send({t:'hi',id:myId,name:me.name,color:me.color,skin:me.skinId});
-     netTO(()=>{if(s===netSession&&!connected&&!playing){hzGrey.add(rid);findGame();}},5000);return true;}
-    if(m.t==='noroom'){wsClose();if(++tries<8){netTO(attempt,300);}else{joinAt(j+1);}return true;}
+     netTO(()=>{if(s===netSession&&!connected&&!playing){greyAdd(rid);findGame();}},5000);return true;}
+    if(m.t==='noroom'){wsClose();tries++;
+     if(tries%8===0){probeRid(rid).then(ex=>{if(s!==netSession||done)return;
+      if(ex)netTO(attempt,320+Math.random()*280);else joinAt(j+1);});}
+     else if(tries>=24){joinAt(j+1);}
+     else netTO(attempt,320+Math.random()*280);
+     return true;}
     if(m.t==='exists'||m.t==='full'){joinAt(j+1);return true;}
     return false;};
    wsOnOpenAndMessage(s);};
@@ -1586,7 +1606,7 @@ function findGame(){if(mode==='host')return;
     let k=j+1;while(k<cands.length&&cands[k].n>LAGGY_N)k++;preQueueJoin(k);};
    return;}
   joinAt(j);};
- scanTo=netTO(claim,9000);
+ scanTo=netTO(claim,25000);
  const regP=regList();
  hzScan(ids).then(m=>{
   if(s!==netSession||mode!=='search'||done)return;
@@ -1595,7 +1615,7 @@ function findGame(){if(mode==='host')return;
   regP.then(j=>{
    if(s!==netSession||mode!=='search'||done)return;
    const rr=(j&&j.rooms)?j.rooms:[];
-   cands=cands.concat(rr.filter(r=>r.vis==='public'&&r.n>0&&r.n<r.cap)
+   cands=cands.concat(rr.filter(r=>r.vis==='public'&&r.n>0&&r.n<r.cap&&!hzGrey.has(r.rid))
      .map(r=>({id:r.rid,n:r.n,cap:r.cap,reg:r.id,regName:r.name,createdAt:r.createdAt})))
     .sort((a,b)=>b.n-a.n||(b.createdAt||0)-(a.createdAt||0));
    preQueueJoin(0);});}).catch(()=>{
@@ -1605,7 +1625,7 @@ function findGame(){if(mode==='host')return;
   claim();});}
 function findDuelRoom(){
  const s=++netSession;mode='search';connected=false;hostConn=null;reconnecting=false;
- stat('SEARCHING QUEUE ['+NETP.mode+']');
+ stat('SEARCHING QUEUE ['+NETP.mode+']');phaseStart=Date.now();
  wsClose();wsWelcome=null;hzSawMsg=false;
  const need=NEED[NETP.mode],cap=need+2;
  const ids=ROOMSETS[NETP.mode].map(c=>'hza-'+NETP.mode+'-'+c);
@@ -1618,22 +1638,38 @@ function findDuelRoom(){
   if(j>=cands.length){claim();return;}
   const rid=cands[j].id;NETP.code=rid.split('-').pop()||NETP.code;
   stat('JOINING QUEUE ['+NETP.mode+'] · ROOM '+NETP.code);
-  let tries=0;
+  let tries=0,openToT=0;
   const attempt=()=>{
    if(s!==netSession||done)return;
+   if(Date.now()-phaseStart>24000){joinAt(j+1);return;}
    wsClose();hzSawMsg=false;
    try{ws=new WebSocket(wsUrl('c',rid,cap));}catch(e){joinAt(j+1);return;}
+   const w=ws;
+   if(openToT){clearTimeout(openToT);openToT=0;}
+   /* stall guard: a socket that never finishes connecting (blocked embed, dead
+      network) must never hang the queue — force-retry instead of eternal wait */
+   openToT=setTimeout(()=>{try{if(s===netSession&&!done&&ws===w&&w.readyState===0){
+    w.onclose=null;w.onmessage=null;try{w.close();}catch(e){}ws=null;netTO(attempt,250);}}catch(e){}},5000);
    wsWelcome=m=>{
-    if(m.t==='ok'){if(done)return false;done=true;clearTimeout(scanTo);wsWelcome=null;
+    if(openToT){clearTimeout(openToT);openToT=0;}
+    if(m.t==='ok'){
+     /* hl: hostless grace room — nobody will answer our sync. Skip instantly. */
+     if(m.hl){if(done)return true;wsClose();greyAdd(rid);joinAt(j+1);return true;}
+     if(done)return false;done=true;clearTimeout(scanTo);wsWelcome=null;
      hostConn=mkHostConn();stat('JOINED QUEUE · ROOM '+NETP.code);wireClient(hostConn,s);wsOnOpenAndMessage(s);
      hostConn.send({t:'hi',id:myId,name:me.name,color:me.color,skin:me.skinId});
-     netTO(()=>{if(s===netSession&&!connected&&!playing){hzGrey.add(rid);findDuelRoom();}},5000);return true;}
-    if(m.t==='noroom'){wsClose();if(++tries<4){netTO(attempt,250);}else{joinAt(j+1);}return true;}
+     netTO(()=>{if(s===netSession&&!connected&&!playing){greyAdd(rid);findDuelRoom();}},5000);return true;}
+    if(m.t==='noroom'){wsClose();tries++;
+     if(tries%8===0){probeRid(rid).then(ex=>{if(s!==netSession||done)return;
+      if(ex)netTO(attempt,320+Math.random()*280);else joinAt(j+1);});}
+     else if(tries>=16){joinAt(j+1);}
+     else netTO(attempt,320+Math.random()*280);
+     return true;}
     if(m.t==='exists'||m.t==='full'){joinAt(j+1);return true;}
     return false;};
    wsOnOpenAndMessage(s);};
   attempt();};
- scanTo=netTO(claim,9000);
+ scanTo=netTO(claim,25000);
  hzScan(ids).then(m=>{
   if(s!==netSession||mode!=='search'||done)return;
   cands=Object.values(m).filter(x=>x.exists&&x.n<cap&&!hzGrey.has(x.id)).sort((a,b)=>((a.n>=need?1:0)-(b.n>=need?1:0))||(b.n-a.n));
@@ -1724,25 +1760,40 @@ function joinServerListRoom(r,code){
 function joinRelayRoom(rid,cap){
  const s=++netSession;mode='search';connected=false;hostConn=null;reconnecting=false;
  wsClose();wsWelcome=null;hzSawMsg=false;clearNetTimers();
+ phaseStart=Date.now();
  stat('LINKING TO SERVER…');
- let tries=0,finished=false,lastErr='';
+ let tries=0,finished=false,lastErr='',openToT=0;
+ const finishFallback=()=>{if(s!==netSession||finished)return;finished=true;wsWelcome=null;
+  if(lastErr==='full'){stat('SERVER FULL',1);regLeave();NETP.rid='';NETP.regId='';NETP.regCap=0;
+   $('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);return;}
+  NETP.code=rid;becomeHost();};
  const attempt=()=>{
   if(s!==netSession||finished)return;
+  if(Date.now()-phaseStart>30000){finishFallback();return;}
   wsClose();hzSawMsg=false;
   try{ws=new WebSocket(wsUrl('c',rid,cap||QUEUE_CAP));}catch(e){finished=true;NETP.code=rid;becomeHost();return;}
+  const w=ws;
+  if(openToT){clearTimeout(openToT);openToT=0;}
+  /* stall guard: if this socket never finishes connecting (sandboxed embed with
+     blocked sockets, black-holed network) retry instead of "Connecting…" forever */
+  openToT=setTimeout(()=>{try{if(s===netSession&&!finished&&ws===w&&w.readyState===0){
+   w.onclose=null;w.onmessage=null;try{w.close();}catch(e){}ws=null;netTO(attempt,250);}}catch(e){}},5000);
   wsWelcome=m=>{
-   if(m.t==='ok'){if(finished)return false;finished=true;wsWelcome=null;
+   if(openToT){clearTimeout(openToT);openToT=0;}
+   if(m.t==='ok'){if(finished)return false;finished=true;wsWelcome=null;NETP._cjfb=0;
     hostConn=mkHostConn();stat('LINKED — SYNCING');wireClient(hostConn,s);wsOnOpenAndMessage(s);
     hostConn.send({t:'hi',id:myId,name:me.name,color:me.color,skin:me.skinId});
-    netTO(()=>{if(s===netSession&&!connected&&!playing){hzGrey.add(rid);becomeHost();}},5000);return true;}
-   if(m.t==='noroom'){wsClose();if(++tries<10){netTO(attempt,300);}else{finished=true;NETP.code=rid;becomeHost();}return true;}
-   if(m.t==='exists'||m.t==='full'){wsClose();lastErr=m.t;
-    if(++tries<4){netTO(attempt,400);return true;}
-    if(finished)return true;finished=true;wsWelcome=null;
-    if(lastErr==='full'){stat('SERVER FULL',1);regLeave();NETP.rid='';NETP.regId='';NETP.regCap=0;
-     $('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);}
-    else{NETP.code=rid;becomeHost();}
+    netTO(()=>{if(s===netSession&&!connected&&!playing){greyAdd(rid);becomeHost();}},5000);return true;}
+   if(m.t==='noroom'){wsClose();tries++;lastErr='noroom';
+    /* relay keeps state per isolate: a live room can answer noroom from the wrong
+       isolate — persist with jittered retries + probe before falling back */
+    if(tries%8===0){probeRid(rid).then(ex=>{if(s!==netSession||finished)return;
+     if(ex)netTO(attempt,320+Math.random()*280);else finishFallback();});}
+    else netTO(attempt,320+Math.random()*280);
     return true;}
+   if(m.t==='exists'||m.t==='full'){wsClose();lastErr=m.t;tries++;
+    if(m.t==='full'&&tries>=5){finishFallback();return true;}
+    netTO(attempt,400+Math.random()*300);return true;}
    return false;};
   wsOnOpenAndMessage(s);};
  attempt();}
@@ -1786,10 +1837,10 @@ function hzSelfCheck(){
     stat('ROOM CONFLICT — RESCANNING');hostFailN=0;connected=false;wsClose();mode='search';
     netTO(()=>{if(mode==='search'){if(NETP.rid)joinRelayRoom(NETP.rid,NETP.regCap||QUEUE_CAP);else findGame();}},400+Math.random()*600);}})
   .catch(()=>{});}
-let hostFailT=0,hostFailN=0,hzHostSince=0;
+let hostFailT=0,hostFailN=0,hzHostSince=0,phaseStart=0;
 function transferHostToMe(){
  if(mode!=='client'||!connected)return;
- mode='host';reconnecting=false;connected=true;hzHostSince=Date.now();stat('');
+ mode='host';reconnecting=false;connected=true;hzHostSince=Date.now();stat('');NETP._cjfb=0;
  lobOpen();
  hostConn=mkHostConn();
  idToConn.clear();joinOrder=[myId];
@@ -1819,7 +1870,7 @@ function becomeHost(){const s=++netSession;mode='claim';stat('CLAIMING ROOM');re
  try{ws=new WebSocket(wsUrl('h',netId(),NETP.regCap||(NETP.mode==='ffa'?QUEUE_CAP:NEED[NETP.mode]+2)));}catch(e){clearTimeout(claimTo);hfail();return;}
  wsWelcome=m=>{
   if(m.t==='ok'){clearTimeout(claimTo);
-   hostFailT=0;hostFailN=0;
+   hostFailT=0;hostFailN=0;NETP._cjfb=0;
    const reclaimed=m.r===1;
    mode='host';connected=true;hzHostSince=Date.now();wsWelcome=null;wsOnOpenAndMessage(s);lobOpen();
    if(NETP.regId&&!REG)regEnter({id:NETP.regId,rid:netId(),name:'',vis:'public',cap:NETP.regCap||QUEUE_CAP});
@@ -1839,8 +1890,15 @@ function becomeHost(){const s=++netSession;mode='claim';stat('CLAIMING ROOM');re
     else if(M.on)bcast(mstPacket());}
    return true;}
   if(m.t==='exists'){clearTimeout(claimTo);wsWelcome=null;
-   hostFailN++;
-   hzGrey.add(netId());
+   hostFailN++;hostFailT=Date.now();
+   greyAdd(netId());
+   /* 'exists' = a live host already holds this rid (other isolate / same code):
+      join it as a client instead of dead-ending in a ROOM BUSY retry loop. */
+   if((NETP.rid||NETP.regId)&&hostFailN>=2&&!NETP._cjfb){
+    const xrid=netId();NETP._cjfb=1;NETP.code=xrid.split('-').pop()||NETP.code;
+    stat('ROOM ACTIVE — JOINING');
+    netTO(()=>{if(s===netSession&&mode==='claim')joinRelayRoom(xrid,NETP.regCap||QUEUE_CAP);},500);
+    return true;}
    if(NETP.mode==='ffa'&&hostFailN>=4){
     wsClose();connected=false;mode='idle';
     roster.clear();roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});idToConn.clear();joinOrder=[myId];syncRoster();
@@ -1862,6 +1920,15 @@ setInterval(()=>{if(connected&&playing&&document.hidden)sendState();},1000);
 setInterval(()=>{if(mode==='client'&&connected&&!reconnecting&&lastPongT&&performance.now()-lastPongT>9000)hostLost(netSession);},500);
 setInterval(()=>{if(mode==='client'&&connected&&hostConn&&hostConn.open){try{hostConn.send({t:'png',ts:performance.now()});}catch(e){}}},2000);
 setInterval(()=>{if(mode==='client'&&connected)send({t:'sync'});},4000);
+/* phase watchdog: guarantees the game can NEVER sit in a connecting state forever,
+   no matter how hostile the embed (blocked sockets, stalled WS, dead relay). */
+setInterval(()=>{if(mode!=='search'||connected||playing||!phaseStart||Date.now()-phaseStart<45000)return;
+ phaseStart=Date.now();
+ if(NETP.mode==='ffa'){stat('RELAY UNREACHABLE — OFFLINE FFA',1);
+  netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';
+  NETP.rid='';NETP.regId='';NETP.regCap=0;
+  roster.clear();roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});idToConn.clear();joinOrder=[myId];syncRoster();
+  M.seed=(Math.random()*899999+100000)|0;startMatch(600,-1,'ffa');}},1000);
 setInterval(()=>{if(mode!=='host')return;const now=Date.now();
  idToConn.forEach((c,id)=>{if(now-(c._last||0)>9000)drop(id);});},3000);
 setInterval(()=>{if(mode==='host'&&connected)hzSelfCheck();},5000);
@@ -2154,11 +2221,11 @@ function setSkin(id){const sid=Math.max(0,Math.min(SKINS.length-1,id|0));me.skin
 $('skinlist').addEventListener('click',e=>{const c=e.target.closest('.skcell');if(c)setSkin(+c.dataset.skin);});
 $('skcancel').onclick=closeSkinPicker;
 function setQueueUI(on){$('bskin').style.display='block';$('bskin').classList.toggle('stop',!!on);$('bskin').textContent=on?'STOP QUEUE':'SELECT SKIN';$('bskin').onclick=on?stopQueue:openSkinPicker;}
-function stopQueue(){netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();lobClose();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
+function stopQueue(){netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();lobClose();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';NETP._cjfb=0;phaseStart=0;$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
 renderSkins();
 $('uname').focus();
 function prep(){audio();if(AC&&AC.state==='suspended')AC.resume();
- hostFailN=0;
+ hostFailN=0;NETP._cjfb=0;phaseStart=0;
  try{const kb=document.getElementById('kicknote');if(kb)kb.style.display='none';}catch(e){}
  setVol($('vol').value/100);musVolPct=+$('mvol').value;applyMusicVol();applyGfx(SAVE.gfx||1);resumeMusic();
  me.name=($('uname').value.trim()||('P'+Math.floor(Math.random()*999))).toUpperCase().slice(0,12);
