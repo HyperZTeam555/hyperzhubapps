@@ -321,6 +321,8 @@ canvas{display:block}
 <div id="mend"><div id="mendbox"><h2>MATCH OVER</h2><div id="mendwin"></div><div id="mendrows"></div><div id="mendrw"></div><button id="mback">BACK TO LOBBY</button></div></div>
 <div id="ytplayer"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>if(typeof Peer==='undefined'){document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/scr'+'ipt>');}</script>
 <script id="hzaGame">
 const $=id=>document.getElementById(id);
 const rnd=(a,b)=>a+Math.random()*(b-a);
@@ -919,6 +921,7 @@ function remoteAttack(id,w){
 function netAtk(w){
  try{if(!playing)return;
   if(mode==='host')bcast({t:'at',id:myId,w});else send({t:'at',w});
+  try{p2pEventAll({t:'at',id:myId,w});}catch(e){}
  }catch(e){}}
 function makeRemote(id,name,skinId){const p=roster.get(id)||{};const grp=buildBody(SKINS[skinId===undefined?(p.skin??0):skinId],false);
  const tag=tagSprite(name,getCol(id));grp.add(tag);grp.visible=false;scene.add(grp);grp.userData.id=id;
@@ -1337,7 +1340,9 @@ function wsDispatch(m){
  if(!m||typeof m!=='object')return;
  if(m.t==='ok'||m.t==='exists'||m.t==='noroom'||m.t==='full'){
   if(wsWelcome)wsWelcome(m);return;}
+ if(m.t==='pid'){try{p2pMeet(m);}catch(e){}return;}
  if(m.t==='@'){
+  try{if(m.m&&m.m.t==='s'&&m.m.id)P2P.lastSock.set(String(m.m.id).slice(0,24),performance.now());}catch(e){}
   if(mode==='host'){const from=m.from||'???';const c=idToConn.get(from)||mkConn(from);hostData(c,m.m);}
   else if(hostConn&&hostConn.open)hostConn.fire('data',m.m);
   return;}
@@ -1364,6 +1369,130 @@ function wsOnOpenAndMessage(s){
  ws.onerror=()=>{};}
 function send(o){if(hostConn&&hostConn.open)hostConn.send(o);}
 function bcast(o,ex){wsSend({t:'@',to:'*',ex:Array.isArray(ex)?ex:null,m:o});}
+/* ---------- P2P WEBCRTC FAILOVER (PeerJS) ----------
+   Every player creates a PeerJS peer the moment they join and announces its ID
+   to the WHOLE room over the relay socket (t:'pid' — fanned out by the relay).
+   A full WebRTC mesh (unreliable 20TPS state channel 's' + reliable event
+   channel 'c') forms WHILE the socket is healthy. If the socket relinks,
+   states/bullets/hits/deaths instantly flow over the mesh — zero reconnect
+   delay, positions keep saving — until the socket returns. Steady state costs
+   nothing: P2P only carries traffic for peers whose socket path looks stale. */
+const P2P={peer:null,pid:'',room:'',conns:new Map(),pidToId:new Map(),lastSock:new Map(),gone:new Map(),names:new Map(),out:null};
+function p2pAvail(){try{return typeof Peer!=='undefined';}catch(e){return false;}}
+function sockOk(){try{return !!(ws&&ws.readyState===1&&connected&&!reconnecting);}catch(e){return false;}}
+function p2pEnsure(){
+ if(!p2pAvail())return;
+ const rid=netId()||'';
+ if(P2P.peer&&!P2P.peer.destroyed&&P2P.room===rid)return;
+ p2pKill();
+ if(!rid)return;
+ P2P.room=rid;
+ try{
+  const id='hza'+Math.random().toString(36).slice(2,12);
+  const p=new Peer(id,{debug:0});
+  P2P.peer=p;P2P.pid=id;
+  p.on('open',function(){p2pAnnounce();});
+  p.on('connection',function(c){try{p2pIn(c);}catch(e){}});
+  p.on('disconnected',function(){try{if(!p.destroyed)p.reconnect();}catch(e){}});
+  p.on('error',function(e){try{if(e&&e.type==='unavailable-id'&&!p.destroyed)p2pKill();}catch(x){}});
+ }catch(e){P2P.peer=null;P2P.pid='';}}
+function p2pKill(){
+ try{if(P2P.peer&&!P2P.peer.destroyed)P2P.peer.destroy();}catch(e){}
+ P2P.peer=null;P2P.pid='';P2P.room='';
+ P2P.conns.forEach(function(pc){if(pc.guard){try{clearTimeout(pc.guard);}catch(e){}pc.guard=0;}
+  try{if(pc.s)pc.s.close();}catch(e){}try{if(pc.c)pc.c.close();}catch(e){}});
+ P2P.conns.clear();}
+function p2pAnnounce(){try{if(P2P.pid)wsSend({t:'pid',pid:P2P.pid});}catch(e){}}
+function p2pMeet(m){
+ if(!m||!m.pid||m.id===myId||!p2pAvail())return;
+ p2pEnsure();
+ const pid=String(m.pid).slice(0,48),id=String(m.id).slice(0,24);
+ if(pid===P2P.pid)return;
+ P2P.pidToId.set(pid,id);
+ if(!P2P.peer||P2P.peer.destroyed||!P2P.peer.open)return;
+ const pc=P2P.conns.get(pid);
+ if(pc){if(!pc.id)pc.id=id;return;}
+ if(String(P2P.pid)<pid)p2pConnect(pid,id);}
+function p2pConnect(pid,id){
+ try{
+  const s=P2P.peer.connect(pid,{label:'s',reliable:false,serialization:'json'});
+  const c=P2P.peer.connect(pid,{label:'c',reliable:true,serialization:'json'});
+  const pc={id:id||'',s:s,c:c,sOpen:false,cOpen:false,z:0,guard:0};
+  pc.guard=setTimeout(function(){const q=P2P.conns.get(pid);if(q===pc&&!pc.cOpen)p2pDrop(pid);},8000);
+  P2P.conns.set(pid,pc);
+  p2pCh(pid,pc,s);p2pCh(pid,pc,c);
+ }catch(e){}}
+function p2pIn(c){
+ if(!c||!c.peer||!p2pAvail())return;
+ const pid=String(c.peer).slice(0,48);
+ let pc=P2P.conns.get(pid);
+ if(!pc){pc={id:P2P.pidToId.get(pid)||'',s:null,c:null,sOpen:false,cOpen:false,z:0,guard:0};
+  pc.guard=setTimeout(function(){const q=P2P.conns.get(pid);if(q===pc&&!pc.cOpen)p2pDrop(pid);},8000);
+  P2P.conns.set(pid,pc);}
+ if(c.label==='s'){if(pc.s&&pc.s!==c){try{pc.s.close();}catch(e){}}pc.s=c;}
+ else{if(pc.c&&pc.c!==c){try{pc.c.close();}catch(e){}}pc.c=c;}
+ p2pCh(pid,pc,c);}
+function p2pCh(pid,pc,dc){
+ if(!dc)return;
+ dc.on('open',function(){
+  if(dc.label==='s')pc.sOpen=true;
+  else{pc.cOpen=true;try{pc.c.send({t:'p2hi',id:myId});}catch(e){}}
+  if(pc.sOpen&&pc.cOpen){if(pc.guard){clearTimeout(pc.guard);pc.guard=0;}
+   if(pc.id&&P2P.out){try{pc.s.send(P2P.out);}catch(e){}}}});
+ dc.on('data',function(d){try{p2pData(pid,pc,dc.label,d);}catch(e){}});
+ dc.on('close',function(){if(dc.label==='s')pc.sOpen=false;else pc.cOpen=false;
+  if(!pc.sOpen&&!pc.cOpen)p2pDrop(pid);});
+ dc.on('error',function(){});}
+function p2pDrop(pid){const pc=P2P.conns.get(pid);if(!pc)return;
+ if(pc.guard){try{clearTimeout(pc.guard);}catch(e){}pc.guard=0;}
+ try{if(pc.s)pc.s.close();}catch(e){}
+ try{if(pc.c)pc.c.close();}catch(e){}
+ P2P.conns.delete(pid);}
+function p2pForget(id){P2P.lastSock.delete(id);
+ try{if(window.__hzaAC&&window.__hzaAC.isKickedPeer&&window.__hzaAC.isKickedPeer(id)){p2pHardForget(id);return;}}catch(e){}
+ /* relay says this player's SOCKET left — but their P2P link may be alive (that
+    is the whole point of the failover mesh). Keep the mesh; mark them gone and
+    only tear down if nothing arrives over WebRTC within 12s. */
+ if(P2P.conns.size)P2P.gone.set(String(id).slice(0,24),Date.now());
+ else p2pHardForget(id);}
+function p2pHardForget(id){
+ const kills=[];P2P.conns.forEach(function(pc,pid){if(pc.id===id||P2P.pidToId.get(pid)===id)kills.push(pid);});
+ kills.forEach(p2pDrop);
+ const del=[];P2P.pidToId.forEach(function(v,k){if(v===id)del.push(k);});del.forEach(function(k){P2P.pidToId.delete(k);});
+ P2P.names.delete(id);P2P.gone.delete(id);P2P.lastSock.delete(id);}
+function p2pNeed(id){if(!sockOk())return true;
+ const t=P2P.lastSock.get(id);
+ return !t||(performance.now()-t>700);}
+function p2pData(pid,pc,label,d){
+ if(!d||typeof d!=='object')return;
+ if(label==='s'){
+  if(d.t==='s'&&d.id){if(!pc.id)pc.id=String(d.id).slice(0,24);P2P.gone.delete(String(d.id).slice(0,24));applyStateLocal(d);}
+  return;}
+ if(d.t==='p2hi'){if(d.id&&!pc.id)pc.id=String(d.id).slice(0,24);return;}
+ if(d.t==='b'){if(d.id===myId)return;
+  if(mode==='host'&&window.__hzaAC&&!window.__hzaAC.bulletIn(d,d.id))return;
+  if(window.__hzaAC){try{window.__hzaAC.noteRemoteBullet(d,d.id);}catch(e){}}
+  enemyBullet(d);}
+ else if(d.t==='ht'){if(window.__hzaAC&&!window.__hzaAC.victimGate(d.fr,d.d,d.w))return;
+  if(d.to===myId)damage(d.d,d.fr);else applyHitVis(d.to,d.d);}
+ else if(d.t==='hp'){applyHitVis(d.id,d.d);}
+ else if(d.t==='d'){if(window.__hzaAC){try{window.__hzaAC.noteDeath(d.id);}catch(e){}}onDied(d.id,d.by);}
+ else if(d.t==='at'){if(d.id&&d.id!==myId)remoteAttack(d.id,d.w);}}
+function p2pEventAll(m){if(!p2pAvail())return;
+ P2P.conns.forEach(function(pc){if(pc.cOpen&&(!pc.id||p2pNeed(pc.id))){try{pc.c.send(m);}catch(e){}}});}
+function p2pEventTo(id,m){if(!p2pAvail()||!id)return;
+ P2P.conns.forEach(function(pc){if(pc.cOpen&&pc.id===id&&p2pNeed(id)){try{pc.c.send(m);}catch(e){}}});}
+function p2pLive(){try{return p2pAvail()&&P2P.conns.size>0;}catch(e){return false;}}
+/* mesh keepalive: broker reconnect, dead-conn prune, re-announce (self-heals) */
+setInterval(function(){
+ if(!p2pAvail())return;
+ try{if(P2P.peer&&!P2P.peer.destroyed&&P2P.peer.disconnected)P2P.peer.reconnect();}catch(e){}
+ P2P.conns.forEach(function(pc,pid){if(!pc.sOpen&&!pc.cOpen){pc.z=(pc.z||0)+1;if(pc.z>5)p2pDrop(pid);}else pc.z=0;});
+ try{P2P.gone.forEach(function(t,id){if(Date.now()-t>12000)p2pHardForget(id);});}catch(e){}
+ if(!connected)return;
+ try{p2pEnsure();}catch(e){}
+ if(P2P.pid&&P2P.peer&&P2P.peer.open)p2pAnnounce();
+},3000);
 function netId(){if(NETP.rid)return NETP.rid;return NETP.mode==='ffa'?'hyperzarena-'+NETP.code:'hza-'+NETP.mode+'-'+NETP.code;}
 let lastPongT=0;
 let fpsN=0,fpsVal=0,fpsT=performance.now(),lastStateT=0,pgS=[];
@@ -1377,10 +1506,12 @@ function getAnimState(){
 function sendState(){
  const o={x:me.x,y:Math.max(0,me.y),z:me.z,ry:me.yaw,hp:dead?0:me.hp,lv:me.lv,xp:me.xp,w:me.w,sl:me.slot,k:me.k,d:me.d,vy:me.vy,g:me.ground?1:0,l:ladderAttached?1:0,sc:(!dead&&me.slot===1&&aiming&&GUNS[me.w]&&GUNS[me.w].scope)?1:0,pt:+me.pitch.toFixed(3),anim:getAnimState(),ds:(typeof dashT==='number'&&dashT>0)?1:0,
   ct:performance.now()|0,pg:pgMed()|0,fp:fpsVal|0,bg:document.hidden?1:0};
- if(mode==='host')bcast({t:'s',id:myId,...o});else send({t:'s',...o});}
+ if(mode==='host')bcast({t:'s',id:myId,...o});else send({t:'s',...o});
+ P2P.out={t:'s',id:myId,...o};
+ try{if(p2pAvail())P2P.conns.forEach(function(pc){if(pc.sOpen&&(!pc.id||p2pNeed(pc.id))){try{pc.s.send(P2P.out);}catch(e){}}});}catch(e){}}
 function applyStateLocal(m){if(!m||m.id===myId)return;
  let r=remotes.get(m.id);
- if(!r){const p=roster.get(m.id)||{name:'???'};r=makeRemote(m.id,p.name,p.skin||0);}
+ if(!r){const pn=roster.get(m.id)||(P2P.names.get(m.id)?{name:P2P.names.get(m.id),skin:0}:{name:'???'});r=makeRemote(m.id,pn.name,pn.skin||0);}
  r.tx=m.x;r.ty=m.y;r.tz=m.z;r.tryaw=m.ry;r.hp=m.hp;r.lv=m.lv;r.k=m.k;r.d=m.d;
  if(m.skin!==undefined&&m.skin!==r.skinId)setRemoteSkin(m.id,m.skin);
  if(m.anim){r.animMoving=!!m.anim.moving;r.ladder=!!m.anim.ladder;r.climbDir=m.anim.climb||0;}
@@ -1396,7 +1527,8 @@ function syncRoster(){roster.forEach((v,id)=>{if(id!==myId&&!remotes.has(id))mak
  setNPC(NETP.mode==='ffa'&&playing&&roster.size<=1);}
 function drop(id){const c=idToConn.get(id);if(c){try{c.close()}catch(e){}}
  idToConn.delete(id);joinOrder=joinOrder.filter(x=>x!==id);
- if(roster.delete(id)){removeRemote(id);bcast({t:'lv',id});bcast({t:'r',list:[...roster.entries()]});syncRoster();}}
+ if(roster.delete(id)){removeRemote(id);bcast({t:'lv',id});bcast({t:'r',list:[...roster.entries()]});syncRoster();}
+ try{p2pForget(id);}catch(e){}}
 function mstPacket(){return {t:'mst',seed:M.seed,g:M.gun,dur:M.dur,tm:M.mode,tt:M.t,
  cl:chests.map(c=>c?{i:c.i,x:c.x,y:c.y,z:c.z,o:c.open?1:0}:null),
  od:doors.filter(d=>d.open).map(d=>d.i),
@@ -1434,6 +1566,7 @@ function hostData(c,m){
   if(NETP.mode==='ffa'&&roster.size>=FFA_CAP){try{c.send({t:'full'});}catch(e){}netTO(()=>{try{c.close()}catch(e){}},300);return;}
   if(NETP.mode!=='ffa'&&M.on){c.send({t:'full'});netTO(()=>{try{c.close()}catch(e){}},300);return;}
   c._mid=m.id;c._last=Date.now();idToConn.set(m.id,c);
+  try{P2P.names.set(String(m.id).slice(0,24),String(m.name||'P').slice(0,16));}catch(e){}
   roster.set(m.id,{name:m.name,color:m.color,skin:Math.max(0,Math.min(SKINS.length-1,(m.skin??0)|0))});joinOrder.push(m.id);
   c.send({t:'w',list:[...roster.entries()]});
   bcast({t:'r',list:[...roster.entries()]},[m.id]);
@@ -1449,6 +1582,7 @@ function hostData(c,m){
   if(!c._mid)netTO(()=>{if(!c._mid){try{c.close()}catch(e){}}},30000);return;}
  const from=c._mid;if(!from)return;c._last=Date.now();
  if(m.t==='s'){if(window.__hzaAC&&!window.__hzaAC.hostState(m,from))return;
+  try{P2P.lastSock.set(from,performance.now());}catch(e){}
   const o={t:'s',id:from,x:m.x,y:m.y,z:m.z,ry:m.ry,hp:m.hp,lv:m.lv,xp:m.xp,w:m.w,sl:m.sl,k:m.k,d:m.d,vy:m.vy,g:m.g,l:m.l,sc:m.sc,pt:m.pt,skin:m.skin??0,anim:m.anim,ct:m.ct,pg:m.pg,fp:m.fp,bg:m.bg};
   applyStateLocal(o);bcast(o,[from]);}
  else if(m.t==='b'){if(window.__hzaAC&&!window.__hzaAC.bulletIn(m,from))return;
@@ -1483,10 +1617,13 @@ function hostData(c,m){
 function wireClient(c,s){
  c.on('data',m=>{if(s!==netSession)return;
   if(m.t==='w'){if(connected)return;connected=true;mode='client';lastPongT=performance.now();
+   try{p2pEnsure();if(P2P.peer&&P2P.peer.open)p2pAnnounce();}catch(e){}
+   try{m.list.forEach(function(e2){if(e2&&e2[1]&&e2[1].name)P2P.names.set(String(e2[0]).slice(0,24),String(e2[1].name).slice(0,16));});}catch(e){}
    roster=new Map(m.list);roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});syncRoster();
    if(NETP.mode!=='ffa')stat('QUEUED '+(roster.size)+'/'+NEED[NETP.mode]);
    else{stat('JOINED '+(NETP.rid?(REG&&REG.name?REG.name.toUpperCase():'SERVER'):'FFA ROOM '+NETP.code)+' · '+roster.size+'/'+(NETP.regCap||FFA_CAP));netTO(()=>{if(s===netSession&&!playing)findGame();},6000);}}
   else if(m.t==='r'){roster=new Map(m.list);
+   try{m.list.forEach(function(e2){if(e2&&e2[1]&&e2[1].name)P2P.names.set(String(e2[0]).slice(0,24),String(e2[1].name).slice(0,16));});}catch(e){}
    if(!roster.has(myId))roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});syncRoster();
    if(NETP.mode!=='ffa'&&!playing)stat('QUEUED '+(roster.size)+'/'+NEED[NETP.mode]);
    else if(!playing&&NETP.mode==='ffa'&&(NETP.code||NETP.rid))stat('JOINED '+(NETP.rid?(REG&&REG.name?REG.name.toUpperCase():'SERVER'):'FFA ROOM '+NETP.code)+' · '+roster.size+'/'+(NETP.regCap||FFA_CAP));}
@@ -1525,7 +1662,7 @@ function wireClient(c,s){
   else if(m.t==='at'){if(m.id!==myId)remoteAttack(m.id,m.w);}
  else if(m.t==='csp1'){if(isFinite(+m.x)&&isFinite(+m.z))addChest((+m.i)|0,+m.x,+m.y||0,+m.z);}
  else if(m.t==='cdes'){removeChest((+m.i)|0);}
- else if(m.t==='lv'){removeRemote(m.id);roster.delete(m.id);syncRoster();}});
+ else if(m.t==='lv'){removeRemote(m.id);roster.delete(m.id);try{p2pForget(m.id);}catch(e){}syncRoster();}});
  c.on('close',()=>{if(s!==netSession)return;hostLost(s);});
  c.on('error',()=>{});}
 function hostLost(s){
@@ -1841,7 +1978,7 @@ let hostFailT=0,hostFailN=0,hzHostSince=0,phaseStart=0;
 function transferHostToMe(){
  if(mode!=='client'||!connected)return;
  mode='host';reconnecting=false;connected=true;hzHostSince=Date.now();stat('');NETP._cjfb=0;
- lobOpen();
+ lobOpen();try{p2pEnsure();if(P2P.peer&&P2P.peer.open)p2pAnnounce();}catch(e){}
  hostConn=mkHostConn();
  idToConn.clear();joinOrder=[myId];
  roster.forEach((v,id)=>{if(id===myId)return;const c=mkConn(id);c._mid=id;c._last=Date.now();idToConn.set(id,c);joinOrder.push(id);});
@@ -1873,6 +2010,7 @@ function becomeHost(){const s=++netSession;mode='claim';stat('CLAIMING ROOM');re
    hostFailT=0;hostFailN=0;NETP._cjfb=0;
    const reclaimed=m.r===1;
    mode='host';connected=true;hzHostSince=Date.now();wsWelcome=null;wsOnOpenAndMessage(s);lobOpen();
+   try{p2pEnsure();if(P2P.peer&&P2P.peer.open)p2pAnnounce();}catch(e){}
    if(NETP.regId&&!REG)regEnter({id:NETP.regId,rid:netId(),name:'',vis:'public',cap:NETP.regCap||QUEUE_CAP});
    if(!reclaimed){
     roster.clear();roster.set(myId,{name:me.name,color:me.color,skin:me.skinId});
@@ -1916,7 +2054,7 @@ function becomeHost(){const s=++netSession;mode='claim';stat('CLAIMING ROOM');re
    netTO(()=>{if(s===netSession&&mode==='claim')becomeHost();},250);return;}
   if(mode==='claim'){clearTimeout(claimTo);hfail();return;}
   if(mode==='host')hostLost(s);};}
-setInterval(()=>{if(connected&&playing&&document.hidden)sendState();},1000);
+setInterval(()=>{if((connected||p2pLive())&&playing&&document.hidden)sendState();},1000);
 setInterval(()=>{if(mode==='client'&&connected&&!reconnecting&&lastPongT&&performance.now()-lastPongT>9000)hostLost(netSession);},500);
 setInterval(()=>{if(mode==='client'&&connected&&hostConn&&hostConn.open){try{hostConn.send({t:'png',ts:performance.now()});}catch(e){}}},2000);
 setInterval(()=>{if(mode==='client'&&connected)send({t:'sync'});},4000);
@@ -1976,6 +2114,7 @@ function damage(d,from){if(dead||!playing||M.over||from===myId)return;
 function die(by){dead=true;me.d++;me.streak=0;reloadEnd=0;aiming=false;
  if(mode==='host'){onDied(myId,by);bcast({t:'d',id:myId,by});}
  else send({t:'d',by});
+ try{p2pEventAll({t:'d',id:myId,by});}catch(e){}
  $('dby').textContent='BY '+nm(by).toUpperCase();$('death').style.display='flex';
  setTimeout(()=>{if(!playing)return;const sp=SPAWNS[Math.floor(Math.random()*SPAWNS.length)]||[0,0];
   me.x=sp[0];me.z=sp[1];me.y=0;me.vy=0;me.hp=100;dead=false;spawnProt=performance.now()+1000;
@@ -1997,7 +2136,8 @@ function routeHit(owner,d,head){if(owner===myId)return;
  const wpn=me.slot===2?'k':me.w;
  if(mode==='host'){const tc=idToConn.get(owner);if(tc&&tc.open)tc.send({t:'ht',to:owner,d,fr:myId,w:wpn});
   bcast({t:'hp',id:owner,d},[owner]);}
- else send({t:'ht',to:owner,d,w:wpn});}
+ else send({t:'ht',to:owner,d,w:wpn});
+ try{p2pEventTo(owner,{t:'ht',to:owner,d:d,fr:myId,w:wpn});p2pEventAll({t:'hp',id:owner,d:d});}catch(e){}}
 function knifeSwing(){swingT=1;sSwing();netAtk('k');
  const fwd=new THREE.Vector3();camera.getWorldDirection(fwd);
  const op=camera.getWorldPosition(new THREE.Vector3());
@@ -2044,7 +2184,8 @@ function fireShot(){if(dead||!playing||M.over||!locked)return;
   const d=fwd.clone().addScaledVector(rt,(Math.random()-.5)*2*spr).addScaledVector(up,(Math.random()-.5)*2*spr).normalize();
   spawnBullet(op.clone().addScaledVector(d,.5),d,g.spd,g.dmg,myId);}
  if(!scoped){const msg={t:'b',x:op.x,y:op.y,z:op.z,dx:fwd.x,dy:fwd.y,dz:fwd.z,w:me.w};
-  if(mode==='host')bcast({id:myId,...msg});else send(msg);}
+  if(mode==='host')bcast({id:myId,...msg});else send(msg);
+  try{p2pEventAll({t:'b',id:myId,...msg});}catch(e){}}
  if(mag[me.w]<=0)startReload();}
 function equip(i){if(!SAVE.guns.includes(i)){toast('LOCKED — WIN MATCHES TO UNLOCK');sDry();return;}
  if(i===me.w&&me.slot===1)return;me.w=i;me.slot=1;reloadEnd=0;if(mag[i]===undefined)fillAmmo(i);
@@ -2163,6 +2304,7 @@ document.addEventListener('keyup',e=>{if(e.code==='Tab'){e.preventDefault();show
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouseDown=false;aiming=false;});
 $('resume').onclick=()=>{requestLock();};
 function leaveToMenu(){
+ try{p2pKill();}catch(e){}
  regLeave();lobClose();
  netSession++;mode='idle';
  clearNetTimers();
@@ -2221,10 +2363,11 @@ function setSkin(id){const sid=Math.max(0,Math.min(SKINS.length-1,id|0));me.skin
 $('skinlist').addEventListener('click',e=>{const c=e.target.closest('.skcell');if(c)setSkin(+c.dataset.skin);});
 $('skcancel').onclick=closeSkinPicker;
 function setQueueUI(on){$('bskin').style.display='block';$('bskin').classList.toggle('stop',!!on);$('bskin').textContent=on?'STOP QUEUE':'SELECT SKIN';$('bskin').onclick=on?stopQueue:openSkinPicker;}
-function stopQueue(){netSession++;clearNetTimers();wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();lobClose();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';NETP._cjfb=0;phaseStart=0;$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
+function stopQueue(){netSession++;clearNetTimers();try{p2pKill();}catch(e){}wsClose();wsWelcome=null;hostConn=null;connected=false;reconnecting=false;mode='idle';regLeave();lobClose();$('srvwarn').style.display='none';NETP.rid='';NETP.regId='';NETP.regCap=0;NETP.regCode='';NETP._cjfb=0;phaseStart=0;$('gpick').style.display='none';$('dpanel').style.display='none';$('bffa').disabled=false;$('bduel').disabled=false;setQueueUI(false);stat('QUEUE STOPPED');}
 renderSkins();
 $('uname').focus();
 function prep(){audio();if(AC&&AC.state==='suspended')AC.resume();
+ try{p2pKill();}catch(e){}
  hostFailN=0;NETP._cjfb=0;phaseStart=0;
  try{const kb=document.getElementById('kicknote');if(kb)kb.style.display='none';}catch(e){}
  setVol($('vol').value/100);musVolPct=+$('mvol').value;applyMusicVol();applyGfx(SAVE.gfx||1);resumeMusic();
@@ -2483,9 +2626,9 @@ function loop(){requestAnimationFrame(loop);
   const tFov=scoped?18:(aiming?58:((keys.ShiftLeft||keys.ShiftRight)&&(keys.KeyW||keys.KeyA||keys.KeyS||keys.KeyD)?82:75));
   camera.fov+=(tFov-camera.fov)*dt*12;
   camera.updateProjectionMatrix();}
- if(connected&&playing){
-  if(now-lastStateT>200)lastStateT=now-33;
-  if(now-lastStateT>=33){lastStateT+=33;sendState();}}
+ if(playing&&(sockOk()||p2pLive())){
+  if(now-lastStateT>500)lastStateT=now-50;
+  if(now-lastStateT>=50){lastStateT+=50;sendState();}}
  renderer.render(scene,camera);}
 loop();
 </script>
