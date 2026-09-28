@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Geometry Dash</title>
+</head>
+<body style="margin:0;overflow:hidden;">
+
+<iframe
+  id="game"
+  style="width:100vw;height:100vh;border:0;display:block;"
+  allowfullscreen>
+</iframe>
+
+<script>
+const mirrors = [
+  "https://hyperzteam456.github.io/webgl-dashers/",
+  "https://raw.githack.com/HyperZTeam456/webgl-dashers/main/index.html",
+  "https://rawcdn.githack.com/HyperZTeam456/webgl-dashers/main/index.html"
+];
+
+const iframe = document.getElementById("game");
+
+Promise.any(
+  mirrors.map(url =>
+    fetch(url, {
+      method: "HEAD",
+      cache: "no-store"
+    }).then(response => {
+      if (!response.ok) throw new Error(response.status);
+      return url;
+    })
+  )
+).then(url => {
+  iframe.src = url;
+}).catch(() => {
+  iframe.src = mirrors[0];
+});
+</script>
+
+</body>
+</html>
