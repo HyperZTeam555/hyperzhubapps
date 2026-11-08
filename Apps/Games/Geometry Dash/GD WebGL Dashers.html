@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Geometry Dash</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    iframe {
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<iframe id="game" allowfullscreen></iframe>
+
+<script>
+  const mirrors = [
+    "https://webgl-dashers.vercel.app/",
+    "https://hyperzteam456.github.io/webgl-dashers/",
+    "https://raw.githack.com/HyperZTeam456/webgl-dashers/main/index.html",
+    "https://rawcdn.githack.com/HyperZTeam456/webgl-dashers/main/index.html",
+    "https://githubraw.com/HyperZTeam456/webgl-dashers/main/index.html",
+    "https://cdn.githubraw.com/HyperZTeam456/webgl-dashers/main/index.html"
+  ];
+
+  const iframe = document.getElementById("game");
+
+  function ping(url) {
+    return fetch(url, {
+      method: "HEAD",
+      mode: "no-cors",
+      cache: "no-store"
+    }).then(() => url);
+  }
+
+  Promise.any(mirrors.map(ping))
+    .then(url => {
+      iframe.src = url;
+    })
+    .catch(() => {
+      iframe.src = mirrors[0];
+    });
+</script>
+
+</body>
+</html>
